@@ -17,5 +17,19 @@ public:
 		GPIO_PinWrite(_P, _B, state);
 	}
 };
+template<gpio_port_num_t _P, uint32_t _B> class CDigitalIn {
+public:
+	CDigitalIn() {
+		gpio_pin_config_t config =
+		{
+				kGPIO_DigitalInput,
+				0,
+		};
+		GPIO_PinInit(_P, _B, &config);
+	}
+	int get() {
+		return GPIO_PinRead(_P, _B);
+	}
+};
 
 #endif /* DIGITAL_OUT_H_ */

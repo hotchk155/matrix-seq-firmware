@@ -77,6 +77,7 @@ void GPIO_PinInit(gpio_port_num_t port, uint8_t pin, const gpio_pin_config_t *co
     if (config->pinDirection == kGPIO_DigitalInput)
     {
         base->PDDR &= ~(1U << ((uint32_t)pin + (shift * PIN_NUMBERS_EACH_PORT)));
+        base->PIDR &= ~(1U << ((uint32_t)pin + (shift * PIN_NUMBERS_EACH_PORT)));//JHH
     }
     else
     {

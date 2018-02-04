@@ -43,11 +43,14 @@
 #define MAIN_INCLUDE
 #include "digital_out.h"
 #include "delays.h"
+#include "display_panel.h"
 /* TODO: insert other definitions and declarations here. */
 
  CDigitalOut<kGPIO_PORTB, 5> LED1;
  CDigitalOut<kGPIO_PORTC, 3> LED2;
  CDigitalOut<kGPIO_PORTC, 2> LED3;
+ CDigitalOut<kGPIO_PORTE, 2> PowerControl;
+ CDigitalIn<kGPIO_PORTE, 1> OffSwitch;
 
 
 /*
@@ -60,20 +63,18 @@ int main(void) {
     BOARD_InitBootPeripherals();
 
     CDelay::init();
+    CDelay::wait_ms(500);
+    PowerControl.set(1);
+
     //printf("Hello World\n");
     /* Force the counter to be placed into memory. */
 
-    /* Enter an infinite loop, just incrementing a counter. */
-    while(1) {
-        LED1.set(1);
-        LED2.set(1);
-        LED3.set(1);
-        CDelay::wait_ms(100);
-        LED1.set(0);
-        LED2.set(0);
-        LED3.set(0);
-        CDelay::wait_ms(100);
+    /* Enter an infinite loop, just incrementing a counter.
+     * */
+    panelInit();
 
+    while(1) {
+        panelRefresh();
     }
     return 0 ;
 }

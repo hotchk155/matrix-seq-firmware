@@ -3,6 +3,7 @@
    <common>
       <processor>MKE02Z64xxx4</processor>
       <package>MKE02Z64VLD4</package>
+      <board></board>
       <mcu_data>ksdk2_0</mcu_data>
       <cores selected="core0">
          <core name="Cortex-M0P" id="core0" description="M0P core"/>
@@ -20,6 +21,14 @@
                <pin_label pin_num="12" pin_signal="PTB5/FTM2_CH5/SPI0_PCS0/ACMP1_OUT" label="LED1" identifier="LED1"/>
                <pin_label pin_num="14" pin_signal="PTC3/FTM2_CH3/ADC0_SE11" label="LED2" identifier="LED2"/>
                <pin_label pin_num="15" pin_signal="PTC2/FTM2_CH2/ADC0_SE10" label="LED3" identifier="LED3"/>
+               <pin_label pin_num="38" pin_signal="PTE2/SPI0_MISO" label="POWER_CTRL" identifier="POWER_CTRL"/>
+               <pin_label pin_num="39" pin_signal="PTE1/SPI0_MOSI" label="OFF_SWITCH" identifier="OFF_SWITCH"/>
+               <pin_label pin_num="18" pin_signal="PTD5/KBI1_P5" label="P_KDAT" identifier="P_KDAT"/>
+               <pin_label pin_num="19" pin_signal="PTC1/FTM2_CH1/ADC0_SE9" label="P_KCLK" identifier="P_KCLK"/>
+               <pin_label pin_num="20" pin_signal="PTC0/FTM2_CH0/ADC0_SE8" label="P_ARCK" identifier="P_ARCK"/>
+               <pin_label pin_num="21" pin_signal="PTB3/KBI0_P7/SPI0_MOSI/FTM0_CH1/ADC0_SE7" label="P_ADAT" identifier="P_ADAT"/>
+               <pin_label pin_num="22" pin_signal="PTB2/KBI0_P6/SPI0_SCK/FTM0_CH0/ADC0_SE6" label="P_ASCK" identifier="P_ASCK"/>
+               <pin_label pin_num="34" pin_signal="PTA1/KBI0_P1/FTM0_CH1/ACMP0_IN1/ADC0_SE1" label="P_ENA" identifier="P_ENA"/>
             </pin_labels>
          </pins_profile>
          <functions_list>
@@ -31,6 +40,16 @@
                   <enableClock>true</enableClock>
                </options>
                <dependencies>
+                  <dependency resourceType="Peripheral" resourceId="OSC" description="Peripheral OSC is not initialized" problem_level="1" source="Pins: BOARD_InitPins">
+                     <feature name="initialized" evaluation="">
+                        <data>true</data>
+                     </feature>
+                  </dependency>
+                  <dependency resourceType="Peripheral" resourceId="GPIOB" description="Peripheral GPIOB is not initialized" problem_level="1" source="Pins: BOARD_InitPins">
+                     <feature name="initialized" evaluation="">
+                        <data>true</data>
+                     </feature>
+                  </dependency>
                   <dependency resourceType="Peripheral" resourceId="GPIOA" description="Peripheral GPIOA is not initialized" problem_level="1" source="Pins: BOARD_InitPins">
                      <feature name="initialized" evaluation="">
                         <data>true</data>
@@ -41,11 +60,36 @@
                         <data>true</data>
                      </feature>
                   </dependency>
+                  <dependency resourceType="SWComponent" resourceId="platform.drivers.port" description="Pins initialization requires the PORT Driver in the project." problem_level="2" source="Pins.BOARD_InitPins">
+                     <feature name="enabled" evaluation="equal" configuration="core0">
+                        <data>true</data>
+                     </feature>
+                  </dependency>
                </dependencies>
                <pins>
                   <pin peripheral="GPIOA" signal="GPIO, 13" pin_num="12" pin_signal="PTB5/FTM2_CH5/SPI0_PCS0/ACMP1_OUT"/>
                   <pin peripheral="GPIOA" signal="GPIO, 18" pin_num="15" pin_signal="PTC2/FTM2_CH2/ADC0_SE10"/>
                   <pin peripheral="GPIOA" signal="GPIO, 19" pin_num="14" pin_signal="PTC3/FTM2_CH3/ADC0_SE11"/>
+                  <pin peripheral="OSC" signal="EXTAL" pin_num="9" pin_signal="PTB7/I2C0_SCL/EXTAL"/>
+                  <pin peripheral="OSC" signal="XTAL" pin_num="10" pin_signal="PTB6/I2C0_SDA/XTAL"/>
+                  <pin peripheral="GPIOB" signal="GPIO, 1" pin_num="39" pin_signal="PTE1/SPI0_MOSI">
+                     <pin_features>
+                        <pin_feature name="direction" value="INPUT"/>
+                        <pin_feature name="high_drive_enable" value="disable"/>
+                        <pin_feature name="pullup_enable" value="enable"/>
+                     </pin_features>
+                  </pin>
+                  <pin peripheral="GPIOB" signal="GPIO, 2" pin_num="38" pin_signal="PTE2/SPI0_MISO">
+                     <pin_features>
+                        <pin_feature name="direction" value="OUTPUT"/>
+                     </pin_features>
+                  </pin>
+                  <pin peripheral="GPIOA" signal="GPIO, 29" pin_num="18" pin_signal="PTD5/KBI1_P5"/>
+                  <pin peripheral="GPIOA" signal="GPIO, 17" pin_num="19" pin_signal="PTC1/FTM2_CH1/ADC0_SE9"/>
+                  <pin peripheral="GPIOA" signal="GPIO, 16" pin_num="20" pin_signal="PTC0/FTM2_CH0/ADC0_SE8"/>
+                  <pin peripheral="GPIOA" signal="GPIO, 10" pin_num="22" pin_signal="PTB2/KBI0_P6/SPI0_SCK/FTM0_CH0/ADC0_SE6"/>
+                  <pin peripheral="GPIOA" signal="GPIO, 11" pin_num="21" pin_signal="PTB3/KBI0_P7/SPI0_MOSI/FTM0_CH1/ADC0_SE7"/>
+                  <pin peripheral="GPIOA" signal="GPIO, 1" pin_num="34" pin_signal="PTA1/KBI0_P1/FTM0_CH1/ACMP0_IN1/ADC0_SE1"/>
                </pins>
             </function>
          </functions_list>
@@ -65,17 +109,30 @@
                      </feature>
                   </dependency>
                </dependencies>
-               <clock_sources/>
+               <clock_sources>
+                  <clock_source id="OSC.OSC.outFreq" value="20 MHz" locked="false" enabled="false"/>
+               </clock_sources>
                <clock_outputs>
-                  <clock_output id="Bus_clock.outFreq" value="16.777216 MHz" locked="false" accuracy=""/>
+                  <clock_output id="Bus_clock.outFreq" value="8.388608 MHz" locked="false" accuracy=""/>
                   <clock_output id="Core_clock.outFreq" value="16.777216 MHz" locked="false" accuracy=""/>
-                  <clock_output id="Flash_clock.outFreq" value="16.777216 MHz" locked="false" accuracy=""/>
+                  <clock_output id="Flash_clock.outFreq" value="8.388608 MHz" locked="false" accuracy=""/>
                   <clock_output id="ICSFF_clock.outFreq" value="16.384 kHz" locked="false" accuracy=""/>
+                  <clock_output id="ICSIR_clock.outFreq" value="32.768 kHz" locked="false" accuracy=""/>
                   <clock_output id="LPO_clock.outFreq" value="1 kHz" locked="false" accuracy=""/>
                   <clock_output id="Plat_clock.outFreq" value="16.777216 MHz" locked="false" accuracy=""/>
                   <clock_output id="System_clock.outFreq" value="16.777216 MHz" locked="false" accuracy=""/>
                </clock_outputs>
-               <clock_settings/>
+               <clock_settings>
+                  <setting id="ICS.BDIV.scale" value="2" locked="true"/>
+                  <setting id="ICS.RDIV.scale" value="32" locked="false"/>
+                  <setting id="ICS_C1_IRCLKEN_CFG" value="Enabled" locked="false"/>
+                  <setting id="OSC_CR_OSCEN_CFG" value="Enabled" locked="false"/>
+                  <setting id="OSC_CR_OSCSTEN_CFG" value="Enabled" locked="false"/>
+                  <setting id="OSC_CR_OSC_MODE_CFG" value="ModeOscLowPower" locked="false"/>
+                  <setting id="OSC_CR_RANGE_CFG" value="High" locked="false"/>
+                  <setting id="OSC_CR_RANGE_RDIV_CFG" value="High" locked="false"/>
+                  <setting id="SIM.BUSDIV.scale" value="2" locked="false"/>
+               </clock_settings>
                <called_from_default_init>true</called_from_default_init>
             </clock_configuration>
          </clock_configurations>
