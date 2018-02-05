@@ -3,13 +3,13 @@
 
 #include "fsl_gpio.h"
 
-template<gpio_port_num_t _P, uint32_t _B> class CDigitalOut {
+template<gpio_port_num_t _P, uint32_t _B, int _D = 0> class CDigitalOut {
 public:
 	CDigitalOut() {
 		gpio_pin_config_t config =
 		{
 				kGPIO_DigitalOutput,
-				0,
+				_D,
 		};
 		GPIO_PinInit(_P, _B, &config);
 	}

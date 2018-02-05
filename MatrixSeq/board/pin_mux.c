@@ -24,6 +24,9 @@ pin_labels:
 - {pin_num: '21', pin_signal: PTB3/KBI0_P7/SPI0_MOSI/FTM0_CH1/ADC0_SE7, label: P_ADAT, identifier: P_ADAT}
 - {pin_num: '22', pin_signal: PTB2/KBI0_P6/SPI0_SCK/FTM0_CH0/ADC0_SE6, label: P_ASCK, identifier: P_ASCK}
 - {pin_num: '34', pin_signal: PTA1/KBI0_P1/FTM0_CH1/ACMP0_IN1/ADC0_SE1, label: P_ENA, identifier: P_ENA}
+- {pin_num: '37', pin_signal: PTC6/UART1_RX, label: KEYSCAN1, identifier: KEYSCAN1}
+- {pin_num: '16', pin_signal: PTD7/KBI1_P7/UART2_TX, label: KEYSCAN2, identifier: KEYSCAN2}
+- {pin_num: '17', pin_signal: PTD6/KBI1_P6/UART2_RX, label: KEYSCAN3, identifier: KEYSCAN3}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 /* clang-format on */
@@ -59,9 +62,12 @@ BOARD_InitPins:
   - {pin_num: '18', peripheral: GPIOA, signal: 'GPIO, 29', pin_signal: PTD5/KBI1_P5}
   - {pin_num: '19', peripheral: GPIOA, signal: 'GPIO, 17', pin_signal: PTC1/FTM2_CH1/ADC0_SE9}
   - {pin_num: '20', peripheral: GPIOA, signal: 'GPIO, 16', pin_signal: PTC0/FTM2_CH0/ADC0_SE8}
+  - {pin_num: '34', peripheral: GPIOA, signal: 'GPIO, 1', pin_signal: PTA1/KBI0_P1/FTM0_CH1/ACMP0_IN1/ADC0_SE1}
   - {pin_num: '22', peripheral: GPIOA, signal: 'GPIO, 10', pin_signal: PTB2/KBI0_P6/SPI0_SCK/FTM0_CH0/ADC0_SE6}
   - {pin_num: '21', peripheral: GPIOA, signal: 'GPIO, 11', pin_signal: PTB3/KBI0_P7/SPI0_MOSI/FTM0_CH1/ADC0_SE7}
-  - {pin_num: '34', peripheral: GPIOA, signal: 'GPIO, 1', pin_signal: PTA1/KBI0_P1/FTM0_CH1/ACMP0_IN1/ADC0_SE1}
+  - {pin_num: '37', peripheral: GPIOA, signal: 'GPIO, 22', pin_signal: PTC6/UART1_RX, direction: INPUT, pullup_enable: enable}
+  - {pin_num: '17', peripheral: GPIOA, signal: 'GPIO, 30', pin_signal: PTD6/KBI1_P6/UART2_RX, direction: INPUT, pullup_enable: enable}
+  - {pin_num: '16', peripheral: GPIOA, signal: 'GPIO, 31', pin_signal: PTD7/KBI1_P7/UART2_TX, direction: INPUT, pullup_enable: enable}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 /* clang-format on */
@@ -78,6 +84,12 @@ void BOARD_InitPins(void)
     PORT_SetHighDriveEnable(PORT, kPORT_HighDrive_PTE1, 0);
     /* Pull Enable for Port E Bit 1: 0x01u */
     PORT_SetPinPullUpEnable(PORT, kPORT_PTE, kPORT_PinIdx1, 1);
+    /* Pull Enable for Port C Bit 6: 0x01u */
+    PORT_SetPinPullUpEnable(PORT, kPORT_PTC, kPORT_PinIdx6, 1);
+    /* Pull Enable for Port D Bit 6: 0x01u */
+    PORT_SetPinPullUpEnable(PORT, kPORT_PTD, kPORT_PinIdx6, 1);
+    /* Pull Enable for Port D Bit 7: 0x01u */
+    PORT_SetPinPullUpEnable(PORT, kPORT_PTD, kPORT_PinIdx7, 1);
 }
 /***********************************************************************************************************************
  * EOF

@@ -151,6 +151,20 @@ void BOARD_InitBootPins(void);
 #define BOARD_INITPINS_P_ARCK_NAME "P_ARCK"    /*!<@brief Identifier name */
                                                /* @} */
 
+/*! @name PTA1 (number 34), P_ENA
+  @{ */
+#define BOARD_INITPINS_P_ENA_PERIPHERAL GPIOA /*!<@brief Device name: GPIOA */
+#define BOARD_INITPINS_P_ENA_SIGNAL GPIO      /*!<@brief GPIOA signal: GPIO */
+#define BOARD_INITPINS_P_ENA_GPIO GPIOA       /*!<@brief GPIO device name: GPIOA */
+#define BOARD_INITPINS_P_ENA_GPIO_PIN 1U      /*!<@brief PORTA pin index: 1 */
+#define BOARD_INITPINS_P_ENA_PORT PORTA       /*!<@brief PORT device name: PORTA */
+#define BOARD_INITPINS_P_ENA_PIN 1U           /*!<@brief PORTA pin index: 1 */
+#define BOARD_INITPINS_P_ENA_CHANNEL 1        /*!<@brief GPIOA GPIO channel: 1 */
+#define BOARD_INITPINS_P_ENA_PIN_NAME PTA1    /*!<@brief Pin name */
+#define BOARD_INITPINS_P_ENA_LABEL "P_ENA"    /*!<@brief Label */
+#define BOARD_INITPINS_P_ENA_NAME "P_ENA"     /*!<@brief Identifier name */
+                                              /* @} */
+
 /*! @name PTB2 (number 22), P_ASCK
   @{ */
 #define BOARD_INITPINS_P_ASCK_PERIPHERAL GPIOA /*!<@brief Device name: GPIOA */
@@ -179,19 +193,50 @@ void BOARD_InitBootPins(void);
 #define BOARD_INITPINS_P_ADAT_NAME "P_ADAT"    /*!<@brief Identifier name */
                                                /* @} */
 
-/*! @name PTA1 (number 34), P_ENA
+/*! @name PTC6 (number 37), KEYSCAN1
   @{ */
-#define BOARD_INITPINS_P_ENA_PERIPHERAL GPIOA /*!<@brief Device name: GPIOA */
-#define BOARD_INITPINS_P_ENA_SIGNAL GPIO      /*!<@brief GPIOA signal: GPIO */
-#define BOARD_INITPINS_P_ENA_GPIO GPIOA       /*!<@brief GPIO device name: GPIOA */
-#define BOARD_INITPINS_P_ENA_GPIO_PIN 1U      /*!<@brief PORTA pin index: 1 */
-#define BOARD_INITPINS_P_ENA_PORT PORTA       /*!<@brief PORT device name: PORTA */
-#define BOARD_INITPINS_P_ENA_PIN 1U           /*!<@brief PORTA pin index: 1 */
-#define BOARD_INITPINS_P_ENA_CHANNEL 1        /*!<@brief GPIOA GPIO channel: 1 */
-#define BOARD_INITPINS_P_ENA_PIN_NAME PTA1    /*!<@brief Pin name */
-#define BOARD_INITPINS_P_ENA_LABEL "P_ENA"    /*!<@brief Label */
-#define BOARD_INITPINS_P_ENA_NAME "P_ENA"     /*!<@brief Identifier name */
-                                              /* @} */
+#define BOARD_INITPINS_KEYSCAN1_PERIPHERAL GPIOA                  /*!<@brief Device name: GPIOA */
+#define BOARD_INITPINS_KEYSCAN1_SIGNAL GPIO                       /*!<@brief GPIOA signal: GPIO */
+#define BOARD_INITPINS_KEYSCAN1_GPIO GPIOA                        /*!<@brief GPIO device name: GPIOA */
+#define BOARD_INITPINS_KEYSCAN1_GPIO_PIN 22U                      /*!<@brief PORTA pin index: 22 */
+#define BOARD_INITPINS_KEYSCAN1_PORT PORTC                        /*!<@brief PORT device name: PORTC */
+#define BOARD_INITPINS_KEYSCAN1_PIN 6U                            /*!<@brief PORTC pin index: 6 */
+#define BOARD_INITPINS_KEYSCAN1_CHANNEL 22                        /*!<@brief GPIOA GPIO channel: 22 */
+#define BOARD_INITPINS_KEYSCAN1_PIN_NAME PTC6                     /*!<@brief Pin name */
+#define BOARD_INITPINS_KEYSCAN1_LABEL "KEYSCAN1"                  /*!<@brief Label */
+#define BOARD_INITPINS_KEYSCAN1_NAME "KEYSCAN1"                   /*!<@brief Identifier name */
+#define BOARD_INITPINS_KEYSCAN1_DIRECTION kPIN_MUX_DirectionInput /*!<@brief Direction */
+                                                                  /* @} */
+
+/*! @name PTD6 (number 17), KEYSCAN3
+  @{ */
+#define BOARD_INITPINS_KEYSCAN3_PERIPHERAL GPIOA                  /*!<@brief Device name: GPIOA */
+#define BOARD_INITPINS_KEYSCAN3_SIGNAL GPIO                       /*!<@brief GPIOA signal: GPIO */
+#define BOARD_INITPINS_KEYSCAN3_GPIO GPIOA                        /*!<@brief GPIO device name: GPIOA */
+#define BOARD_INITPINS_KEYSCAN3_GPIO_PIN 30U                      /*!<@brief PORTA pin index: 30 */
+#define BOARD_INITPINS_KEYSCAN3_PORT PORTD                        /*!<@brief PORT device name: PORTD */
+#define BOARD_INITPINS_KEYSCAN3_PIN 6U                            /*!<@brief PORTD pin index: 6 */
+#define BOARD_INITPINS_KEYSCAN3_CHANNEL 30                        /*!<@brief GPIOA GPIO channel: 30 */
+#define BOARD_INITPINS_KEYSCAN3_PIN_NAME PTD6                     /*!<@brief Pin name */
+#define BOARD_INITPINS_KEYSCAN3_LABEL "KEYSCAN3"                  /*!<@brief Label */
+#define BOARD_INITPINS_KEYSCAN3_NAME "KEYSCAN3"                   /*!<@brief Identifier name */
+#define BOARD_INITPINS_KEYSCAN3_DIRECTION kPIN_MUX_DirectionInput /*!<@brief Direction */
+                                                                  /* @} */
+
+/*! @name PTD7 (number 16), KEYSCAN2
+  @{ */
+#define BOARD_INITPINS_KEYSCAN2_PERIPHERAL GPIOA                  /*!<@brief Device name: GPIOA */
+#define BOARD_INITPINS_KEYSCAN2_SIGNAL GPIO                       /*!<@brief GPIOA signal: GPIO */
+#define BOARD_INITPINS_KEYSCAN2_GPIO GPIOA                        /*!<@brief GPIO device name: GPIOA */
+#define BOARD_INITPINS_KEYSCAN2_GPIO_PIN 31U                      /*!<@brief PORTA pin index: 31 */
+#define BOARD_INITPINS_KEYSCAN2_PORT PORTD                        /*!<@brief PORT device name: PORTD */
+#define BOARD_INITPINS_KEYSCAN2_PIN 7U                            /*!<@brief PORTD pin index: 7 */
+#define BOARD_INITPINS_KEYSCAN2_CHANNEL 31                        /*!<@brief GPIOA GPIO channel: 31 */
+#define BOARD_INITPINS_KEYSCAN2_PIN_NAME PTD7                     /*!<@brief Pin name */
+#define BOARD_INITPINS_KEYSCAN2_LABEL "KEYSCAN2"                  /*!<@brief Label */
+#define BOARD_INITPINS_KEYSCAN2_NAME "KEYSCAN2"                   /*!<@brief Identifier name */
+#define BOARD_INITPINS_KEYSCAN2_DIRECTION kPIN_MUX_DirectionInput /*!<@brief Direction */
+                                                                  /* @} */
 
 /*!
  * @brief Configures pin routing and optionally pin electrical features.

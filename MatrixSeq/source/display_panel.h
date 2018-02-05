@@ -10,5 +10,6 @@
 
 void panelInit();
 void panelRefresh();
+void panelRun();
 
 #endif /* DISPLAY_PANEL_H_ */

@@ -74,7 +74,7 @@ int main(void) {
     panelInit();
 
     while(1) {
-        panelRefresh();
+    	panelRun();
     }
     return 0 ;
 }
