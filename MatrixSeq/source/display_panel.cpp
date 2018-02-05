@@ -29,10 +29,7 @@ CDigitalIn<kGPIO_PORTD, 6> pKeyScan3;
 // Refresh is done in 2 phases
 // Layer 1 time --- Layer 2 time
 
-static volatile uint16_t l_key1 = 0;
-static volatile uint16_t l_key2 = 0;
-static volatile uint16_t l_key3 = 0;
-
+static volatile uint32_t l_key_state = 0;
 static volatile uint16_t l_acc_key1 = 0;
 static volatile uint16_t l_acc_key2 = 0;
 static volatile uint16_t l_acc_key3 = 0;
@@ -43,6 +40,33 @@ static volatile uint32_t l_buf2[32] = {0};
 static volatile uint32_t *l_disp_buf = l_buf1;
 static volatile uint32_t *l_load_buf = l_buf2;
 static volatile byte l_switch_buffers = 0;
+
+#define KEY_L1	(1U<<0)
+#define KEY_L2	(1U<<1)
+#define KEY_L3	(1U<<2)
+#define KEY_L4	(1U<<3)
+#define KEY_L5	(1U<<19)
+#define KEY_L6	(1U<<18)
+#define KEY_L7	(1U<<17)
+#define KEY_L8	(1U<<16)
+
+#define KEY_B1	(1U<<8)
+#define KEY_B2	(1U<<9)
+#define KEY_B3	(1U<<10)
+#define KEY_B4	(1U<<11)
+#define KEY_B5	(1U<<12)
+#define KEY_B6	(1U<<13)
+#define KEY_B7	(1U<<14)
+#define KEY_B8	(1U<<15)
+
+#define KEY_R1	(1U<<7)
+#define KEY_R2	(1U<<6)
+#define KEY_R3	(1U<<5)
+#define KEY_R4	(1U<<4)
+#define KEY_R5	(1U<<20)
+#define KEY_R6	(1U<<21)
+#define KEY_R7	(1U<<22)
+#define KEY_R8	(1U<<23)
 
 static uint32_t l_render_buf[32] = {
 		/*
@@ -237,17 +261,18 @@ int lookupChar(char ch, byte *buf)
   }
 }
 
-void print_char(char ch, int row, int col) {
+void print_char(char ch, int row, int col, int bright=0) {
 	byte buf[8];
 	lookupChar(ch, buf);
 	int shift = 31 - 7 - col;
+	int base = bright? 16:0;
 	for(int i=0; i<8; ++i) {
 		if(row >= 0 && row < 16) {
 			if(shift < 0) {
-				l_render_buf[row] |= ((uint32_t)buf[i]>>shift);
+				l_render_buf[base+row] |= ((uint32_t)buf[i]>>shift);
 			}
 			else {
-				l_render_buf[row] |= ((uint32_t)buf[i]<<shift);
+				l_render_buf[base+row] |= ((uint32_t)buf[i]<<shift);
 			}
 		}
 		++row;
@@ -466,14 +491,18 @@ void PIT_CH1_IRQHandler(void) {
 		if(++l_cathode >= 16) {
 			l_cathode = 0; // scan is complete, go back to beginning
 
-			l_key1 = l_acc_key1;
-			l_key2 = l_acc_key2;
-			l_key3 = l_acc_key3;
+			// form a 32 bit key state value
+			l_key_state = ((uint32_t)l_acc_key2);
+			l_key_state |= ((uint32_t)l_acc_key1);
+			l_key_state |= (((uint32_t)l_acc_key3)<<8);
 
+			// zero the key state accumulators
 			l_acc_key1 = 0;
 			l_acc_key2 = 0;
 			l_acc_key3 = 0;
 
+			// switch display buffers if there is new data
+			// to display
 			if(l_switch_buffers) {
 				volatile uint32_t *p = l_disp_buf;
 				l_disp_buf = l_load_buf;
@@ -545,103 +574,46 @@ void panelRun()
 
 	cls();
 
-	uint32_t mask = 1;
-	char row = 0;
+	uint32_t k = 1;
 	int i;
-	for(i=0; i<16; ++i) {
-		if(l_key1 & mask) {
-			row = 'A';
+	for(i=0; i<24; ++i) {
+		if(l_key_state & k) {
 			break;
 		}
-		if(l_key2 & mask) {
-			row = 'B';
-			break;
-		}
-		if(l_key3 & mask) {
-			row = 'C';
-			break;
-		}
-		mask<<=1;
+		k<<=1;
 	}
-	if(row > 0) {
-		print_char(row,5,5);
-		print_char('0' + i/10,5,11);
-		print_char('0' + i%10,5,17);
+	char c1=0;
+	char c2=0;
+	switch(k) {
+	case KEY_L1: c1='L'; c2='1'; break;
+	case KEY_L2: c1='L'; c2='2'; break;
+	case KEY_L3: c1='L'; c2='3'; break;
+	case KEY_L4: c1='L'; c2='4'; break;
+	case KEY_L5: c1='L'; c2='5'; break;
+	case KEY_L6: c1='L'; c2='6'; break;
+	case KEY_L7: c1='L'; c2='7'; break;
+	case KEY_L8: c1='L'; c2='8'; break;
+	case KEY_B1: c1='B'; c2='1'; break;
+	case KEY_B2: c1='B'; c2='2'; break;
+	case KEY_B3: c1='B'; c2='3'; break;
+	case KEY_B4: c1='B'; c2='4'; break;
+	case KEY_B5: c1='B'; c2='5'; break;
+	case KEY_B6: c1='B'; c2='6'; break;
+	case KEY_B7: c1='B'; c2='7'; break;
+	case KEY_B8: c1='B'; c2='8'; break;
+	case KEY_R1: c1='R'; c2='1'; break;
+	case KEY_R2: c1='R'; c2='2'; break;
+	case KEY_R3: c1='R'; c2='3'; break;
+	case KEY_R4: c1='R'; c2='4'; break;
+	case KEY_R5: c1='R'; c2='5'; break;
+	case KEY_R6: c1='R'; c2='6'; break;
+	case KEY_R7: c1='R'; c2='7'; break;
+	case KEY_R8: c1='R'; c2='8'; break;
 	}
 
+	//print_char(c1,5,5);
+	print_char(c1,5,5,1);
+	print_char(c2,5,11);
 
-	uint32_t key_state = ((uint32_t)l_key2);
-	key_state |= ((uint32_t)l_key1);
-	key_state |= (((uint32_t)l_key3)<<8);
-
-	l_render_buf[15] = key_state;
-
-
-	Left side top to bottom
-	0	B00		0
-	1 	B01		1
-	2	B02		2
-	3	B03		3
-	4	C11		19
-	5	C10		18
-	6	C09		17
-	7	C08		16
-
-	Bottom left to right
-	0	A08		8
-	1	A09		9
-	2	A10		10
-	3	A11		11
-	4	A12		12
-	5	A13		13
-	6	A14		14
-	7	A15		15
-
-	Left side top to bottom
-	0	B07		7
-	1	B06		6
-	2	B05		5
-	3	B04		4
-	4	C12		20
-	5	C13		21
-	6	C14		22
-	7	C15		23
-
-	/*
-Left side top to bottom
-0	B00		0
-1 	B01		1
-2	B02		2
-3	B03		3
-4	C11		19
-5	C10		18
-6	C09		17
-7	C08		16
-
-Bottom left to right
-0	A08		8
-1	A09		9
-2	A10		10
-3	A11		11
-4	A12		12
-5	A13		13
-6	A14		14
-7	A15		15
-
-Left side top to bottom
-0	B07		7
-1	B06		6
-2	B05		5
-3	B04		4
-4	C12		20
-5	C13		21
-6	C14		22
-7	C15		23
-
-
-	 */
-//	l_render_buf[0] = l_key1;
-//	l_render_buf[1] = l_key2;
-//	l_render_buf[2] = l_key3;
 	load();
 }
