@@ -93,9 +93,9 @@ static uint32_t l_render_buf[32] = {
 		0b01000010010000100100001001000000,
 		0b01111100010000000100001001111000,
 		0b01000011010000000100001001000000,
-		0b01000011010000100100001001000000,
+		0b00000000000000000001000000000000,
 		0b01111100001111000111110001111110,
-		0b00011000000000000000000000000000,
+		0b00000000000000000000000000000000,
 
 		0b11111111000000001111111100000000,
 		0b11111111000000001111111100000000,
@@ -283,9 +283,9 @@ void print_char(char ch, int row, int col, int bright=0) {
  * Copy the contents of the "write buffer" to the buffer that is actually used
  * for the display refreshes
  */
-void load() {
+void xload() {
 
-	//while(l_switch_buffers);
+	while(l_switch_buffers);
 
 	for(int i=0; i<32; ++i) {
 		l_load_buf[i] = 0;
@@ -347,6 +347,40 @@ void load() {
 	}
 	l_switch_buffers = 1;
 }
+
+
+
+void load() {
+
+	while(l_switch_buffers);
+
+	// scan over the 16 cathode lines
+	for(int k_idx = 0; k_idx < 16; ++k_idx) {
+
+		// need to assemble 32 bits of anode data
+		uint32_t anode_data = 0U;
+		anode_data = 0U;
+ 		for(int a_idx = 0; a_idx < 32; ++a_idx) {
+
+			// get the index of the source word in the render buffer
+			int src_index = (k_idx & 0xF8) + (a_idx & 0x07);
+
+			// get mask to get the source bit from the word
+			uint32_t src_mask = 0x80000000U >> ((k_idx & 0x07) + (a_idx & 0xF8));
+
+			// look up the data from input buffer
+			anode_data >>= 1;
+			if(l_render_buf[src_index] & src_mask) {
+				anode_data |= 0x80000000U;
+			}
+		}
+		l_load_buf[k_idx] =anode_data;
+	}
+
+
+	l_switch_buffers = 1;
+}
+
 
 void cls() {
 	for(int i=0; i<32; ++i) {
@@ -435,7 +469,8 @@ void PIT_CH1_IRQHandler(void) {
 	}
 	else {
 		// fetch data from layer 2
-		data = l_disp_buf[l_cathode+16];
+		data = l_disp_buf[l_cathode];
+		//data = l_disp_buf[l_cathode+16];
 	}
 
 	// fill the 32 bits of anode shift register data
@@ -564,7 +599,7 @@ void panelRun()
 
 
 
-	cls();
+//	cls();
 /*
 	uint32_t k = 1;
 	int i;
@@ -607,7 +642,7 @@ void panelRun()
 	print_char(c1,5,5,1);
 	print_char(c2,5,11);
 */
-	extern int g_pos;
-	l_render_buf[0] = 1U<<(31-g_pos);
+//	extern int g_pos;
+//	l_render_buf[0] = 1U<<(31-g_pos);
 	load();
 }
