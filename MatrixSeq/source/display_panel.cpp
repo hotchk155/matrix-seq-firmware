@@ -285,7 +285,7 @@ void print_char(char ch, int row, int col, int bright=0) {
  */
 void load() {
 
-	while(l_switch_buffers);
+	//while(l_switch_buffers);
 
 	for(int i=0; i<32; ++i) {
 		l_load_buf[i] = 0;
@@ -385,12 +385,7 @@ void panelInit() {
 }
 
 
-#define PORTA_BASE 0
-#define PORTB_BASE 8
-#define PORTC_BASE 16
-#define PORTD_BASE 24
 
-#define MK_GPIOA_BIT(port, bit) (((uint32_t)1) << ((port) + (bit)))
 #define BIT_KDAT	MK_GPIOA_BIT(PORTD_BASE, 5)
 #define BIT_KCLK	MK_GPIOA_BIT(PORTC_BASE, 1)
 #define BIT_ARCK	MK_GPIOA_BIT(PORTC_BASE, 0)
@@ -412,9 +407,6 @@ CDigitalOut<kGPIO_PORTB, 2> pASCK;
 CDigitalOut<kGPIO_PORTA, 1> pENABLE;
 */
 
-#define SET_GPIOA(mask) ((GPIO_Type *)GPIOA_BASE)->PSOR = (mask)
-#define CLR_GPIOA(mask) ((GPIO_Type *)GPIOA_BASE)->PCOR = (mask)
-#define READ_GPIOA(mask) (((GPIO_Type *)GPIOA_BASE)->PDIR & (mask))
 
 static int l_cathode = 0;
 static byte l_phase = 0;
@@ -566,14 +558,14 @@ void panelRefresh() {
 
 
 
-
+int pos = 0;
 void panelRun()
 {
 
 
 
 	cls();
-
+/*
 	uint32_t k = 1;
 	int i;
 	for(i=0; i<24; ++i) {
@@ -611,9 +603,11 @@ void panelRun()
 	case KEY_R8: c1='R'; c2='8'; break;
 	}
 
-	//print_char(c1,5,5);
+	print_char(c1,5,5);
 	print_char(c1,5,5,1);
 	print_char(c2,5,11);
-
+*/
+	extern int g_pos;
+	l_render_buf[0] = 1U<<(31-g_pos);
 	load();
 }

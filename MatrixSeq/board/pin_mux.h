@@ -238,6 +238,34 @@ void BOARD_InitBootPins(void);
 #define BOARD_INITPINS_KEYSCAN2_DIRECTION kPIN_MUX_DirectionInput /*!<@brief Direction */
                                                                   /* @} */
 
+/*! @name PTD0 (number 2), ENCODER2
+  @{ */
+#define BOARD_INITPINS_ENCODER2_PERIPHERAL GPIOA /*!<@brief Device name: GPIOA */
+#define BOARD_INITPINS_ENCODER2_SIGNAL GPIO      /*!<@brief GPIOA signal: GPIO */
+#define BOARD_INITPINS_ENCODER2_GPIO GPIOA       /*!<@brief GPIO device name: GPIOA */
+#define BOARD_INITPINS_ENCODER2_GPIO_PIN 24U     /*!<@brief PORTA pin index: 24 */
+#define BOARD_INITPINS_ENCODER2_PORT PORTD       /*!<@brief PORT device name: PORTD */
+#define BOARD_INITPINS_ENCODER2_PIN 0U           /*!<@brief PORTD pin index: 0 */
+#define BOARD_INITPINS_ENCODER2_CHANNEL 24       /*!<@brief GPIOA GPIO channel: 24 */
+#define BOARD_INITPINS_ENCODER2_PIN_NAME PTD0    /*!<@brief Pin name */
+#define BOARD_INITPINS_ENCODER2_LABEL "ENCODER2" /*!<@brief Label */
+#define BOARD_INITPINS_ENCODER2_NAME "ENCODER2"  /*!<@brief Identifier name */
+                                                 /* @} */
+
+/*! @name PTD1 (number 1), ENCODER1
+  @{ */
+#define BOARD_INITPINS_ENCODER1_PERIPHERAL GPIOA /*!<@brief Device name: GPIOA */
+#define BOARD_INITPINS_ENCODER1_SIGNAL GPIO      /*!<@brief GPIOA signal: GPIO */
+#define BOARD_INITPINS_ENCODER1_GPIO GPIOA       /*!<@brief GPIO device name: GPIOA */
+#define BOARD_INITPINS_ENCODER1_GPIO_PIN 25U     /*!<@brief PORTA pin index: 25 */
+#define BOARD_INITPINS_ENCODER1_PORT PORTD       /*!<@brief PORT device name: PORTD */
+#define BOARD_INITPINS_ENCODER1_PIN 1U           /*!<@brief PORTD pin index: 1 */
+#define BOARD_INITPINS_ENCODER1_CHANNEL 25       /*!<@brief GPIOA GPIO channel: 25 */
+#define BOARD_INITPINS_ENCODER1_PIN_NAME PTD1    /*!<@brief Pin name */
+#define BOARD_INITPINS_ENCODER1_LABEL "ENCODER1" /*!<@brief Label */
+#define BOARD_INITPINS_ENCODER1_NAME "ENCODER1"  /*!<@brief Identifier name */
+                                                 /* @} */
+
 /*!
  * @brief Configures pin routing and optionally pin electrical features.
  *

@@ -27,6 +27,8 @@ pin_labels:
 - {pin_num: '37', pin_signal: PTC6/UART1_RX, label: KEYSCAN1, identifier: KEYSCAN1}
 - {pin_num: '16', pin_signal: PTD7/KBI1_P7/UART2_TX, label: KEYSCAN2, identifier: KEYSCAN2}
 - {pin_num: '17', pin_signal: PTD6/KBI1_P6/UART2_RX, label: KEYSCAN3, identifier: KEYSCAN3}
+- {pin_num: '1', pin_signal: PTD1/KBI1_P1/FTM2_CH3/SPI1_MOSI, label: ENCODER1, identifier: ENCODER1}
+- {pin_num: '2', pin_signal: PTD0/KBI1_P0/FTM2_CH2/SPI1_SCK, label: ENCODER2, identifier: ENCODER2}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 /* clang-format on */
@@ -68,6 +70,8 @@ BOARD_InitPins:
   - {pin_num: '37', peripheral: GPIOA, signal: 'GPIO, 22', pin_signal: PTC6/UART1_RX, direction: INPUT, pullup_enable: enable}
   - {pin_num: '17', peripheral: GPIOA, signal: 'GPIO, 30', pin_signal: PTD6/KBI1_P6/UART2_RX, direction: INPUT, pullup_enable: enable}
   - {pin_num: '16', peripheral: GPIOA, signal: 'GPIO, 31', pin_signal: PTD7/KBI1_P7/UART2_TX, direction: INPUT, pullup_enable: enable}
+  - {pin_num: '2', peripheral: GPIOA, signal: 'GPIO, 24', pin_signal: PTD0/KBI1_P0/FTM2_CH2/SPI1_SCK, pullup_enable: enable}
+  - {pin_num: '1', peripheral: GPIOA, signal: 'GPIO, 25', pin_signal: PTD1/KBI1_P1/FTM2_CH3/SPI1_MOSI, pullup_enable: enable}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 /* clang-format on */
@@ -86,6 +90,10 @@ void BOARD_InitPins(void)
     PORT_SetPinPullUpEnable(PORT, kPORT_PTE, kPORT_PinIdx1, 1);
     /* Pull Enable for Port C Bit 6: 0x01u */
     PORT_SetPinPullUpEnable(PORT, kPORT_PTC, kPORT_PinIdx6, 1);
+    /* Pull Enable for Port D Bit 0: 0x01u */
+    PORT_SetPinPullUpEnable(PORT, kPORT_PTD, kPORT_PinIdx0, 1);
+    /* Pull Enable for Port D Bit 1: 0x01u */
+    PORT_SetPinPullUpEnable(PORT, kPORT_PTD, kPORT_PinIdx1, 1);
     /* Pull Enable for Port D Bit 6: 0x01u */
     PORT_SetPinPullUpEnable(PORT, kPORT_PTD, kPORT_PinIdx6, 1);
     /* Pull Enable for Port D Bit 7: 0x01u */
