@@ -24,6 +24,22 @@ CDigitalIn<kGPIO_PORTC, 6> pKeyScan1;
 CDigitalIn<kGPIO_PORTD, 7> pKeyScan2;
 CDigitalIn<kGPIO_PORTD, 6> pKeyScan3;
 
+CDigitalIn<kGPIO_PORTD, 0> pEncoder1;
+CDigitalIn<kGPIO_PORTD, 1> pEncoder2;
+
+#define BIT_KDAT		MK_GPIOA_BIT(PORTD_BASE, 5)
+#define BIT_KCLK		MK_GPIOA_BIT(PORTC_BASE, 1)
+#define BIT_ARCK		MK_GPIOA_BIT(PORTC_BASE, 0)
+#define BIT_ADAT		MK_GPIOA_BIT(PORTB_BASE, 3)
+#define BIT_ASCK		MK_GPIOA_BIT(PORTB_BASE, 2)
+#define BIT_ENABLE		MK_GPIOA_BIT(PORTA_BASE, 1)
+#define BIT_KEYSCAN1	MK_GPIOA_BIT(PORTC_BASE, 6)
+#define BIT_KEYSCAN2	MK_GPIOA_BIT(PORTD_BASE, 7)
+#define BIT_KEYSCAN3	MK_GPIOA_BIT(PORTD_BASE, 6)
+#define BIT_ENCODER1	MK_GPIOA_BIT(PORTD_BASE, 0)
+#define BIT_ENCODER2	MK_GPIOA_BIT(PORTD_BASE, 1)
+
+
 // The render buffer, contains two "layers". Elements 0-15 are layer 1
 // and elements 16-31 are layer 2
 // Refresh is done in 2 phases
@@ -35,11 +51,12 @@ static volatile uint16_t l_acc_key2 = 0;
 static volatile uint16_t l_acc_key3 = 0;
 
 static volatile byte l_keys_pending = 0;
-static volatile uint32_t l_buf1[32] = {0};
-static volatile uint32_t l_buf2[32] = {0};
-static volatile uint32_t *l_disp_buf = l_buf1;
-static volatile uint32_t *l_load_buf = l_buf2;
-static volatile byte l_switch_buffers = 0;
+static volatile uint32_t l_disp_buf[32] = {0};
+static volatile byte l_disp_update = 0;
+
+static volatile byte l_enc_state[3] = {0};
+
+volatile int g_enc_pos = 0;
 
 #define KEY_L1	(1U<<0)
 #define KEY_L2	(1U<<1)
@@ -105,9 +122,9 @@ static uint32_t l_render_buf[32] = {
 		0b11111111000000001111111100000000,
 		0b11111111000000001111111100000000,
 		0b11111111000000001111111100000000,
-		0b00000111111111110000000011111111,
-		0b00000001111111110000000011111111,
-		0b00000001111111110000000011111111,
+		0b00000000111111110000000011111111,
+		0b00000000111111110000000011111111,
+		0b00000000111111110000000011111111,
 		0b00000000111111110000000011111111,
 		0b00000000111111110000000011111111,
 		0b00000000111111110000000011111111,
@@ -279,109 +296,6 @@ void print_char(char ch, int row, int col, int bright=0) {
 	}
 }
 
-/*
- * Copy the contents of the "write buffer" to the buffer that is actually used
- * for the display refreshes
- */
-void xload() {
-
-	while(l_switch_buffers);
-
-	for(int i=0; i<32; ++i) {
-		l_load_buf[i] = 0;
-	}
-	uint32_t mask1 = (uint32_t)0x80000000;
-	uint32_t mask2 = (uint32_t)0x00800000;
-	uint32_t mask3 = (uint32_t)0x00008000;
-	uint32_t mask4 = (uint32_t)0x00000080;
-
-	// loop over the cathode index range for top row 0-7
-	for(int i=0; i<8; ++i) {
-
-		uint32_t bit1 = (uint32_t)0x00000001;
-		uint32_t bit2 = (uint32_t)0x00000100;
-		uint32_t bit3 = (uint32_t)0x00010000;
-		uint32_t bit4 = (uint32_t)0x01000000;
-		for(int j=0; j<8; ++j) {
-			int k;
-			uint32_t dat;
-
-			dat = l_render_buf[j];
-			k = i;
-			if(dat & mask1) l_load_buf[k] |= bit1;
-			if(dat & mask2) l_load_buf[k] |= bit2;
-			if(dat & mask3) l_load_buf[k] |= bit3;
-			if(dat & mask4) l_load_buf[k] |= bit4;
-
-			dat = l_render_buf[j+8];
-			k = 8+i;
-			if(dat & mask1) l_load_buf[k] |= bit1;
-			if(dat & mask2) l_load_buf[k] |= bit2;
-			if(dat & mask3) l_load_buf[k] |= bit3;
-			if(dat & mask4) l_load_buf[k] |= bit4;
-
-			dat = l_render_buf[j+16];
-			k = 16+i;
-			if(dat & mask1) l_load_buf[k] |= bit1;
-			if(dat & mask2) l_load_buf[k] |= bit2;
-			if(dat & mask3) l_load_buf[k] |= bit3;
-			if(dat & mask4) l_load_buf[k] |= bit4;
-
-
-			dat = l_render_buf[j+24];
-			k = 24+i;
-			if(dat & mask1) l_load_buf[k] |= bit1;
-			if(dat & mask2) l_load_buf[k] |= bit2;
-			if(dat & mask3) l_load_buf[k] |= bit3;
-			if(dat & mask4) l_load_buf[k] |= bit4;
-
-			bit1<<=1;
-			bit2<<=1;
-			bit3<<=1;
-			bit4<<=1;
-		}
-		mask1 >>= 1;
-		mask2 >>= 1;
-		mask3 >>= 1;
-		mask4 >>= 1;
-	}
-	l_switch_buffers = 1;
-}
-
-
-
-void load() {
-
-	while(l_switch_buffers);
-	memcpy((void*)l_disp_buf,(void*)l_render_buf,32*sizeof(uint32_t));
-	/*
-	// scan over the 16 cathode lines
-	for(int k_idx = 0; k_idx < 16; ++k_idx) {
-
-		// need to assemble 32 bits of anode data
-		uint32_t anode_data = 0U;
-		anode_data = 0U;
- 		for(int a_idx = 0; a_idx < 32; ++a_idx) {
-
-			// get the index of the source word in the render buffer
-			int src_index = (k_idx & 0xF8) + (a_idx & 0x07);
-
-			// get mask to get the source bit from the word
-			uint32_t src_mask = 0x80000000U >> ((k_idx & 0x07) + (a_idx & 0xF8));
-
-			// look up the data from input buffer
-			anode_data >>= 1;
-			if(l_render_buf[src_index] & src_mask) {
-				anode_data |= 0x80000000U;
-			}
-		}
-		l_load_buf[k_idx] =anode_data;
-	}
-*/
-
-	l_switch_buffers = 1;
-}
-
 
 void cls() {
 	for(int i=0; i<32; ++i) {
@@ -415,21 +329,12 @@ void panelInit() {
 
 	  EnableIRQ(PIT_CH1_IRQn);
 	  PIT_EnableInterrupts(PIT, kPIT_Chnl_1, kPIT_TimerInterruptEnable);
-	  PIT_SetTimerPeriod(PIT, kPIT_Chnl_1, (uint32_t) USEC_TO_COUNT(200, CLOCK_GetBusClkFreq()));
+	  PIT_SetTimerPeriod(PIT, kPIT_Chnl_1, (uint32_t) USEC_TO_COUNT(20, CLOCK_GetBusClkFreq()));
 	  PIT_StartTimer(PIT, kPIT_Chnl_1);
 }
 
 
 
-#define BIT_KDAT	MK_GPIOA_BIT(PORTD_BASE, 5)
-#define BIT_KCLK	MK_GPIOA_BIT(PORTC_BASE, 1)
-#define BIT_ARCK	MK_GPIOA_BIT(PORTC_BASE, 0)
-#define BIT_ADAT	MK_GPIOA_BIT(PORTB_BASE, 3)
-#define BIT_ASCK	MK_GPIOA_BIT(PORTB_BASE, 2)
-#define BIT_ENABLE	MK_GPIOA_BIT(PORTA_BASE, 1)
-#define BIT_KEYSCAN1	MK_GPIOA_BIT(PORTC_BASE, 6)
-#define BIT_KEYSCAN2	MK_GPIOA_BIT(PORTD_BASE, 7)
-#define BIT_KEYSCAN3	MK_GPIOA_BIT(PORTD_BASE, 6)
 
 
 
@@ -452,17 +357,16 @@ void PIT_CH1_IRQHandler(void) {
 
 	volatile uint32_t *src;
 	if(!l_phase) {
-		if(!l_cathode) {
-			// start of cycle - clock a bit into cathode register
-			SET_GPIOA(BIT_KDAT);
-			CLR_GPIOA(BIT_KCLK);
-			SET_GPIOA(BIT_KCLK);
-			CLR_GPIOA(BIT_KDAT);
+
+		if(l_disp_update) {
+			memcpy((void*)l_disp_buf,(void*)l_render_buf,32*sizeof(uint32_t));
+			l_disp_update = 0;
 		}
+
 		// fetch data from layer 1
 		src = l_disp_buf;
 	}
-	else if(l_phase < 3) {
+	else if(l_phase < 20) {
 		++l_phase;
 		return;
 	}
@@ -487,76 +391,6 @@ void PIT_CH1_IRQHandler(void) {
 	}
 
 	if(!l_phase) { // layer 1
-
-		SET_GPIOA(BIT_ENABLE); 	// turn off the display
-		CLR_GPIOA(BIT_KCLK); 	// clock cathode bit along one place..
-		SET_GPIOA(BIT_KCLK);	// ..so we are addressing next anode row
-		CLR_GPIOA(BIT_ARCK);	// anode shift register store clock pulse..
-		SET_GPIOA(BIT_ARCK); 	// ..loads new data on to anode lines
-		CLR_GPIOA(BIT_ENABLE);	// turn the display back on
-
-		l_phase = 1;
-	}
-	else { // layer 2
-
-		CLR_GPIOA(BIT_ARCK);	// anode shift register store clock pulse..
-		SET_GPIOA(BIT_ARCK);	// ..loads new data on to anode lines
-
-		// read status of keys tied to this cathode bit
-		if(!READ_GPIOA(BIT_KEYSCAN1)) {
-			l_acc_key1 |= (1U<<l_cathode);
-		}
-		if(!READ_GPIOA(BIT_KEYSCAN2)) {
-			l_acc_key2 |= (1U<<l_cathode);
-		}
-		if(!READ_GPIOA(BIT_KEYSCAN3)) {
-			l_acc_key3 |= (1U<<l_cathode);
-		}
-
-		// move along to next cathode bit
-		if(++l_cathode >= 16) {
-			l_cathode = 0; // scan is complete, go back to beginning
-
-			// form a 32 bit key state value
-			l_key_state = ((uint32_t)l_acc_key2);
-			l_key_state |= ((uint32_t)l_acc_key1);
-			l_key_state |= (((uint32_t)l_acc_key3)<<8);
-
-			// zero the key state accumulators
-			l_acc_key1 = 0;
-			l_acc_key2 = 0;
-			l_acc_key3 = 0;
-
-			// switch display buffers if there is new data
-			// to display
-			if(l_switch_buffers) {
-				volatile uint32_t *p = l_disp_buf;
-				l_disp_buf = l_load_buf;
-				l_load_buf = p;
-				l_switch_buffers = 0;
-			}
-		}
-
-		l_phase = 0;
-	}
-
-	// swap to other layer
-	//PIT_StartTimer(PIT, kPIT_Chnl_1);
-
-}
-
-} // extern "C"
-
-
-/*
-void PIT_CH1_IRQHandler(void) {
-	PIT_ClearStatusFlags(PIT, kPIT_Chnl_1, kPIT_TimerFlag);
-	//PIT_StopTimer(PIT, kPIT_Chnl_1);
-
-	uint32_t data;
-
-
-	if(!l_phase) {
 		if(!l_cathode) {
 			// start of cycle - clock a bit into cathode register
 			SET_GPIOA(BIT_KDAT);
@@ -564,34 +398,6 @@ void PIT_CH1_IRQHandler(void) {
 			SET_GPIOA(BIT_KCLK);
 			CLR_GPIOA(BIT_KDAT);
 		}
-		// fetch data from layer 1
-		data = l_disp_buf[l_cathode];
-	}
-	else if(l_phase < 3) {
-		++l_phase;
-		return;
-	}
-	else {
-		// fetch data from layer 2
-		data = l_disp_buf[l_cathode];
-		//data = l_disp_buf[l_cathode+16];
-	}
-
-	// fill the 32 bits of anode shift register data
-	uint32_t mask = 0x80000000;
-	while(mask) {
-		if(data&mask) {
-			SET_GPIOA(BIT_ADAT);
-		}
-		else {
-			CLR_GPIOA(BIT_ADAT);
-		}
-		CLR_GPIOA(BIT_ASCK);
-		SET_GPIOA(BIT_ASCK);
-		mask >>= 1;
-	}
-
-	if(!l_phase) { // layer 1
 
 		SET_GPIOA(BIT_ENABLE); 	// turn off the display
 		CLR_GPIOA(BIT_KCLK); 	// clock cathode bit along one place..
@@ -631,68 +437,47 @@ void PIT_CH1_IRQHandler(void) {
 			l_acc_key1 = 0;
 			l_acc_key2 = 0;
 			l_acc_key3 = 0;
-
-			// switch display buffers if there is new data
-			// to display
-			if(l_switch_buffers) {
-				volatile uint32_t *p = l_disp_buf;
-				l_disp_buf = l_load_buf;
-				l_load_buf = p;
-				l_switch_buffers = 0;
-			}
 		}
 
 		l_phase = 0;
 	}
 
-	// swap to other layer
-	//PIT_StartTimer(PIT, kPIT_Chnl_1);
+	// get the state of the two encoder inputs into a 2 bit value
+	byte new_state = 0;
+	if(!(READ_GPIOA(BIT_ENCODER1))) {
+		new_state |= 0b10;
+	}
+	if(!(READ_GPIOA(BIT_ENCODER2))) {
+		new_state |= 0b01;
+	}
 
-}
-*/
+	// make sure the state has changed and does not match
+	// the previous state (which may indicate a bounce)
+	if(new_state != l_enc_state[0] && new_state != l_enc_state[1]) {
 
-void panelRefresh() {
-	// clock a HIGH bit into cathode register
-	pKDAT.set(1);
-	pKCLK.set(0);
-	pKCLK.set(1);
-	pKDAT.set(0);
-
-//	pKCLK.set(0);
-//	pKCLK.set(1);
-
-
-	// cycle through the 16 cathode lines
-	for(int i=0; i<16; ++i) {
-
-		pKCLK.set(0);
-		pKCLK.set(1);
-
-		uint32_t data = l_disp_buf[i];
-		/*byte buf[4] = {
-			(byte)(data>>8),
-			(byte)(data),
-			(byte)(data>>24),
-			(byte)(data>>16)
-		};
-		SPI_WriteBlocking(SPI0, buf, 4);*/
-		uint32_t mask = 0x80000000;
-		while(mask) {
-			pADAT.set(!!(data&mask));
-			pASCK.set(0);
-			pASCK.set(1);
-			mask >>= 1;
+		if(new_state == 0b11) {
+			if( (l_enc_state[0] == 0b10) &&
+				(l_enc_state[1] == 0b00) &&
+				(l_enc_state[2] == 0b01)) {
+				++g_enc_pos;
+			}
+			else if( (l_enc_state[0] == 0b01) &&
+				(l_enc_state[1] == 0b00) &&
+				(l_enc_state[2] == 0b10)) {
+				--g_enc_pos;
+			}
 		}
-		pARCK.set(0);
-		pARCK.set(1);
-		pENABLE.set(0); // display on
 
-		volatile int q;
-		for(q=0; q<1000; ++q);
-
-		pENABLE.set(1);	// display off
+		l_enc_state[2] = l_enc_state[1];
+		l_enc_state[1] = l_enc_state[0];
+		l_enc_state[0] = new_state;
 	}
 }
+
+} // extern "C"
+
+
+
 
 
 
@@ -745,7 +530,13 @@ void panelRun()
 	print_char(c1,5,5,1);
 	print_char(c2,5,11);
 */
-//	extern int g_pos;
-//	l_render_buf[0] = 1U<<(31-g_pos);
-	load();
+	int pos = 31 - g_enc_pos;
+	if(pos < 0) pos = 0;
+	if(pos > 31) pos = 31;
+
+	l_render_buf[0] = 1U<<pos;
+	l_disp_update = 1;
 }
+
+
+

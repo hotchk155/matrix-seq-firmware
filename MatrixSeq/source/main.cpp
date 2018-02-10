@@ -44,7 +44,7 @@
 #include "digital_out.h"
 #include "delays.h"
 #include "display_panel.h"
-#include "encoder.h"
+
 /* TODO: insert other definitions and declarations here. */
 
  CDigitalOut<kGPIO_PORTB, 5> LED1;
@@ -53,7 +53,6 @@
  CDigitalOut<kGPIO_PORTE, 2> PowerControl;
  CDigitalIn<kGPIO_PORTE, 1> OffSwitch;
 
- CEncoder encoder;
 
  int g_pos = 0;
 /*
@@ -77,9 +76,6 @@ int main(void) {
     panelInit();
 
     while(1) {
-    	int delta = encoder.read();
-    	if(delta < 0 && g_pos > 0) --g_pos;
-    	if(delta > 0 && g_pos < 31) ++g_pos;
     	panelRun();
     }
     return 0 ;
