@@ -92,8 +92,8 @@ static uint32_t l_render_buf[32] = {
 		0b01111100001111000111110001111110,
 		0b01000010010000100100001001000000,
 		0b01111100010000000100001001111000,
-		0b01000011010000000100001001000000,
-		0b00000000000000000001000000000000,
+		0b01000010010000000100001001000000,
+		0b01000010010000100100001001000000,
 		0b01111100001111000111110001111110,
 		0b00000000000000000000000000000000,
 
@@ -353,7 +353,8 @@ void xload() {
 void load() {
 
 	while(l_switch_buffers);
-
+	memcpy((void*)l_disp_buf,(void*)l_render_buf,32*sizeof(uint32_t));
+	/*
 	// scan over the 16 cathode lines
 	for(int k_idx = 0; k_idx < 16; ++k_idx) {
 
@@ -376,7 +377,7 @@ void load() {
 		}
 		l_load_buf[k_idx] =anode_data;
 	}
-
+*/
 
 	l_switch_buffers = 1;
 }
@@ -445,6 +446,109 @@ CDigitalOut<kGPIO_PORTA, 1> pENABLE;
 static int l_cathode = 0;
 static byte l_phase = 0;
 extern "C" {
+void PIT_CH1_IRQHandler(void) {
+	PIT_ClearStatusFlags(PIT, kPIT_Chnl_1, kPIT_TimerFlag);
+	//PIT_StopTimer(PIT, kPIT_Chnl_1);
+
+	volatile uint32_t *src;
+	if(!l_phase) {
+		if(!l_cathode) {
+			// start of cycle - clock a bit into cathode register
+			SET_GPIOA(BIT_KDAT);
+			CLR_GPIOA(BIT_KCLK);
+			SET_GPIOA(BIT_KCLK);
+			CLR_GPIOA(BIT_KDAT);
+		}
+		// fetch data from layer 1
+		src = l_disp_buf;
+	}
+	else if(l_phase < 3) {
+		++l_phase;
+		return;
+	}
+	else {
+		// fetch data from layer 2
+		src = l_disp_buf + 16;
+	}
+
+
+
+	for(int anode = 31; anode >=0; --anode) {
+		int src_index= (l_cathode & 0xF8) + (anode & 0x07);
+		int src_mask = ((l_cathode & 0x07) + (anode & 0xF8));
+		if(src[src_index] & (0x80000000U >> src_mask)) {
+			SET_GPIOA(BIT_ADAT);
+		}
+		else {
+			CLR_GPIOA(BIT_ADAT);
+		}
+		CLR_GPIOA(BIT_ASCK);
+		SET_GPIOA(BIT_ASCK);
+	}
+
+	if(!l_phase) { // layer 1
+
+		SET_GPIOA(BIT_ENABLE); 	// turn off the display
+		CLR_GPIOA(BIT_KCLK); 	// clock cathode bit along one place..
+		SET_GPIOA(BIT_KCLK);	// ..so we are addressing next anode row
+		CLR_GPIOA(BIT_ARCK);	// anode shift register store clock pulse..
+		SET_GPIOA(BIT_ARCK); 	// ..loads new data on to anode lines
+		CLR_GPIOA(BIT_ENABLE);	// turn the display back on
+
+		l_phase = 1;
+	}
+	else { // layer 2
+
+		CLR_GPIOA(BIT_ARCK);	// anode shift register store clock pulse..
+		SET_GPIOA(BIT_ARCK);	// ..loads new data on to anode lines
+
+		// read status of keys tied to this cathode bit
+		if(!READ_GPIOA(BIT_KEYSCAN1)) {
+			l_acc_key1 |= (1U<<l_cathode);
+		}
+		if(!READ_GPIOA(BIT_KEYSCAN2)) {
+			l_acc_key2 |= (1U<<l_cathode);
+		}
+		if(!READ_GPIOA(BIT_KEYSCAN3)) {
+			l_acc_key3 |= (1U<<l_cathode);
+		}
+
+		// move along to next cathode bit
+		if(++l_cathode >= 16) {
+			l_cathode = 0; // scan is complete, go back to beginning
+
+			// form a 32 bit key state value
+			l_key_state = ((uint32_t)l_acc_key2);
+			l_key_state |= ((uint32_t)l_acc_key1);
+			l_key_state |= (((uint32_t)l_acc_key3)<<8);
+
+			// zero the key state accumulators
+			l_acc_key1 = 0;
+			l_acc_key2 = 0;
+			l_acc_key3 = 0;
+
+			// switch display buffers if there is new data
+			// to display
+			if(l_switch_buffers) {
+				volatile uint32_t *p = l_disp_buf;
+				l_disp_buf = l_load_buf;
+				l_load_buf = p;
+				l_switch_buffers = 0;
+			}
+		}
+
+		l_phase = 0;
+	}
+
+	// swap to other layer
+	//PIT_StartTimer(PIT, kPIT_Chnl_1);
+
+}
+
+} // extern "C"
+
+
+/*
 void PIT_CH1_IRQHandler(void) {
 	PIT_ClearStatusFlags(PIT, kPIT_Chnl_1, kPIT_TimerFlag);
 	//PIT_StopTimer(PIT, kPIT_Chnl_1);
@@ -545,8 +649,7 @@ void PIT_CH1_IRQHandler(void) {
 	//PIT_StartTimer(PIT, kPIT_Chnl_1);
 
 }
-
-} // extern "C"
+*/
 
 void panelRefresh() {
 	// clock a HIGH bit into cathode register
