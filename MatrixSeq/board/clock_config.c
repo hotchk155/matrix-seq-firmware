@@ -57,26 +57,29 @@ void BOARD_InitBootClocks(void)
 name: BOARD_BootClockRUN
 called_from_default_init: true
 outputs:
-- {id: Bus_clock.outFreq, value: 8.388608 MHz}
-- {id: Core_clock.outFreq, value: 16.777216 MHz}
-- {id: Flash_clock.outFreq, value: 8.388608 MHz}
-- {id: ICSFF_clock.outFreq, value: 16.384 kHz}
+- {id: Bus_clock.outFreq, value: 20 MHz}
+- {id: Core_clock.outFreq, value: 40 MHz}
+- {id: Flash_clock.outFreq, value: 20 MHz}
+- {id: ICSFF_clock.outFreq, value: 39.0625/2 kHz}
 - {id: ICSIR_clock.outFreq, value: 32.768 kHz}
 - {id: LPO_clock.outFreq, value: 1 kHz}
-- {id: Plat_clock.outFreq, value: 16.777216 MHz}
-- {id: System_clock.outFreq, value: 16.777216 MHz}
+- {id: OSCER_clock.outFreq, value: 20 MHz}
+- {id: Plat_clock.outFreq, value: 40 MHz}
+- {id: System_clock.outFreq, value: 40 MHz}
 settings:
-- {id: ICS.BDIV.scale, value: '2', locked: true}
-- {id: ICS.RDIV.scale, value: '32'}
+- {id: ICSMode, value: FEE}
+- {id: ICS.BDIV.scale, value: '1', locked: true}
+- {id: ICS.IREFS.sel, value: ICS.RDIV}
+- {id: ICS.RDIV.scale, value: '512'}
 - {id: ICS_C1_IRCLKEN_CFG, value: Enabled}
 - {id: OSC_CR_OSCEN_CFG, value: Enabled}
 - {id: OSC_CR_OSCSTEN_CFG, value: Enabled}
 - {id: OSC_CR_OSC_MODE_CFG, value: ModeOscLowPower}
 - {id: OSC_CR_RANGE_CFG, value: High}
 - {id: OSC_CR_RANGE_RDIV_CFG, value: High}
-- {id: SIM.BUSDIV.scale, value: '2'}
+- {id: SIM.BUSDIV.scale, value: '2', locked: true}
 sources:
-- {id: OSC.OSC.outFreq, value: 20 MHz}
+- {id: OSC.OSC.outFreq, value: 20 MHz, enabled: true}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS **********/
 /* clang-format on */
 
@@ -85,10 +88,10 @@ sources:
  ******************************************************************************/
 const ics_config_t icsConfig_BOARD_BootClockRUN =
     {
-        .icsMode = kICS_ModeFEI,                  /* FEI - FLL Engaged Internal */
+        .icsMode = kICS_ModeFEE,                  /* FEE - FLL Engaged External */
         .irClkEnableMode = kICS_IrclkEnable,      /* ICSIRCLK enabled, ICSIRCLK disabled in STOP mode */
-        .bDiv = 0x1U,                             /* Bus clock divider: divided by 2 */
-        .rDiv = 0x0U,                             /* FLL external reference clock divider: divided by 32 */
+        .bDiv = 0x0U,                             /* Bus clock divider: divided by 1 */
+        .rDiv = 0x4U,                             /* FLL external reference clock divider: divided by 512 */
     };
 const sim_clock_config_t simConfig_BOARD_BootClockRUN =
     {
@@ -97,7 +100,7 @@ const sim_clock_config_t simConfig_BOARD_BootClockRUN =
     };
 const osc_config_t oscConfig_BOARD_BootClockRUN =
     {
-        .freq = 0U,                               /* Oscillator frequency: 0Hz */
+        .freq = 20000000U,                        /* Oscillator frequency: 20000000Hz */
         .workMode = kOSC_ModeOscLowPower,         /* Oscillator low power */
         .enableMode = kOSC_Enable | kOSC_EnableInStop,/* Enable external reference clock, enable external reference clock in STOP mode */
     };
@@ -109,8 +112,12 @@ void BOARD_BootClockRUN(void)
 {
     /* Set the system clock dividers in SIM to safe value. */
     CLOCK_SetSimSafeDivs();
-    /* Set ICS to FEI mode. */
-    CLOCK_BootToFeiMode(icsConfig_BOARD_BootClockRUN.bDiv);
+    /* Initializes OSC0 according to board configuration. */
+    CLOCK_InitOsc0(&oscConfig_BOARD_BootClockRUN);
+    CLOCK_SetXtal0Freq(oscConfig_BOARD_BootClockRUN.freq);
+    /* Set ICS to FEE mode. */
+    CLOCK_BootToFeeMode(icsConfig_BOARD_BootClockRUN.bDiv,
+                        icsConfig_BOARD_BootClockRUN.rDiv);
     /* Configure the Internal Reference clock (ICSIRCLK). */
     CLOCK_SetInternalRefClkConfig(icsConfig_BOARD_BootClockRUN.irClkEnableMode);
     /* Set the clock configuration in SIM module. */

@@ -13,6 +13,12 @@
 #include "fsl_spi.h"
 #include "fsl_pit.h"
 
+CDigitalOut<kGPIO_PORTA, 6> pGate4;
+CDigitalOut<kGPIO_PORTD, 4> pGate3;
+CDigitalOut<kGPIO_PORTD, 3> pGate2;
+CDigitalOut<kGPIO_PORTD, 2> pGate1;
+
+
 CDigitalOut<kGPIO_PORTD, 5> pKDAT;
 CDigitalOut<kGPIO_PORTC, 1> pKCLK;
 CDigitalOut<kGPIO_PORTC, 0> pARCK;
@@ -39,7 +45,16 @@ CDigitalIn<kGPIO_PORTD, 1> pEncoder2;
 #define BIT_ENCODER1	MK_GPIOA_BIT(PORTD_BASE, 0)
 #define BIT_ENCODER2	MK_GPIOA_BIT(PORTD_BASE, 1)
 
-
+#define BIT_GATE1		MK_GPIOA_BIT(PORTD_BASE, 2)
+#define BIT_GATE2		MK_GPIOA_BIT(PORTD_BASE, 3)
+#define BIT_GATE3		MK_GPIOA_BIT(PORTD_BASE, 4)
+#define BIT_GATE4		MK_GPIOA_BIT(PORTA_BASE, 6)
+/*
+CDigitalOut<kGPIO_PORTA, 6> pGate4;
+CDigitalOut<kGPIO_PORTD, 4> pGate3;
+CDigitalOut<kGPIO_PORTD, 3> pGate2;
+CDigitalOut<kGPIO_PORTD, 2> pGate1;
+*/
 // The render buffer, contains two "layers". Elements 0-15 are layer 1
 // and elements 16-31 are layer 2
 // Refresh is done in 2 phases
@@ -57,6 +72,8 @@ static volatile byte l_disp_update = 0;
 static volatile byte l_enc_state[3] = {0};
 
 volatile int g_enc_pos = 0;
+
+static volatile uint32_t l_next_pit_period = 0;
 
 #define KEY_L1	(1U<<0)
 #define KEY_L2	(1U<<1)
@@ -303,8 +320,11 @@ void cls() {
 	}
 }
 
-static uint32_t s_DisplayPhaseDuration1;
-static uint32_t s_DisplayPhaseDuration2;
+static uint32_t periodShort;
+static uint32_t periodMedium;
+static uint32_t periodLong;
+
+
 void panelInit() {
 
 	//spi_master_config_t config;
@@ -318,18 +338,20 @@ void panelInit() {
 	//SPI_Enable(SPI0, true);
 
 	// turn the panel off
-	s_DisplayPhaseDuration1 = USEC_TO_COUNT(1000, CLOCK_GetBusClkFreq());
-	s_DisplayPhaseDuration2 = USEC_TO_COUNT(200, CLOCK_GetBusClkFreq());
 
 
+	periodShort = (uint32_t) USEC_TO_COUNT(50, CLOCK_GetBusClkFreq());
+	periodMedium = (uint32_t) USEC_TO_COUNT(300, CLOCK_GetBusClkFreq());
+	periodLong = (uint32_t) USEC_TO_COUNT(400, CLOCK_GetBusClkFreq());
 
 	pENABLE.set(1);
 	//cls();
 	//load();
 
+	  l_next_pit_period = periodShort;
 	  EnableIRQ(PIT_CH1_IRQn);
 	  PIT_EnableInterrupts(PIT, kPIT_Chnl_1, kPIT_TimerInterruptEnable);
-	  PIT_SetTimerPeriod(PIT, kPIT_Chnl_1, (uint32_t) USEC_TO_COUNT(20, CLOCK_GetBusClkFreq()));
+	  PIT_SetTimerPeriod(PIT, kPIT_Chnl_1, l_next_pit_period);
 	  PIT_StartTimer(PIT, kPIT_Chnl_1);
 }
 
@@ -347,73 +369,158 @@ CDigitalOut<kGPIO_PORTB, 2> pASCK;
 CDigitalOut<kGPIO_PORTA, 1> pENABLE;
 */
 
-
+enum {
+	PHASE_NORMAL,		// layer 1 only
+	PHASE_DIM,			// layer 2 only
+	PHASE_BRIGHT		// layer 1 and layer 2 together
+};
 static int l_cathode = 0;
-static byte l_phase = 0;
-extern "C" {
-void PIT_CH1_IRQHandler(void) {
+static byte l_phase = PHASE_NORMAL;
+
+////////////////////////////////////////////////////////////////////////////
+// DISPLAY UPDATE INTERRUPT SERVICE ROUTINE
+// The ISR is called sequentially 3 times for each of the cathode rows (each
+// of which has 32 bits of image data and 32 bits of brightness data)
+//
+// Call 1 - Load image (layer 1) data for this cathode row
+// ("medium" period before next PIT call to ISR)
+// Call 2 - Load brightness (layer 2) data for this cathode row
+// ("short" period before next PIT call to ISR)
+// Call 3 - Load logical AND of layer 1 and layer 2 data for this cathode row
+//          and prepare to move to the next cathode row
+// ("long" period before next PIT call to ISR)
+//
+extern "C" void PIT_CH1_IRQHandler(void) {
 	PIT_ClearStatusFlags(PIT, kPIT_Chnl_1, kPIT_TimerFlag);
-	//PIT_StopTimer(PIT, kPIT_Chnl_1);
+	PIT_StopTimer(PIT, kPIT_Chnl_1);
+	SET_GPIOA(BIT_GATE1);
 
 	volatile uint32_t *src;
-	if(!l_phase) {
 
-		if(l_disp_update) {
-			memcpy((void*)l_disp_buf,(void*)l_render_buf,32*sizeof(uint32_t));
-			l_disp_update = 0;
-		}
+	// First layer
+	switch(l_phase) {
 
-		// fetch data from layer 1
-		src = l_disp_buf;
-	}
-	else if(l_phase < 20) {
-		++l_phase;
-		return;
-	}
-	else {
-		// fetch data from layer 2
-		src = l_disp_buf + 16;
-	}
+	////////////////////////////////////////////////////////////////////////////
+	// NORMAL BRIGHTNESS PHASE
+	case PHASE_NORMAL:
+		SET_GPIOA(BIT_GATE2);
 
-
-
-	for(int anode = 31; anode >=0; --anode) {
-		int src_index= (l_cathode & 0xF8) + (anode & 0x07);
-		int src_mask = ((l_cathode & 0x07) + (anode & 0xF8));
-		if(src[src_index] & (0x80000000U >> src_mask)) {
-			SET_GPIOA(BIT_ADAT);
-		}
-		else {
-			CLR_GPIOA(BIT_ADAT);
-		}
-		CLR_GPIOA(BIT_ASCK);
-		SET_GPIOA(BIT_ASCK);
-	}
-
-	if(!l_phase) { // layer 1
-		if(!l_cathode) {
-			// start of cycle - clock a bit into cathode register
+		if(!l_cathode) { // starting  a new refresh cycle
+			// copy over updated render buffer if available
+			if(l_disp_update) {
+				memcpy((void*)l_disp_buf,(void*)l_render_buf,32*sizeof(uint32_t));
+				l_disp_update = 0;
+			}
+			// clock bit into cathode shift reg
 			SET_GPIOA(BIT_KDAT);
 			CLR_GPIOA(BIT_KCLK);
 			SET_GPIOA(BIT_KCLK);
 			CLR_GPIOA(BIT_KDAT);
 		}
 
-		SET_GPIOA(BIT_ENABLE); 	// turn off the display
+		// populate the anode shift register with data from display layer 1
+		for(int anode = 31; anode >=0; --anode) {
+			int src_index= (l_cathode & 0xF8) + (anode & 0x07);
+			int src_mask = ((l_cathode & 0x07) + (anode & 0xF8));
+			if(l_disp_buf[src_index] & (0x80000000U >> src_mask)) {
+				SET_GPIOA(BIT_ADAT);
+			}
+			else {
+				CLR_GPIOA(BIT_ADAT);
+			}
+			CLR_GPIOA(BIT_ASCK);
+			SET_GPIOA(BIT_ASCK);
+		}
+
+		SET_GPIOA(BIT_ENABLE);  // turn off the display
 		CLR_GPIOA(BIT_KCLK); 	// clock cathode bit along one place..
 		SET_GPIOA(BIT_KCLK);	// ..so we are addressing next anode row
 		CLR_GPIOA(BIT_ARCK);	// anode shift register store clock pulse..
 		SET_GPIOA(BIT_ARCK); 	// ..loads new data on to anode lines
 		CLR_GPIOA(BIT_ENABLE);	// turn the display back on
 
-		l_phase = 1;
-	}
-	else { // layer 2
+		l_phase = PHASE_DIM;
+		PIT_SetTimerPeriod(PIT, kPIT_Chnl_1, periodMedium);
+		break;
 
-		CLR_GPIOA(BIT_ARCK);	// anode shift register store clock pulse..
-		SET_GPIOA(BIT_ARCK);	// ..loads new data on to anode lines
+	////////////////////////////////////////////////////////////////////////////
+	// LOW BRIGHTNESS PHASE
+	case PHASE_DIM:
+		SET_GPIOA(BIT_ENABLE); // turn off the display
+		for(int anode = 31; anode >=0; --anode) {
+			int src_index= (l_cathode & 0xF8) + (anode & 0x07);
+			int src_mask = ((l_cathode & 0x07) + (anode & 0xF8));
+			if(l_disp_buf[16+src_index] & (0x80000000U >> src_mask)) {
+				SET_GPIOA(BIT_ADAT);
+			}
+			else {
+				CLR_GPIOA(BIT_ADAT);
+			}
+			CLR_GPIOA(BIT_ASCK);
+			SET_GPIOA(BIT_ASCK);
+		}
+		CLR_GPIOA(BIT_ARCK);
+		SET_GPIOA(BIT_ARCK);
+		CLR_GPIOA(BIT_ENABLE); // turn on the display
+		l_phase = PHASE_BRIGHT;
+		PIT_SetTimerPeriod(PIT, kPIT_Chnl_1, periodShort);
+		break;
 
-		// read status of keys tied to this cathode bit
+	////////////////////////////////////////////////////////////////////////////
+	// HIGH BRIGHTNESS PHASE
+	case PHASE_BRIGHT:
+		SET_GPIOA(BIT_ENABLE); // turn off the display
+		for(int anode = 31; anode >=0; --anode) {
+			int src_index= (l_cathode & 0xF8) + (anode & 0x07);
+			int src_mask = ((l_cathode & 0x07) + (anode & 0xF8));
+			if(l_disp_buf[src_index] & l_disp_buf[16+src_index] & (0x80000000U >> src_mask)) {
+				SET_GPIOA(BIT_ADAT);
+			}
+			else {
+				CLR_GPIOA(BIT_ADAT);
+			}
+			CLR_GPIOA(BIT_ASCK);
+			SET_GPIOA(BIT_ASCK);
+		}
+		CLR_GPIOA(BIT_ARCK);
+		SET_GPIOA(BIT_ARCK);
+		CLR_GPIOA(BIT_ENABLE); // turn display back on again
+
+		////////////////////////////////////////////////
+		// READ ENCODER
+		// get the state of the two encoder inputs into a 2 bit value
+		byte new_state = 0;
+		if(!(READ_GPIOA(BIT_ENCODER1))) {
+			new_state |= 0b10;
+		}
+		if(!(READ_GPIOA(BIT_ENCODER2))) {
+			new_state |= 0b01;
+		}
+
+		// make sure the state has changed and does not match
+		// the previous state (which may indicate a bounce)
+		if(new_state != l_enc_state[0] && new_state != l_enc_state[1]) {
+
+			if(new_state == 0b11) {
+				if( (l_enc_state[0] == 0b10) &&
+					(l_enc_state[1] == 0b00) &&
+					(l_enc_state[2] == 0b01)) {
+					++g_enc_pos;
+				}
+				else if( (l_enc_state[0] == 0b01) &&
+					(l_enc_state[1] == 0b00) &&
+					(l_enc_state[2] == 0b10)) {
+					--g_enc_pos;
+				}
+			}
+
+			l_enc_state[2] = l_enc_state[1];
+			l_enc_state[1] = l_enc_state[0];
+			l_enc_state[0] = new_state;
+		}
+
+		////////////////////////////////////////////////
+		// SCAN KEYBOARD ROW
 		if(!READ_GPIOA(BIT_KEYSCAN1)) {
 			l_acc_key1 |= (1U<<l_cathode);
 		}
@@ -424,11 +531,11 @@ void PIT_CH1_IRQHandler(void) {
 			l_acc_key3 |= (1U<<l_cathode);
 		}
 
-		// move along to next cathode bit
+		// move along to next cathode bit - have we finished a scan?
 		if(++l_cathode >= 16) {
-			l_cathode = 0; // scan is complete, go back to beginning
+			l_cathode = 0;
 
-			// form a 32 bit key state value
+			// form the final 32 bit key state value
 			l_key_state = ((uint32_t)l_acc_key2);
 			l_key_state |= ((uint32_t)l_acc_key1);
 			l_key_state |= (((uint32_t)l_acc_key3)<<8);
@@ -439,46 +546,14 @@ void PIT_CH1_IRQHandler(void) {
 			l_acc_key3 = 0;
 		}
 
-		l_phase = 0;
+		l_phase = PHASE_NORMAL;
+		PIT_SetTimerPeriod(PIT, kPIT_Chnl_1, periodLong);
+		break;
 	}
 
-	// get the state of the two encoder inputs into a 2 bit value
-	byte new_state = 0;
-	if(!(READ_GPIOA(BIT_ENCODER1))) {
-		new_state |= 0b10;
-	}
-	if(!(READ_GPIOA(BIT_ENCODER2))) {
-		new_state |= 0b01;
-	}
-
-	// make sure the state has changed and does not match
-	// the previous state (which may indicate a bounce)
-	if(new_state != l_enc_state[0] && new_state != l_enc_state[1]) {
-
-		if(new_state == 0b11) {
-			if( (l_enc_state[0] == 0b10) &&
-				(l_enc_state[1] == 0b00) &&
-				(l_enc_state[2] == 0b01)) {
-				++g_enc_pos;
-			}
-			else if( (l_enc_state[0] == 0b01) &&
-				(l_enc_state[1] == 0b00) &&
-				(l_enc_state[2] == 0b10)) {
-				--g_enc_pos;
-			}
-		}
-
-		l_enc_state[2] = l_enc_state[1];
-		l_enc_state[1] = l_enc_state[0];
-		l_enc_state[0] = new_state;
-	}
+	PIT_StartTimer(PIT, kPIT_Chnl_1);
+	CLR_GPIOA(BIT_GATE1);
 }
-
-} // extern "C"
-
-
-
-
 
 
 int pos = 0;
@@ -535,6 +610,7 @@ void panelRun()
 	if(pos > 31) pos = 31;
 
 	l_render_buf[0] = 1U<<pos;
+	l_render_buf[16] = 0;
 	l_disp_update = 1;
 }
 

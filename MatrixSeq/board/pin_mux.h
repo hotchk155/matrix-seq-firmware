@@ -266,6 +266,62 @@ void BOARD_InitBootPins(void);
 #define BOARD_INITPINS_ENCODER1_NAME "ENCODER1"  /*!<@brief Identifier name */
                                                  /* @} */
 
+/*! @name PTA6 (number 26), GATEOUT4
+  @{ */
+#define BOARD_INITPINS_GATEOUT4_PERIPHERAL GPIOA /*!<@brief Device name: GPIOA */
+#define BOARD_INITPINS_GATEOUT4_SIGNAL GPIO      /*!<@brief GPIOA signal: GPIO */
+#define BOARD_INITPINS_GATEOUT4_GPIO GPIOA       /*!<@brief GPIO device name: GPIOA */
+#define BOARD_INITPINS_GATEOUT4_GPIO_PIN 6U      /*!<@brief PORTA pin index: 6 */
+#define BOARD_INITPINS_GATEOUT4_PORT PORTA       /*!<@brief PORT device name: PORTA */
+#define BOARD_INITPINS_GATEOUT4_PIN 6U           /*!<@brief PORTA pin index: 6 */
+#define BOARD_INITPINS_GATEOUT4_CHANNEL 6        /*!<@brief GPIOA GPIO channel: 6 */
+#define BOARD_INITPINS_GATEOUT4_PIN_NAME PTA6    /*!<@brief Pin name */
+#define BOARD_INITPINS_GATEOUT4_LABEL "GATEOUT4" /*!<@brief Label */
+#define BOARD_INITPINS_GATEOUT4_NAME "GATEOUT4"  /*!<@brief Identifier name */
+                                                 /* @} */
+
+/*! @name PTD2 (number 31), GATEOUT1
+  @{ */
+#define BOARD_INITPINS_GATEOUT1_PERIPHERAL GPIOA /*!<@brief Device name: GPIOA */
+#define BOARD_INITPINS_GATEOUT1_SIGNAL GPIO      /*!<@brief GPIOA signal: GPIO */
+#define BOARD_INITPINS_GATEOUT1_GPIO GPIOA       /*!<@brief GPIO device name: GPIOA */
+#define BOARD_INITPINS_GATEOUT1_GPIO_PIN 26U     /*!<@brief PORTA pin index: 26 */
+#define BOARD_INITPINS_GATEOUT1_PORT PORTD       /*!<@brief PORT device name: PORTD */
+#define BOARD_INITPINS_GATEOUT1_PIN 2U           /*!<@brief PORTD pin index: 2 */
+#define BOARD_INITPINS_GATEOUT1_CHANNEL 26       /*!<@brief GPIOA GPIO channel: 26 */
+#define BOARD_INITPINS_GATEOUT1_PIN_NAME PTD2    /*!<@brief Pin name */
+#define BOARD_INITPINS_GATEOUT1_LABEL "GATEOUT1" /*!<@brief Label */
+#define BOARD_INITPINS_GATEOUT1_NAME "GATEOUT1"  /*!<@brief Identifier name */
+                                                 /* @} */
+
+/*! @name PTD3 (number 30), GATEOUT2
+  @{ */
+#define BOARD_INITPINS_GATEOUT2_PERIPHERAL GPIOA /*!<@brief Device name: GPIOA */
+#define BOARD_INITPINS_GATEOUT2_SIGNAL GPIO      /*!<@brief GPIOA signal: GPIO */
+#define BOARD_INITPINS_GATEOUT2_GPIO GPIOA       /*!<@brief GPIO device name: GPIOA */
+#define BOARD_INITPINS_GATEOUT2_GPIO_PIN 27U     /*!<@brief PORTA pin index: 27 */
+#define BOARD_INITPINS_GATEOUT2_PORT PORTD       /*!<@brief PORT device name: PORTD */
+#define BOARD_INITPINS_GATEOUT2_PIN 3U           /*!<@brief PORTD pin index: 3 */
+#define BOARD_INITPINS_GATEOUT2_CHANNEL 27       /*!<@brief GPIOA GPIO channel: 27 */
+#define BOARD_INITPINS_GATEOUT2_PIN_NAME PTD3    /*!<@brief Pin name */
+#define BOARD_INITPINS_GATEOUT2_LABEL "GATEOUT2" /*!<@brief Label */
+#define BOARD_INITPINS_GATEOUT2_NAME "GATEOUT2"  /*!<@brief Identifier name */
+                                                 /* @} */
+
+/*! @name PTD4 (number 29), GATEOUT3
+  @{ */
+#define BOARD_INITPINS_GATEOUT3_PERIPHERAL GPIOA /*!<@brief Device name: GPIOA */
+#define BOARD_INITPINS_GATEOUT3_SIGNAL GPIO      /*!<@brief GPIOA signal: GPIO */
+#define BOARD_INITPINS_GATEOUT3_GPIO GPIOA       /*!<@brief GPIO device name: GPIOA */
+#define BOARD_INITPINS_GATEOUT3_GPIO_PIN 28U     /*!<@brief PORTA pin index: 28 */
+#define BOARD_INITPINS_GATEOUT3_PORT PORTD       /*!<@brief PORT device name: PORTD */
+#define BOARD_INITPINS_GATEOUT3_PIN 4U           /*!<@brief PORTD pin index: 4 */
+#define BOARD_INITPINS_GATEOUT3_CHANNEL 28       /*!<@brief GPIOA GPIO channel: 28 */
+#define BOARD_INITPINS_GATEOUT3_PIN_NAME PTD4    /*!<@brief Pin name */
+#define BOARD_INITPINS_GATEOUT3_LABEL "GATEOUT3" /*!<@brief Label */
+#define BOARD_INITPINS_GATEOUT3_NAME "GATEOUT3"  /*!<@brief Identifier name */
+                                                 /* @} */
+
 /*!
  * @brief Configures pin routing and optionally pin electrical features.
  *

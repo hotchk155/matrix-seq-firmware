@@ -29,6 +29,10 @@ pin_labels:
 - {pin_num: '17', pin_signal: PTD6/KBI1_P6/UART2_RX, label: KEYSCAN3, identifier: KEYSCAN3}
 - {pin_num: '1', pin_signal: PTD1/KBI1_P1/FTM2_CH3/SPI1_MOSI, label: ENCODER1, identifier: ENCODER1}
 - {pin_num: '2', pin_signal: PTD0/KBI1_P0/FTM2_CH2/SPI1_SCK, label: ENCODER2, identifier: ENCODER2}
+- {pin_num: '26', pin_signal: PTA6/FTM2_FLT1/ACMP1_IN0/ADC0_SE2, label: GATEOUT4, identifier: GATEOUT4}
+- {pin_num: '29', pin_signal: PTD4/KBI1_P4, label: GATEOUT3, identifier: GATEOUT3}
+- {pin_num: '30', pin_signal: PTD3/KBI1_P3/SPI1_PCS0, label: GATEOUT2, identifier: GATEOUT2}
+- {pin_num: '31', pin_signal: PTD2/KBI1_P2/SPI1_MISO, label: GATEOUT1, identifier: GATEOUT1}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 /* clang-format on */
@@ -57,8 +61,6 @@ BOARD_InitPins:
   - {pin_num: '12', peripheral: GPIOA, signal: 'GPIO, 13', pin_signal: PTB5/FTM2_CH5/SPI0_PCS0/ACMP1_OUT}
   - {pin_num: '15', peripheral: GPIOA, signal: 'GPIO, 18', pin_signal: PTC2/FTM2_CH2/ADC0_SE10}
   - {pin_num: '14', peripheral: GPIOA, signal: 'GPIO, 19', pin_signal: PTC3/FTM2_CH3/ADC0_SE11}
-  - {pin_num: '9', peripheral: OSC, signal: EXTAL, pin_signal: PTB7/I2C0_SCL/EXTAL}
-  - {pin_num: '10', peripheral: OSC, signal: XTAL, pin_signal: PTB6/I2C0_SDA/XTAL}
   - {pin_num: '39', peripheral: GPIOB, signal: 'GPIO, 1', pin_signal: PTE1/SPI0_MOSI, direction: INPUT, high_drive_enable: disable, pullup_enable: enable}
   - {pin_num: '38', peripheral: GPIOB, signal: 'GPIO, 2', pin_signal: PTE2/SPI0_MISO, direction: OUTPUT}
   - {pin_num: '18', peripheral: GPIOA, signal: 'GPIO, 29', pin_signal: PTD5/KBI1_P5}
@@ -72,6 +74,12 @@ BOARD_InitPins:
   - {pin_num: '16', peripheral: GPIOA, signal: 'GPIO, 31', pin_signal: PTD7/KBI1_P7/UART2_TX, direction: INPUT, pullup_enable: enable}
   - {pin_num: '2', peripheral: GPIOA, signal: 'GPIO, 24', pin_signal: PTD0/KBI1_P0/FTM2_CH2/SPI1_SCK, pullup_enable: enable}
   - {pin_num: '1', peripheral: GPIOA, signal: 'GPIO, 25', pin_signal: PTD1/KBI1_P1/FTM2_CH3/SPI1_MOSI, pullup_enable: enable}
+  - {pin_num: '9', peripheral: OSC, signal: EXTAL, pin_signal: PTB7/I2C0_SCL/EXTAL}
+  - {pin_num: '10', peripheral: OSC, signal: XTAL, pin_signal: PTB6/I2C0_SDA/XTAL}
+  - {pin_num: '26', peripheral: GPIOA, signal: 'GPIO, 6', pin_signal: PTA6/FTM2_FLT1/ACMP1_IN0/ADC0_SE2}
+  - {pin_num: '31', peripheral: GPIOA, signal: 'GPIO, 26', pin_signal: PTD2/KBI1_P2/SPI1_MISO}
+  - {pin_num: '30', peripheral: GPIOA, signal: 'GPIO, 27', pin_signal: PTD3/KBI1_P3/SPI1_PCS0}
+  - {pin_num: '29', peripheral: GPIOA, signal: 'GPIO, 28', pin_signal: PTD4/KBI1_P4}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 /* clang-format on */
