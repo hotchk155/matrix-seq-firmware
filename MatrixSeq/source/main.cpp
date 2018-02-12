@@ -41,9 +41,13 @@
 #include "MKE02Z4.h"
 /* TODO: insert other include files here. */
 #define MAIN_INCLUDE
+#include "defs.h"
 #include "digital_out.h"
 #include "delays.h"
 #include "display_panel.h"
+#include "sequence.h"
+#include "grid.h"
+
 
 /* TODO: insert other definitions and declarations here. */
 
@@ -53,8 +57,12 @@
  CDigitalOut<kGPIO_PORTE, 2> PowerControl;
  CDigitalIn<kGPIO_PORTE, 1> OffSwitch;
 
+CGrid *g_grid = nullptr;
+void fire_event(int event, uint32_t param) {
+	g_grid->event(event, param);
+}
 
- int g_pos = 0;
+
 /*
  * @brief   Application entry point.
  */
@@ -71,12 +79,24 @@ int main(void) {
     //printf("Hello World\n");
     /* Force the counter to be placed into memory. */
 
+    CSequence sequence;
+    CGrid grid(sequence);
+
+    g_grid = &grid;
+
     /* Enter an infinite loop, just incrementing a counter.
      * */
     panelInit();
+    sequence.test();
 
     while(1) {
+    	if(CDelay::g_ticked) {
+    		sequence.tick();
+    		grid.run();
+    		CDelay::g_ticked = 0;
+    	}
     	panelRun();
+
     }
     return 0 ;
 }
