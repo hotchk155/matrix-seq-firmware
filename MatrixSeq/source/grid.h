@@ -19,7 +19,9 @@ public:
 		ACTION_NONE,
 		ACTION_NOTE_DRAG,
 		ACTION_ERASE,
-		ACTION_CLONE
+		ACTION_CLONE,
+		ACTION_SET_LOOP,
+		ACTION_DRAG_LOOP
 	};
 	CGrid(CSequence& seq) : m_seq(seq) {
 		init();
@@ -48,6 +50,10 @@ public:
 				m_popup = POPUP_MS;
 			}
 			else {
+				if(m_action == ACTION_SET_LOOP) {
+					m_seq.set_loop_start(m_cursor);
+					m_action = ACTION_DRAG_LOOP;
+				}
 				if(m_action == ACTION_ERASE) {
 					m_seq.notes[m_cursor].note = CSequence::NO_NOTE;
 					m_popup = 0;
@@ -64,6 +70,10 @@ public:
 				}
 				if(m_action == ACTION_CLONE) {
 					m_seq.notes[m_cursor].note = m_base_note + m_row;
+					m_popup = POPUP_MS;
+				}
+				else if(m_action == ACTION_DRAG_LOOP) {
+					m_seq.set_loop_end(m_cursor);
 					m_popup = POPUP_MS;
 				}
 			}
@@ -97,6 +107,12 @@ public:
 					m_action = ACTION_ERASE;
 				}
 				break;
+			case KEY_B6:
+				if(m_action == ACTION_NONE) {
+					m_seq.set_pos(m_cursor);
+					m_action = ACTION_SET_LOOP;
+				}
+				break;
 			}
 			break;
 		case EV_KEY_RELEASE:
@@ -117,7 +133,7 @@ public:
 			CRenderBuf::hilite(i) |= mask;
 		}
 
-		CRenderBuf::raster(15) |= CRenderBuf::make_mask(0, m_seq.m_play_length);
+		CRenderBuf::raster(15) |= CRenderBuf::make_mask(m_seq.m_loop_from, m_seq.m_loop_to + 1);
 		mask = CRenderBuf::bit(m_seq.m_play_pos);
 		CRenderBuf::hilite(15) |= mask;
 
@@ -148,11 +164,15 @@ public:
 		}
 
 		if(m_popup) {
-			if(m_cursor < 16) {
-				CRenderBuf::print_note_name(m_row + m_base_note,0);
+			int flags = 0;
+			if(m_cursor > 16) {
+				flags = CRenderBuf::POPUP_LEFT;
+			}
+			if(m_action == ACTION_DRAG_LOOP) {
+				CRenderBuf::print_number2(1 + m_seq.m_loop_to -m_seq.m_loop_from,flags);
 			}
 			else {
-				CRenderBuf::print_note_name(m_row + m_base_note,CRenderBuf::NOTE_NAME_LEFT);
+				CRenderBuf::print_note_name(m_row + m_base_note,flags);
 			}
 		}
 

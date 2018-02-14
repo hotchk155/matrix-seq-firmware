@@ -53,7 +53,7 @@ public:
 		CHAR_RASTER = 1,
 		CHAR_HILITE = 2,
 
-		NOTE_NAME_LEFT = 1
+		POPUP_LEFT = 1
 
 	};
 	static inline void lock() {
@@ -206,7 +206,7 @@ public:
 
 		int col;
 		uint32_t mask;
-		if(flags & NOTE_NAME_LEFT) {
+		if(flags & POPUP_LEFT) {
 			col = 0;
 			mask = make_mask(0,width);
 		}
@@ -216,24 +216,46 @@ public:
 		}
 
 		for(int i=1; i<6; ++i) {
-			g_render_buf[i] |= mask;
-			g_render_buf[i+16] &= ~mask;
+			g_render_buf[i] &= ~mask;
+			g_render_buf[i+16] |= mask;
 		}
 
-		print_char(first, col, 1, CHAR_HILITE);
+		print_char(first, col, 1, CHAR_RASTER);
 		col += 4;
 		if(second) {
-			print_char(second, col, 1, CHAR_HILITE);
+			print_char(second, col, 1, CHAR_RASTER);
 			col += 4;
 		}
 		if(octave<0) {
-			print_char('-', col, 1, CHAR_HILITE);
+			print_char('-', col, 1, CHAR_RASTER);
 			col += 4;
 			octave = -octave;
 		}
-		print_char('0' + octave, col, 1, CHAR_HILITE);
+		print_char('0' + octave, col, 1, CHAR_RASTER);
 	}
 
+	static void print_number2(int value, int flags) {
+		int col;
+		uint32_t mask;
+		if(flags & POPUP_LEFT) {
+			col = 0;
+			mask = make_mask(0,7);
+		}
+		else {
+			col = 25;
+			mask = make_mask(25,32);
+		}
+
+		for(int i=1; i<6; ++i) {
+			g_render_buf[i] &= ~mask;
+			g_render_buf[i+16] |= mask;
+		}
+
+		value %= 100;
+		print_char('0' + (value/10), col, 1, CHAR_RASTER);
+		col += 4;
+		print_char('0' + (value%10), col, 1, CHAR_RASTER);
+	}
 };
 
 
