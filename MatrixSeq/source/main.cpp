@@ -42,6 +42,8 @@
 /* TODO: insert other include files here. */
 #define MAIN_INCLUDE
 #include "defs.h"
+#include "i2c_bus.h"
+#include <cv_gate.h>
 #include "digital_out.h"
 #include "delays.h"
 #include "display_panel.h"
@@ -56,6 +58,9 @@
  CDigitalOut<kGPIO_PORTC, 2> LED3;
  CDigitalOut<kGPIO_PORTE, 2> PowerControl;
  CDigitalIn<kGPIO_PORTE, 1> OffSwitch;
+
+CI2CBus g_i2c_bus;
+CCVGate g_cv_gate;
 
 CGrid *g_grid = nullptr;
 void fire_event(int event, uint32_t param) {
@@ -84,11 +89,15 @@ int main(void) {
 
     g_grid = &grid;
 
+    g_i2c_bus.init();
+    g_i2c_bus.dac_init();
+
     /* Enter an infinite loop, just incrementing a counter.
      * */
     panelInit();
     sequence.test();
 
+    int j=0;
     while(1) {
     	if(CDelay::g_ticked) {
     		sequence.tick();
@@ -96,7 +105,12 @@ int main(void) {
     		CDelay::g_ticked = 0;
     	}
     	panelRun();
-
+    	g_cv_gate.write(3, j);
+        //g_cv.write(1, j);
+        //g_cv.write(2, j);
+        //g_cv.write(3, j);
+    	g_cv_gate.run();
+        if(++j>4095) j = 0;
     }
     return 0 ;
 }

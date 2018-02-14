@@ -80,6 +80,8 @@ BOARD_InitPins:
   - {pin_num: '31', peripheral: GPIOA, signal: 'GPIO, 26', pin_signal: PTD2/KBI1_P2/SPI1_MISO}
   - {pin_num: '30', peripheral: GPIOA, signal: 'GPIO, 27', pin_signal: PTD3/KBI1_P3/SPI1_PCS0}
   - {pin_num: '29', peripheral: GPIOA, signal: 'GPIO, 28', pin_signal: PTD4/KBI1_P4}
+  - {pin_num: '32', peripheral: I2C0, signal: SCL, pin_signal: PTA3/KBI0_P3/UART0_TX/I2C0_SCL}
+  - {pin_num: '33', peripheral: I2C0, signal: SDA, pin_signal: PTA2/KBI0_P2/UART0_RX/I2C0_SDA}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 /* clang-format on */
@@ -106,6 +108,8 @@ void BOARD_InitPins(void)
     PORT_SetPinPullUpEnable(PORT, kPORT_PTD, kPORT_PinIdx6, 1);
     /* Pull Enable for Port D Bit 7: 0x01u */
     PORT_SetPinPullUpEnable(PORT, kPORT_PTD, kPORT_PinIdx7, 1);
+    /* pin 33,32 is configured as I2C0_SDA, I2C0_SCL */
+    PORT_SetPinSelect(kPORT_I2C0, kPORT_I2C0_SCLPTA3_SDAPTA2);
 }
 /***********************************************************************************************************************
  * EOF

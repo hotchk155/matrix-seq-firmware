@@ -49,6 +49,11 @@
                   <enableClock>true</enableClock>
                </options>
                <dependencies>
+                  <dependency resourceType="Peripheral" resourceId="I2C0" description="Peripheral I2C0 is not initialized" problem_level="1" source="Pins: BOARD_InitPins">
+                     <feature name="initialized" evaluation="">
+                        <data>true</data>
+                     </feature>
+                  </dependency>
                   <dependency resourceType="Peripheral" resourceId="GPIOB" description="Peripheral GPIOB is not initialized" problem_level="1" source="Pins: BOARD_InitPins">
                      <feature name="initialized" evaluation="">
                         <data>true</data>
@@ -131,6 +136,8 @@
                   <pin peripheral="GPIOA" signal="GPIO, 26" pin_num="31" pin_signal="PTD2/KBI1_P2/SPI1_MISO"/>
                   <pin peripheral="GPIOA" signal="GPIO, 27" pin_num="30" pin_signal="PTD3/KBI1_P3/SPI1_PCS0"/>
                   <pin peripheral="GPIOA" signal="GPIO, 28" pin_num="29" pin_signal="PTD4/KBI1_P4"/>
+                  <pin peripheral="I2C0" signal="SCL" pin_num="32" pin_signal="PTA3/KBI0_P3/UART0_TX/I2C0_SCL"/>
+                  <pin peripheral="I2C0" signal="SDA" pin_num="33" pin_signal="PTA2/KBI0_P2/UART0_RX/I2C0_SDA"/>
                </pins>
             </function>
          </functions_list>
