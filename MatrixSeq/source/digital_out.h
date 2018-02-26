@@ -17,6 +17,32 @@ public:
 		GPIO_PinWrite(_P, _B, state);
 	}
 };
+template<gpio_port_num_t _P, uint32_t _B, int _D = 0> class CIndicatorLED {
+public:
+	uint8_t m_timeout;
+	CIndicatorLED() {
+		gpio_pin_config_t config =
+		{
+				kGPIO_DigitalOutput,
+				_D,
+		};
+		GPIO_PinInit(_P, _B, &config);
+	}
+	void set(int state) {
+		GPIO_PinWrite(_P, _B, state);
+	}
+	void blink(uint8_t ms) {
+		GPIO_PinWrite(_P, _B, 1);
+		m_timeout = ms;
+	}
+	void run() {
+		if(m_timeout) {
+			if(!--m_timeout) {
+				GPIO_PinWrite(_P, _B, 0);
+			}
+		}
+	}
+};
 template<gpio_port_num_t _P, uint32_t _B> class CDigitalIn {
 public:
 	CDigitalIn() {

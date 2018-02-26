@@ -47,7 +47,6 @@
 #include "midi.h"
 #include "cv_gate.h"
 #include "digital_out.h"
-#include "delays.h"
 #include "display_panel.h"
 #include "sequence.h"
 #include "grid.h"
@@ -55,9 +54,9 @@
 
 /* TODO: insert other definitions and declarations here. */
 
- CDigitalOut<kGPIO_PORTB, 5> LED1;
- CDigitalOut<kGPIO_PORTC, 3> LED2;
- CDigitalOut<kGPIO_PORTC, 2> LED3;
+ CIndicatorLED<kGPIO_PORTB, 5> LED1;
+ CIndicatorLED<kGPIO_PORTC, 3> LED2;
+ CIndicatorLED<kGPIO_PORTC, 2> LED3;
  CDigitalOut<kGPIO_PORTE, 2> PowerControl;
  CDigitalIn<kGPIO_PORTE, 1> OffSwitch;
 
@@ -72,7 +71,7 @@ void fire_event(int event, uint32_t param) {
 
 void fire_note(byte midi_note, byte midi_vel) {
 	m_midi.send_note(0, midi_note, midi_vel);
-	LED1.set(!!midi_vel);
+	//LED1.set(!!midi_vel);
 }
 
 
@@ -85,9 +84,6 @@ int main(void) {
     BOARD_InitBootClocks();
     BOARD_InitBootPeripherals();
 
-    CDelay::init();
-    CDelay::wait_ms(500);
-    PowerControl.set(1);
 
     //printf("Hello World\n");
     /* Force the counter to be placed into memory. */
@@ -101,7 +97,10 @@ int main(void) {
     g_i2c_bus.dac_init();
     g_midi.init();
     g_clock.init();
-    g_clock.set_bpm(120);
+
+
+    g_clock.wait_ms(500);
+    PowerControl.set(1);
 
     /* Enter an infinite loop, just incrementing a counter.
      * */
@@ -114,11 +113,11 @@ int main(void) {
     LED1.set(1);
     CDelay::wait_ms(500);
     }*/
-    int j=0;
+
     while(1) {
 
-    	if(CDelay::g_ticked) {
-    		g_clock.tick();
+    	if(g_clock.m_ms_tick) {
+    		g_clock.m_ms_tick = 0;
     		grid.run();
         	g_cv_gate.run();
 
@@ -126,11 +125,12 @@ int main(void) {
     		if(!OffSwitch.get()) {
     			PowerControl.set(0);
     		}
-    		CDelay::g_ticked = 0;
-    		//if(g_clock.ticked()) {
-    		//	j=!j;
-    		//}
-   			LED3.set(g_clock.ticked());
+    		if(g_clock.is_pending(CSeqClock::CHANNEL_BEAT_LED)) {
+    			LED3.blink(2);
+    		}
+    		else {
+    			LED3.run();
+    		}
 
 /*       		if(j<500) {
        			LED3.set(1);
@@ -141,15 +141,21 @@ int main(void) {
        		if(++j>=1000) {
        			j = 0;
        		}*/
+        	panelRun();
 
     	}
-    	panelRun();
     	//g_cv_gate.write(3, j);
         //g_cv.write(1, j);
         //g_cv.write(2, j);
         //g_cv.write(3, j);
         //if(++j>4095) j = 0;
+
    		//sequence.run();
+    	if(g_clock.is_pending(CSeqClock::CHANNEL_SEQ1)) {
+    		sequence.step();
+    	}
+
+    	g_clock.run();
 
     }
     return 0 ;

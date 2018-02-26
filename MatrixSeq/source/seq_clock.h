@@ -8,161 +8,157 @@
 #ifndef SEQ_CLOCK_H_
 #define SEQ_CLOCK_H_
 
+#include "fsl_common.h"
+#include "fsl_clock.h"
+#include "fsl_pit.h"
 #include "fsl_kbi.h"
 
 
 
+/*
+ 24ppqn ticks interval is stored as
+ */
 //
+
+
 
 class CSeqClock {
 public:
 
-
-	// COUNTER_TYPE is a 64 bit unsigned integer
-	// the top 16 bits are "ticks"
-	// there are 96 ticks per sixteenth note
-	// the remaining are fractions of a tick
-	// The counter is updated once per millisecond, so the increment is defined as the
-	// number of ticks that elapse per millisecond
-	// the counter runs for 32 sixteenth notes before resetting
-	//
-	typedef uint64_t COUNTER_TYPE;
-	typedef uint16_t TICKS_TYPE;
-
-	typedef struct {
-		int id;
-		int step_rate;
-		int step_count;
-		int swing;
-		int slide;
-	} CHANNEL;
-
-
-
-	//static const int TICKS_PER_QTR_NOTE = 96;
-	static const int TICKS_PER_16TH_NOTE = 24;
-	static const int TICKS_PER_MIDI_TICK = 24; // MIDI 24PPQN
-	static const int TICKS_LEFT_SHIFT = 48;
-
-
-	static const TICKS_TYPE NUM_16THS_PER_CYCLE = 32;
-//	static const TICKS_TYPE NUM_TICKS_PER_CYCLE = ((TICKS_TYPE)NUM_16THS_PER_CYCLE * TICKS_PER_16TH);
-//	static const COUNTER_TYPE TICK_COUNTER_ROLLOVER = (((COUNTER_TYPE)NUM_TICKS_PER_CYCLE)<<TICKS_LEFT_SHIFT);
-
-	static const int MAX_EVENTS = 4;
-
-
-	COUNTER_TYPE m_counter;		// the time counter
-	COUNTER_TYPE m_increment;	// the counter increment per millisecond
-
 	enum
 	{
-	  RATE_1    = 2304,
-	  RATE_2D   = 1728,
-	  RATE_2    = 1152,
-	  RATE_4D   = 864,
-	  RATE_2T   = 768,
-	  RATE_4    = 576,
-	  RATE_8D   = 432,
-	  RATE_4T   = 384,
-	  RATE_8    = 288,
-	  RATE_16D  = 216,
-	  RATE_8T   = 192,
-	  RATE_16   = 144,
-	  RATE_16T  = 96,
-	  RATE_32   = 72,
-	  RATE_64   = 36,
-	  RATE_128  = 18
+	  RATE_1    = 96,
+	  RATE_2D   = 72,
+	  RATE_2    = 48,
+	  RATE_4D   = 36,
+	  RATE_2T   = 32,
+	  RATE_4    = 24,
+	  RATE_8D   = 18,
+	  RATE_4T   = 16,
+	  RATE_8    = 12,
+	  RATE_16D  = 9,
+	  RATE_8T   = 8,
+	  RATE_16   = 6,
+	  RATE_16T  = 4,
+	  RATE_32   = 3
 	};
+	enum {
+		CHANNEL_BEAT_LED,
+		CHANNEL_SEQ1,
+		CHANNEL_SEQ2,
+		CHANNEL_SEQ3,
+		CHANNEL_SEQ4,
+		CHANNEL_MAX
+	};
+	typedef struct {
+		byte ticks_per_step;
+		byte pending_steps;
+		double tick_period;
+		double next_tick;
+	} CHANNEL;
 
-	byte m_ttt;
-	volatile int m_ticks;
+	CHANNEL m_chan[CHANNEL_MAX] = {0};
+
+	volatile uint32_t m_millis; 	// millisecond counter
+	volatile uint32_t m_ticks;
+	volatile byte m_ms_tick;
+	float m_bpm;
 	CSeqClock() {
-		m_ppn = 8;
-		m_ticks = 0;
-		m_zzz = 0;
-		m_ttt = 0;
-	}
-	int m_ppn;
-	CSeqClock::TICKS_TYPE m_zzz;
-
-
-	void set_bpm(uint32_t value) {
-		// calculate a 32 bit increment that will roll over after X milliseconds
-		// where X is the number of miliseconds in a single tick
-
-		// 120 BPM is 120 * 4 = 480 sixteenths per min
-		// calculate total number of ticks per minute
-		m_increment = (value * TICKS_PER_16TH_NOTE * 4);
-
-		m_increment = (bpm * TICKS_PER_QTR_NOTE) << TICKS_LEFT_SHIFT; // 10 * ticks per minute at current BPM
-		m_increment /= (60U * 1000U * 10U); // ticks per millisecond at current BPM
-	}
-	float get_bpm(void) {
-		// TODO
-		return 0;
-	}
-	// called once per millisecond
-	void tick() {
-
-#define QQQ (((COUNTER_TYPE)TICKS_PER_QTR_NOTE)<<48)
-		m_counter = (m_counter + m_increment);
-		if(m_counter >= QQQ) {
-			m_ttt = 1;
-			m_counter -= QQQ;
+		m_millis = 0;
+//		m_ticks = 0;
+		m_chan[0].ticks_per_step = RATE_4;
+		for(int i=1; i<CHANNEL_MAX; ++i) {
+			m_chan[i].ticks_per_step = RATE_16;
 		}
-		/*
-		//TICKS_TYPE t = get_ticks();
-		if(m_counter >= m_zzz) {
-			m_zzz = m_zzz + (((COUNTER_TYPE)RATE_16)<<48);
-			if(m_zzz >= TICK_COUNTER_ROLLOVER) {
-				m_zzz -= TICK_COUNTER_ROLLOVER;
-				m_ttt = 1;
-			}
-		}*/
-		//if(++i >= 500) {
-		//	i=0;
-		//	m_ttt = 1;
-		//}
-	}
-	byte ticked() {
-		if(m_ttt) {
-			m_ttt = 0;
-			return 1;
-		}
-		return 0;
-	}
-	void reset() {
-		m_counter = 0;
+		set_bpm(120);
 	}
 
-	inline TICKS_TYPE get_ticks() {
-		return (m_counter >> TICKS_LEFT_SHIFT);
-	}
-	static inline TICKS_TYPE add_ticks(TICKS_TYPE lhs, TICKS_TYPE rhs) {
-		return 0;//(lhs + rhs)%NUM_TICKS_PER_CYCLE;
-	}
+
 
 	void init() {
-	    kbi_config_t kbiConfig;
-	    kbiConfig.mode = kKBI_EdgesDetect;
-	    kbiConfig.pinsEnabled = 0x01; // KBI0 pin 0
-	    kbiConfig.pinsEdge = 0; // Falling Edge
-	    KBI_Init(KBI0, &kbiConfig);
+
+		// configure a timer to cause an interrupt once per second
+		CLOCK_EnableClock(kCLOCK_Pit0);
+		pit_config_t timerConfig = {
+		 .enableRunInDebug = true,
+		};
+		PIT_Init(PIT, &timerConfig);
+		EnableIRQ(PIT_CH0_IRQn);
+		PIT_EnableInterrupts(PIT, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
+		PIT_SetTimerPeriod(PIT, kPIT_Chnl_0, (uint32_t) MSEC_TO_COUNT(1, CLOCK_GetBusClkFreq()));
+		PIT_StartTimer(PIT, kPIT_Chnl_0);
+
+		// configure the KBI peripheral to cause an interrupt when sync pulse in is triggered
+		kbi_config_t kbiConfig;
+		kbiConfig.mode = kKBI_EdgesDetect;
+		kbiConfig.pinsEnabled = 0x01; // KBI0 pin 0
+		kbiConfig.pinsEdge = 0; // Falling Edge
+		KBI_Init(KBI0, &kbiConfig);
 	}
+
+	void set_bpm(float bpm) {
+		m_bpm = bpm;
+//		m_tick_rate = 125; // 6 * (60 * 1000) / (bpm*24);
+		for(int i=0; i<CHANNEL_MAX; ++i) {
+			m_chan[i].tick_period = m_chan[i].ticks_per_step * ((double)60*1000) / ((double)bpm * 24);
+		}
+	}
+
+	void run() {
+
+		for(int i=0; i<CHANNEL_MAX; ++i) {
+			while(m_millis >= m_chan[i].next_tick) {
+				++m_chan[i].pending_steps;
+				m_chan[i].next_tick = m_chan[i].next_tick + m_chan[i].tick_period;
+			}
+		}
+	}
+	byte is_pending(int chan) {
+		if(m_chan[chan].pending_steps) {
+			return m_chan[chan].pending_steps--;
+		}
+		return 0;
+	}
+
+	void wait_ms(int ms) {
+		while(ms) {
+			uint32_t m = m_millis;
+			while(m_millis==m);
+			--ms;
+		}
+	}
+
+
 };
+
+// declare global instance of the sequencer clock
 extern CSeqClock g_clock;
+
+
 #ifdef MAIN_INCLUDE
+
+// define the clock instance
 CSeqClock g_clock;
+
+// define the GPIO pins used for clock (will initialise the port)
 CDigitalIn<kGPIO_PORTA, 0> pClockIn;
 CDigitalOut<kGPIO_PORTC, 5> pClockOut;
+
+// ISR for the millisecond timer
+extern "C" void PIT_CH0_IRQHandler(void) {
+	PIT_ClearStatusFlags(PIT, kPIT_Chnl_0, kPIT_TimerFlag);
+	++g_clock.m_millis;
+	g_clock.m_ms_tick = 1;
+}
+
+// ISR for the KBI interrupt (SYNC IN)
 extern "C" void KBI0_IRQHandler(void)
 {
     if (KBI_IsInterruptRequestDetected(KBI0)) {
         KBI_ClearInterruptFlag(KBI0);
-        g_clock.m_ticks++;
     }
 }
+
 #endif
 
 

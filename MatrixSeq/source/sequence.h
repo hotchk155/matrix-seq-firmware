@@ -12,46 +12,34 @@
 
 typedef struct {
 	byte note;	// MIDI note
-	byte vel;	// MIDI velocity
+	byte mod;	// modulator/velocity
 } SEQ_NOTE;
 
-typedef struct {
-	byte value;
-} SEQ_MOD;
-
-
-#define SEQ_MAX_STEPS 32
-
-
+// This class defines a single layer of a pattern
 class CSequence {
 public:
 	enum {
 		NO_NOTE = 255,
-		NO_POS = -1
+		NO_POS = -1,
+		MAX_STEPS = 32
 	};
-	SEQ_NOTE notes[SEQ_MAX_STEPS];
-	SEQ_MOD mod[SEQ_MAX_STEPS];
+	SEQ_NOTE notes[MAX_STEPS];
 	int m_play_pos;
 	int m_loop_from;
 	int m_loop_to;
 	byte m_last_note;
 
-	CSeqClock::TICKS_TYPE m_next_tick;
-	CSeqClock::TICKS_TYPE m_rate;
 	CSequence() {
 		clear();
 		m_play_pos = 0;
 		m_loop_from = 0;
-		m_loop_to = 16;
-		m_last_note = NO_NOTE;
-		m_next_tick = 0;
-		m_rate =CSeqClock::RATE_16;
+		m_loop_to = 15;
+		m_last_note =NO_NOTE;
 	}
 	void clear() {
-		for(int i=0; i<SEQ_MAX_STEPS; ++i) {
+		for(int i=0; i<MAX_STEPS; ++i) {
 			notes[i].note = NO_NOTE;
-			notes[i].vel = 0;
-			mod[i].value= 0;
+			notes[i].mod = 0;
 		}
 	}
 	void set_loop_start(int pos) {
@@ -72,7 +60,7 @@ public:
 	// tell the sequencer to move to the next step
 	// return value is nonzero if the end of the loop
 	// has been reached
-	byte step() {
+	void step() {
 		++m_play_pos;
 		if(m_play_pos < m_loop_from) {
 			m_play_pos = m_loop_from;
