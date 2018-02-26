@@ -322,6 +322,30 @@ void BOARD_InitBootPins(void);
 #define BOARD_INITPINS_GATEOUT3_NAME "GATEOUT3"  /*!<@brief Identifier name */
                                                  /* @} */
 
+/*! @name KBI0_P0 (number 35), EXTSYNC
+  @{ */
+#define BOARD_INITPINS_EXTSYNC_PERIPHERAL KBI0  /*!<@brief Device name: KBI0 */
+#define BOARD_INITPINS_EXTSYNC_SIGNAL P         /*!<@brief KBI0 signal: P */
+#define BOARD_INITPINS_EXTSYNC_CHANNEL 0        /*!<@brief KBI0 P channel: 0 */
+#define BOARD_INITPINS_EXTSYNC_PIN_NAME KBI0_P0 /*!<@brief Pin name */
+#define BOARD_INITPINS_EXTSYNC_LABEL "EXTSYNC"  /*!<@brief Label */
+#define BOARD_INITPINS_EXTSYNC_NAME "EXTSYNC"   /*!<@brief Identifier name */
+                                                /* @} */
+
+/*! @name PTC5 (number 41), SYNCOUT
+  @{ */
+#define BOARD_INITPINS_SYNCOUT_PERIPHERAL GPIOA /*!<@brief Device name: GPIOA */
+#define BOARD_INITPINS_SYNCOUT_SIGNAL GPIO      /*!<@brief GPIOA signal: GPIO */
+#define BOARD_INITPINS_SYNCOUT_GPIO GPIOA       /*!<@brief GPIO device name: GPIOA */
+#define BOARD_INITPINS_SYNCOUT_GPIO_PIN 21U     /*!<@brief PORTA pin index: 21 */
+#define BOARD_INITPINS_SYNCOUT_PORT PORTC       /*!<@brief PORT device name: PORTC */
+#define BOARD_INITPINS_SYNCOUT_PIN 5U           /*!<@brief PORTC pin index: 5 */
+#define BOARD_INITPINS_SYNCOUT_CHANNEL 21       /*!<@brief GPIOA GPIO channel: 21 */
+#define BOARD_INITPINS_SYNCOUT_PIN_NAME PTC5    /*!<@brief Pin name */
+#define BOARD_INITPINS_SYNCOUT_LABEL "SYNCOUT"  /*!<@brief Label */
+#define BOARD_INITPINS_SYNCOUT_NAME "SYNCOUT"   /*!<@brief Identifier name */
+                                                /* @} */
+
 /*!
  * @brief Configures pin routing and optionally pin electrical features.
  *

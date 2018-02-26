@@ -33,6 +33,8 @@ pin_labels:
 - {pin_num: '29', pin_signal: PTD4/KBI1_P4, label: GATEOUT3, identifier: GATEOUT3}
 - {pin_num: '30', pin_signal: PTD3/KBI1_P3/SPI1_PCS0, label: GATEOUT2, identifier: GATEOUT2}
 - {pin_num: '31', pin_signal: PTD2/KBI1_P2/SPI1_MISO, label: GATEOUT1, identifier: GATEOUT1}
+- {pin_num: '35', pin_signal: PTA0/KBI0_P0/FTM0_CH0/ACMP0_IN0/ADC0_SE0, label: EXTSYNC, identifier: EXTSYNC}
+- {pin_num: '41', pin_signal: PTC5/FTM1_CH1/RTCO, label: SYNCOUT, identifier: SYNCOUT}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 /* clang-format on */
@@ -82,6 +84,10 @@ BOARD_InitPins:
   - {pin_num: '29', peripheral: GPIOA, signal: 'GPIO, 28', pin_signal: PTD4/KBI1_P4}
   - {pin_num: '32', peripheral: I2C0, signal: SCL, pin_signal: PTA3/KBI0_P3/UART0_TX/I2C0_SCL}
   - {pin_num: '33', peripheral: I2C0, signal: SDA, pin_signal: PTA2/KBI0_P2/UART0_RX/I2C0_SDA}
+  - {pin_num: '24', peripheral: UART0, signal: RX, pin_signal: PTB0/KBI0_P4/UART0_RX/ADC0_SE4}
+  - {pin_num: '23', peripheral: UART0, signal: TX, pin_signal: PTB1/KBI0_P5/UART0_TX/ADC0_SE5}
+  - {pin_num: '35', peripheral: KBI0, signal: 'P, 0', pin_signal: PTA0/KBI0_P0/FTM0_CH0/ACMP0_IN0/ADC0_SE0, pullup_enable: disable}
+  - {pin_num: '41', peripheral: GPIOA, signal: 'GPIO, 21', pin_signal: PTC5/FTM1_CH1/RTCO}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 /* clang-format on */
@@ -98,6 +104,8 @@ void BOARD_InitPins(void)
     PORT_SetHighDriveEnable(PORT, kPORT_HighDrive_PTE1, 0);
     /* Pull Enable for Port E Bit 1: 0x01u */
     PORT_SetPinPullUpEnable(PORT, kPORT_PTE, kPORT_PinIdx1, 1);
+    /* Pull Enable for Port A Bit 0: 0x00u */
+    PORT_SetPinPullUpEnable(PORT, kPORT_PTA, kPORT_PinIdx0, 0);
     /* Pull Enable for Port C Bit 6: 0x01u */
     PORT_SetPinPullUpEnable(PORT, kPORT_PTC, kPORT_PinIdx6, 1);
     /* Pull Enable for Port D Bit 0: 0x01u */
@@ -110,6 +118,8 @@ void BOARD_InitPins(void)
     PORT_SetPinPullUpEnable(PORT, kPORT_PTD, kPORT_PinIdx7, 1);
     /* pin 33,32 is configured as I2C0_SDA, I2C0_SCL */
     PORT_SetPinSelect(kPORT_I2C0, kPORT_I2C0_SCLPTA3_SDAPTA2);
+    /* pin 23,24 is configured as UART0_TX, UART0_RX */
+    PORT_SetPinSelect(kPORT_UART0, kPORT_UART0_RXPTB0_TXPTB1);
 }
 /***********************************************************************************************************************
  * EOF

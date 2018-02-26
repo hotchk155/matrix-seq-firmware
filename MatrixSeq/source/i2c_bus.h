@@ -25,6 +25,8 @@ class CI2CBus{
 public:
 
 	static volatile byte s_busy;
+	static volatile byte m_transaction;
+
 	void init() {
 		i2c_master_config_t masterConfig;
 		I2C_MasterGetDefaultConfig(&masterConfig);
@@ -35,11 +37,14 @@ public:
 	inline byte busy() {
 		return s_busy;
 	}
+	inline byte transaction() {
+		return m_transaction;
+	}
 	void wait() {
 		while(s_busy);
 	}
 
-	void write(byte addr, int len) {
+	byte write(byte addr, int len) {
 		m_len = len;
 		m_xfer.slaveAddress = addr;
 		m_xfer.direction = kI2C_Write;
@@ -48,9 +53,11 @@ public:
 		m_xfer.data = m_buf;
 		m_xfer.dataSize = m_len;
 		m_xfer.flags = kI2C_TransferDefaultFlag;
+		byte txn = m_transaction;
 		I2C_MasterTransferCreateHandle(I2C0, &m_handle, i2c_master_callback, NULL);
 		s_busy = 1;
-		status_t ret = I2C_MasterTransferNonBlocking(I2C0, &m_handle, &m_xfer);
+		I2C_MasterTransferNonBlocking(I2C0, &m_handle, &m_xfer);
+		return txn;
 	}
 	void write_blocking(byte addr, int len) {
 		write(addr, len);
@@ -78,15 +85,10 @@ extern CI2CBus g_i2c_bus;
 
 void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle, status_t status, void *userData)
 {
-    /* Signal transfer success when received success status. */
-    if (status == kStatus_Success)
-    {
-    	CI2CBus::s_busy = 0;
-    }
-    else {
-    	CI2CBus::s_busy = 2;
-    }
+	CI2CBus::s_busy = 0;
+	CI2CBus::m_transaction++;
 }
 volatile byte CI2CBus::s_busy = 0;
+volatile byte CI2CBus::m_transaction = 0;
 
 #endif /* I2C_BUS_H_ */

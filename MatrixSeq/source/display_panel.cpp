@@ -14,10 +14,6 @@
 #include "fsl_spi.h"
 #include "fsl_pit.h"
 
-CDigitalOut<kGPIO_PORTA, 6> pGate4;
-CDigitalOut<kGPIO_PORTD, 4> pGate3;
-CDigitalOut<kGPIO_PORTD, 3> pGate2;
-CDigitalOut<kGPIO_PORTD, 2> pGate1;
 
 
 CDigitalOut<kGPIO_PORTD, 5> pKDAT;
@@ -46,10 +42,6 @@ CDigitalIn<kGPIO_PORTD, 1> pEncoder2;
 #define BIT_ENCODER1	MK_GPIOA_BIT(PORTD_BASE, 0)
 #define BIT_ENCODER2	MK_GPIOA_BIT(PORTD_BASE, 1)
 
-#define BIT_GATE1		MK_GPIOA_BIT(PORTD_BASE, 2)
-#define BIT_GATE2		MK_GPIOA_BIT(PORTD_BASE, 3)
-#define BIT_GATE3		MK_GPIOA_BIT(PORTD_BASE, 4)
-#define BIT_GATE4		MK_GPIOA_BIT(PORTA_BASE, 6)
 
 #define DEBOUNCE_MS_PRESS 		50
 #define DEBOUNCE_MS_RELEASE		50
@@ -190,7 +182,6 @@ static byte l_phase = PHASE_NORMAL;
 extern "C" void PIT_CH1_IRQHandler(void) {
 	PIT_ClearStatusFlags(PIT, kPIT_Chnl_1, kPIT_TimerFlag);
 	PIT_StopTimer(PIT, kPIT_Chnl_1);
-	SET_GPIOA(BIT_GATE1);
 
 		// First layer
 	switch(l_phase) {
@@ -198,7 +189,6 @@ extern "C" void PIT_CH1_IRQHandler(void) {
 	////////////////////////////////////////////////////////////////////////////
 	// NORMAL BRIGHTNESS PHASE
 	case PHASE_NORMAL:
-		SET_GPIOA(BIT_GATE2);
 
 		if(!l_cathode) { // starting  a new refresh cycle
 			// copy over updated render buffer if available
@@ -347,7 +337,6 @@ extern "C" void PIT_CH1_IRQHandler(void) {
 	}
 
 	PIT_StartTimer(PIT, kPIT_Chnl_1);
-	CLR_GPIOA(BIT_GATE1);
 }
 
 

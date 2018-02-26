@@ -31,7 +31,7 @@ public:
 		m_cursor = 0;
 		m_row = 0;
 		m_flags = 0;
-		m_base_note = 0;
+		m_base_note = 48;
 		m_action = ACTION_NONE;
 		m_popup = 0;
 	}

@@ -8,6 +8,7 @@
 #ifndef SEQUENCE_H_
 #define SEQUENCE_H_
 
+#include "seq_clock.h"
 
 typedef struct {
 	byte note;	// MIDI note
@@ -33,11 +34,18 @@ public:
 	int m_play_pos;
 	int m_loop_from;
 	int m_loop_to;
+	byte m_last_note;
+
+	CSeqClock::TICKS_TYPE m_next_tick;
+	CSeqClock::TICKS_TYPE m_rate;
 	CSequence() {
 		clear();
 		m_play_pos = 0;
 		m_loop_from = 0;
 		m_loop_to = 16;
+		m_last_note = NO_NOTE;
+		m_next_tick = 0;
+		m_rate =CSeqClock::RATE_16;
 	}
 	void clear() {
 		for(int i=0; i<SEQ_MAX_STEPS; ++i) {
@@ -60,27 +68,38 @@ public:
 	void set_pos(int pos) {
 		m_play_pos = pos;
 	}
-	void tick() {
-		static int c = 0;
-		if(++c >= 100) {
-			c = 0;
-			++m_play_pos;
-			if(m_play_pos < m_loop_from) {
-				m_play_pos = m_loop_from;
-			}
-			else if(m_play_pos > m_loop_to) {
-				m_play_pos = m_loop_from;
-			}
+
+	// tell the sequencer to move to the next step
+	// return value is nonzero if the end of the loop
+	// has been reached
+	byte step() {
+		++m_play_pos;
+		if(m_play_pos < m_loop_from) {
+			m_play_pos = m_loop_from;
+		}
+		else if(m_play_pos > m_loop_to) {
+			m_play_pos = m_loop_from;
+		}
+		if(m_last_note != NO_NOTE) {
+			fire_note(m_last_note, 0);
+			m_last_note = NO_NOTE;
+		}
+		if(notes[m_play_pos].note != NO_NOTE) {
+			m_last_note = notes[m_play_pos].note;
+			fire_note(m_last_note, 127);
 		}
 	}
+	void run() {
+
+	}
 	void test() {
-		notes[0].note = 5;
-		notes[1].note = 5;
-		notes[4].note = 6;
-		notes[5].note = 8;
-		notes[8].note = 0;
-		notes[9].note = 0;
-		notes[12].note = 12;
+		notes[0].note = 45;
+		notes[1].note = 45;
+		notes[4].note = 46;
+		notes[5].note = 48;
+		notes[8].note = 50;
+		notes[9].note = 50;
+		notes[12].note = 52;
 	}
 };
 

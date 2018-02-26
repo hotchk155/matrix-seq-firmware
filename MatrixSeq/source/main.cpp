@@ -43,7 +43,9 @@
 #define MAIN_INCLUDE
 #include "defs.h"
 #include "i2c_bus.h"
-#include <cv_gate.h>
+#include "seq_clock.h"
+#include "midi.h"
+#include "cv_gate.h"
 #include "digital_out.h"
 #include "delays.h"
 #include "display_panel.h"
@@ -61,10 +63,16 @@
 
 CI2CBus g_i2c_bus;
 CCVGate g_cv_gate;
+CMidi m_midi;
 
 CGrid *g_grid = nullptr;
 void fire_event(int event, uint32_t param) {
 	g_grid->event(event, param);
+}
+
+void fire_note(byte midi_note, byte midi_vel) {
+	m_midi.send_note(0, midi_note, midi_vel);
+	LED1.set(!!midi_vel);
 }
 
 
@@ -91,26 +99,58 @@ int main(void) {
 
     g_i2c_bus.init();
     g_i2c_bus.dac_init();
+    g_midi.init();
+    g_clock.init();
+    g_clock.set_bpm(120);
 
     /* Enter an infinite loop, just incrementing a counter.
      * */
     panelInit();
     sequence.test();
 
+    /*for(;;) {
+    LED1.set(0);
+    CDelay::wait_ms(500);
+    LED1.set(1);
+    CDelay::wait_ms(500);
+    }*/
     int j=0;
     while(1) {
+
     	if(CDelay::g_ticked) {
-    		sequence.tick();
+    		g_clock.tick();
     		grid.run();
+        	g_cv_gate.run();
+
+
+    		if(!OffSwitch.get()) {
+    			PowerControl.set(0);
+    		}
     		CDelay::g_ticked = 0;
+    		//if(g_clock.ticked()) {
+    		//	j=!j;
+    		//}
+   			LED3.set(g_clock.ticked());
+
+/*       		if(j<500) {
+       			LED3.set(1);
+       		}
+       		else {
+       			LED3.set(0);
+       		}
+       		if(++j>=1000) {
+       			j = 0;
+       		}*/
+
     	}
     	panelRun();
-    	g_cv_gate.write(3, j);
+    	//g_cv_gate.write(3, j);
         //g_cv.write(1, j);
         //g_cv.write(2, j);
         //g_cv.write(3, j);
-    	g_cv_gate.run();
-        if(++j>4095) j = 0;
+        //if(++j>4095) j = 0;
+   		//sequence.run();
+
     }
     return 0 ;
 }

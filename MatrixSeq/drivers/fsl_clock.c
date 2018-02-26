@@ -360,7 +360,7 @@ void CLOCK_InitOsc0(osc_config_t const *config)
     if ((kOSC_ModeExt != config->workMode) && (OSC0->CR & OSC_CR_OSCEN_MASK))
     {
         /* Wait for stable. */
-         while (!(OSC0->CR & OSC_CR_OSCINIT_MASK))
+        while (!(OSC0->CR & OSC_CR_OSCINIT_MASK))
         {
         }
     }

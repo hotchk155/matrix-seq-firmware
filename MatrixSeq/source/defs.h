@@ -31,6 +31,7 @@ typedef unsigned char byte;
 
 
 extern void fire_event(int event, uint32_t param);
+extern void fire_note(byte midi_note, byte midi_vel);
 
 extern const uint32_t char4x5[];
 #define CHAR4X5_ALPHA		0
