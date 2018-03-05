@@ -15,14 +15,27 @@
 class CSequencer {
 public:
 
+	int m_layer;
+	int m_cursor;
+	int m_row;
+	int m_base_note;
+	int m_action;
+	int m_popup;
+	//byte m_layer;
+	byte m_flags;
+	uint16_t m_copy_mod;
+	char *m_msg;
+	static const uint32_t c_ruler = 0x88888888U;
 
 	enum {
 		NUM_LAYERS = 4
 	};
-	CSequenceLayer m_layer[NUM_LAYERS];
+	CSequenceLayer m_layers[NUM_LAYERS];
 	byte m_midi_velocity = 127;
 	CSequencer() {
 		m_midi_velocity = 127;
+		m_layer = 0;
+		init();
 	}
 
 
@@ -43,13 +56,13 @@ public:
 
 		// run the clock on each sequencer layer
 		for(int i=0; i<NUM_LAYERS; ++i) {
-			if(CSequenceLayer::VELOCITY_SEQUENCE == m_layer[i].m_mode) {
+			if(CSequenceLayer::VELOCITY_SEQUENCE == m_layers[i].m_mode) {
 				velocity_layer = i; // remember if there is a velocity layer (only 1 allowed)
 			}
-			if(CSequenceLayer::NOTE_SEQUENCE == m_layer[i].m_mode) {
+			if(CSequenceLayer::NOTE_SEQUENCE == m_layers[i].m_mode) {
 				note_layer = i; // remember last note layer
 			}
-			stepped |= m_layer[i].tick(ticks, parts_tick);
+			stepped |= m_layers[i].tick(ticks, parts_tick);
 		}
 		if(!stepped) {
 			// if nothing has changed, no need to go further
@@ -58,9 +71,9 @@ public:
 
 		CCVGate::TRANSACTION txn;
 		for(int i=0; i<NUM_LAYERS; ++i) {
-			CSequenceLayer& layer = m_layer[i];
+			CSequenceLayer& layer = m_layers[i];
 			txn.flags[i] = 0;
-			if(CSequenceLayer::NOTE_SEQUENCE == m_layer[i].m_mode) {
+			if(CSequenceLayer::NOTE_SEQUENCE == m_layers[i].m_mode) {
 				note_layer = i; // preceding note layer for a transpose layer
 			}
 
@@ -87,7 +100,7 @@ public:
 						if(layer.m_mode == CSequenceLayer::TRANSPOSE_SEQUENCE) {
 							if(note_layer >= 0) {
 								// get note from the note layer and transpose it
-								midi_note = (byte)m_layer[note_layer].m_value;
+								midi_note = (byte)m_layers[note_layer].m_value;
 								midi_note += ((int)((byte)layer.m_value)-64);
 								midi_note = layer.force_to_scale(midi_note);
 							}
@@ -104,7 +117,7 @@ public:
 						// decide MIDI velocity
 						byte midi_velocity;
 						if(velocity_layer >= 0) {
-							midi_velocity = (byte)m_layer[velocity_layer].m_value;
+							midi_velocity = (byte)m_layers[velocity_layer].m_value;
 						}
 						else {
 							midi_velocity = m_midi_velocity;
@@ -168,6 +181,264 @@ public:
 				g_cv_gate.set(txn);
 				break;
 			}
+		}
+	}
+
+
+
+public:
+	enum {
+		GRID_WIDTH = 32,
+		MAX_CURSOR = 31,
+		POPUP_MS = 2000
+	};
+	/*enum {
+		LAYER_0,
+		LAYER_1,
+		LAYER_2,
+		LAYER_3,
+		LAYER_MOD = 0x80
+	};*/
+	enum {
+		ACTION_NONE,
+		ACTION_NOTE_DRAG,
+		ACTION_MOD_DRAG,
+		ACTION_ERASE,
+		ACTION_MOD_CLONE,
+		ACTION_NOTE_CLONE,
+		ACTION_SET_LOOP,
+		ACTION_DRAG_LOOP
+	};
+	void init() {
+		m_cursor = 0;
+		m_row = 0;
+		m_flags = 0;
+		m_base_note = 48;
+		m_action = ACTION_NONE;
+		m_popup = 0;
+		m_copy_mod = 0;
+		m_msg = nullptr;
+	}
+	void event(int evt, uint32_t param) {
+		CSequenceLayer *layer = &m_layers[m_layer];
+		switch(evt) {
+		case EV_ENCODER:
+			if(m_action == ACTION_NOTE_DRAG) {
+				m_row += (int)param;
+				if(m_row < 0) {
+					m_row = 0;
+				}
+				if(m_row > 12) {
+					m_row = 12;
+				}
+				layer->set_step(m_cursor, m_base_note + m_row);
+				m_popup = POPUP_MS;
+			}
+			else if(m_action == ACTION_MOD_DRAG) {
+				m_copy_mod += 10 * (int)param;
+				if(m_copy_mod < 0) {
+					m_copy_mod = 0;
+				}
+				if(m_copy_mod > 127) {
+					m_copy_mod = 127;
+				}
+				layer->set_step(m_cursor, m_copy_mod);
+				m_popup = 0;
+			}
+			else {
+				if(m_action == ACTION_SET_LOOP) {
+					layer->set_loop_start(m_cursor);
+					m_action = ACTION_DRAG_LOOP;
+				}
+				if(m_action == ACTION_ERASE) {
+					layer->clear_step(m_cursor);
+					m_popup = 0;
+				}
+				if((int)param < 0) {
+					if(m_cursor > 0) {
+						--m_cursor;
+					}
+				}
+				else {
+					if(++m_cursor >=  MAX_CURSOR) {
+						m_cursor = MAX_CURSOR;
+					}
+				}
+				if(m_action == ACTION_MOD_CLONE) {
+					layer->set_step(m_cursor, m_copy_mod);
+				}
+				else if(m_action == ACTION_NOTE_CLONE) {
+					layer->set_step(m_cursor, m_base_note + m_row);
+					m_popup = POPUP_MS;
+				}
+				else if(m_action == ACTION_DRAG_LOOP) {
+					layer->set_loop_end(m_cursor);
+					m_popup = POPUP_MS;
+				}
+			}
+			break;
+		case EV_KEY_PRESS:
+			switch(param) {
+			case KEY_B1:
+				if(m_action == ACTION_NONE) {
+					switch(layer->m_mode) {
+						case CSequenceLayer::NOTE_SEQUENCE:
+							if(!layer->get_step(m_cursor)) {
+								layer->set_step(m_cursor, m_base_note + m_row);
+							}
+							else {
+								m_row = layer->get_step(m_cursor) - m_base_note;
+							}
+							m_popup = POPUP_MS;
+							m_action = ACTION_NOTE_DRAG;
+							break;
+						default:
+							m_copy_mod = layer->get_step(m_cursor);
+							m_popup = 0;
+							m_action = ACTION_MOD_DRAG;
+					}
+				}
+				break;
+			case KEY_B2:
+				if(m_action == ACTION_NONE) {
+					switch(layer->m_mode) {
+						case CSequenceLayer::NOTE_SEQUENCE:
+							m_row = layer->get_step(m_cursor) - m_base_note;
+							m_action = ACTION_NOTE_CLONE;
+							m_popup = POPUP_MS;
+							break;
+						default:
+							m_copy_mod = layer->get_step(m_cursor);
+							m_action = ACTION_MOD_CLONE;
+							m_popup = 0;
+							break;
+					}
+				}
+				break;
+			case KEY_B3:
+				if(m_action == ACTION_NONE) {
+					layer->clear_step(m_cursor);
+					m_action = ACTION_ERASE;
+				}
+				break;
+			case KEY_B6:
+				if(m_action == ACTION_NONE) {
+					layer->set_pos(m_cursor);
+					m_action = ACTION_SET_LOOP;
+				}
+				break;
+			}
+			break;
+		case EV_KEY_RELEASE:
+			m_action = ACTION_NONE;
+			break;
+		}
+	}
+	void repaint() {
+		int i;
+		uint32_t mask;
+		CSequenceLayer *layer = &m_layers[m_layer];
+
+		CRenderBuf::lock();
+		CRenderBuf::clear();
+
+		// displaying the cursor
+		switch(layer->m_mode) {
+			case CSequenceLayer::NOTE_SEQUENCE:
+				mask = CRenderBuf::bit(m_cursor);
+				for(i=0; i<13; ++i) {
+					CRenderBuf::raster(i) &= ~mask;
+					CRenderBuf::hilite(i) |= mask;
+				}
+				break;
+			default:
+				mask = CRenderBuf::bit(m_cursor);
+				for(i=0; i<14; ++i) {
+					CRenderBuf::raster(i) &= ~mask;
+					CRenderBuf::hilite(i) |= mask;
+				}
+		}
+
+		// the loop points
+		mask = CRenderBuf::make_mask(layer->m_loop_from, layer->m_loop_to + 1);
+
+		CRenderBuf::raster(15) |= (c_ruler & mask);
+  		CRenderBuf::hilite(15) |= (~c_ruler & mask);
+		mask = CRenderBuf::bit(layer->m_play_pos);
+		CRenderBuf::raster(15) |= mask;
+		CRenderBuf::hilite(15) |= mask;
+
+		// displaying the cursor
+		switch(layer->m_mode) {
+			case CSequenceLayer::NOTE_SEQUENCE:
+				mask = CRenderBuf::bit(0);
+				for(i=0; i<32; ++i) {
+					int n = SEQ_STEP(layer->m_step[i]);
+					if(n) {
+						n = 12 - n + m_base_note;
+						if(n >= 0 && n <= 12) {
+							CRenderBuf::raster(n) |= mask;
+							if(i == layer->m_play_pos) {
+								CRenderBuf::set_hilite(n, mask);
+							}
+							else {
+								CRenderBuf::clear_hilite(n, mask);
+							}
+						}
+
+						if(SEQ_GATE(layer->m_step[i])) {
+							CRenderBuf::set_raster(14, mask); // trig
+						}
+						else {
+							CRenderBuf::set_hilite(14, mask); // legato
+						}
+					}
+					mask>>=1;
+				}
+				break;
+			default:
+				mask = CRenderBuf::bit(0);
+				for(i=0; i<32; ++i) {
+					int n = (5+SEQ_STEP(layer->m_step[i]))/10;
+					if(n>0) {
+						CRenderBuf::raster(13-n) |= mask;
+					}
+					else {
+						CRenderBuf::hilite(13) |= mask;
+					}
+					mask>>=1;
+				}
+				break;
+		}
+
+		if(m_popup) {
+			int flags = 0;
+			if(m_cursor > 16) {
+				flags = CRenderBuf::POPUP_LEFT;
+			}
+			switch(m_action) {
+			case ACTION_NOTE_DRAG:
+			case ACTION_NOTE_CLONE:
+				CRenderBuf::print_note_name(m_row + m_base_note,flags);
+				break;
+			case ACTION_DRAG_LOOP:
+				CRenderBuf::print_number2(1 + layer->m_loop_to -layer->m_loop_from,flags);
+				break;
+			default:
+				if(m_msg) {
+					CRenderBuf::print_text(m_msg,flags);
+				}
+				break;
+			}
+		}
+
+
+		CRenderBuf::unlock();
+	}
+	void run() {
+		repaint();
+		if(m_popup) {
+			--m_popup;
 		}
 	}
 

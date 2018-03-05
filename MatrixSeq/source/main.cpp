@@ -50,7 +50,7 @@
 #include "display_panel.h"
 #include "sequence_layer.h"
 #include "sequencer.h"
-#include "grid.h"
+
 
 
 /* TODO: insert other definitions and declarations here. */
@@ -69,6 +69,7 @@
 
 
 void fire_event(int event, uint32_t param) {
+	/*
 	if(event == EV_KEY_PRESS) {
 		switch(param) {
 		case KEY_L5: g_grid.set_layer(3); return;
@@ -76,8 +77,8 @@ void fire_event(int event, uint32_t param) {
 		case KEY_L7: g_grid.set_layer(1); return;
 		case KEY_L8: g_grid.set_layer(0); return;
 		}
-	}
-	g_grid.event(event, param);
+	}*/
+	g_sequencer.event(event, param);
 }
 
 void fire_note(byte midi_note, byte midi_vel) {
@@ -113,7 +114,7 @@ int main(void) {
     /* Enter an infinite loop, just incrementing a counter.
      * */
     panelInit();
-    g_sequencer.m_layer[0].test();
+    g_sequencer.m_layers[0].test();
 
     /*for(;;) {
     LED1.set(0);
@@ -126,9 +127,9 @@ int main(void) {
 
     	if(g_clock.m_ms_tick) {
     		g_clock.m_ms_tick = 0;
-    		g_grid.run();
         	g_cv_gate.run();
         	g_sequencer.tick(g_clock.m_ticks, (byte)(256*g_clock.m_part_tick));
+    		g_sequencer.run();
 
     		if(!OffSwitch.get()) {
     			PowerControl.set(0);
