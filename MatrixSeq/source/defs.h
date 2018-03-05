@@ -24,6 +24,8 @@ typedef unsigned char byte;
 #define PORTC_BASE 16
 #define PORTD_BASE 24
 
+extern const uint32_t char4x5[];
+
 #define MK_GPIOA_BIT(port, bit) (((uint32_t)1) << ((port) + (bit)))
 #define SET_GPIOA(mask) ((GPIO_Type *)GPIOA_BASE)->PSOR = (mask)
 #define CLR_GPIOA(mask) ((GPIO_Type *)GPIOA_BASE)->PCOR = (mask)
@@ -33,11 +35,6 @@ typedef unsigned char byte;
 extern void fire_event(int event, uint32_t param);
 extern void fire_note(byte midi_note, byte midi_vel);
 
-extern const uint32_t char4x5[];
-#define CHAR4X5_ALPHA		0
-#define CHAR4X5_HASH		26
-#define CHAR4X5_NUMERIC		32
-#define CHAR4X5_MINUS		42
 
 
 #endif /* DEFS_H_ */

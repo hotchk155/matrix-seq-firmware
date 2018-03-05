@@ -46,6 +46,13 @@ extern volatile byte g_disp_update;
 
 #define KEY_MAXBIT	(1U<<23)
 
+extern const uint32_t char4x5[];
+#define CHAR4X5_ALPHA		0
+#define CHAR4X5_HASH		26
+#define CHAR4X5_NUMERIC		32
+#define CHAR4X5_MINUS		42
+#define CHAR4X5_BLOCK		47
+
 
 class CRenderBuf {
 public:
@@ -108,11 +115,12 @@ public:
 		}
 		return result;
 	}
-	static void print_char(int ch, int col, int row, int flags) {
+	static void print_char(int ch, int col, int row, uint32_t *buf, int size) {
 
 		switch(ch) {
 		case '#': ch = CHAR4X5_HASH; break;
 		case '-': ch = CHAR4X5_MINUS; break;
+		case '~': ch = CHAR4X5_BLOCK; break;
 		default:
 			if(ch >= '0' && ch <= '9') {
 				ch = CHAR4X5_NUMERIC + ch - '0';
@@ -144,7 +152,7 @@ public:
 		// display buffer
 		int shift2 = col - 28;
 
-		for(int i=0; i<5 && row >= 0 && row < 16; ++i) {
+		for(int i=0; i<5 && row >= 0 && row < size; ++i) {
 
 			// fetch data word
 			uint32_t d = p[i];
@@ -161,17 +169,12 @@ public:
 				d>>=shift2;
 			}
 
-			// and add it to the screen data
-			if(flags & CHAR_RASTER) {
-				g_render_buf[row] |= d;
-			}
-			if(flags & CHAR_HILITE) {
-				g_render_buf[16+row] |= d;
-			}
+			buf[row] |= d;
 			++row;
-
 		}
 	}
+
+	/*
 	//
 	// 0111011101110
 	static void print_note_name(byte note, int flags) {
@@ -282,7 +285,7 @@ public:
 			col += 4;
 			++sz;
 		}
-	}
+	}*/
 
 };
 

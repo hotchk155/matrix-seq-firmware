@@ -1,6 +1,6 @@
 #include "defs.h"
 
-const uint32_t char4x5[] = {
+const uint32_t char4x5[30] = {
 
 		// A thru H
 		0xEEECEEEAU,
@@ -32,15 +32,16 @@ const uint32_t char4x5[] = {
 		0xA4E6EEE2U,
 		0xA48222A2U,
 		0xEEEE2EE2U,
-		//8-9-
-		0xEE000000U,
-		0xAA000000U,
-		0xEEE00000U,
-		0xA2000000U,
-		0xEE000000U,
+		//89-
+		0xEE00000FU,
+		0xAA00000FU,
+		0xEEE0000FU,
+		0xA200000FU,
+		0xEE00000FU,
 
 };
 
+/*
 const byte charSet[] = {
 
 1,1,1,1,1,0,1,0, //!
@@ -184,7 +185,7 @@ int lookupChar(char ch, byte *buf)
     return 3;
   }
 }
-
+*/
 /*
 void print_char(char ch, int row, int col, int bright=0) {
 	byte buf[8];

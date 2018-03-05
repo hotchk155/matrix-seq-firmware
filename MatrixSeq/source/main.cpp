@@ -49,6 +49,7 @@
 #include "digital_out.h"
 #include "display_panel.h"
 #include "sequence_layer.h"
+#include "popup.h"
 #include "sequencer.h"
 
 
@@ -126,10 +127,11 @@ int main(void) {
     while(1) {
 
     	if(g_clock.m_ms_tick) {
+    		g_popup.run();
     		g_clock.m_ms_tick = 0;
         	g_cv_gate.run();
         	g_sequencer.tick(g_clock.m_ticks, (byte)(256*g_clock.m_part_tick));
-    		g_sequencer.run();
+    		//g_sequencer.run();
 
     		if(!OffSwitch.get()) {
     			PowerControl.set(0);
@@ -145,6 +147,13 @@ int main(void) {
        			j = 0;
        		}*/
         	panelRun();
+
+    		CRenderBuf::lock();
+    		CRenderBuf::clear();
+    		g_sequencer.repaint();
+    		g_popup.repaint();
+    		CRenderBuf::unlock();
+
 
     	}
     	//g_cv_gate.write(3, j);

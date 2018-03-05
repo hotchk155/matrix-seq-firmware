@@ -219,6 +219,19 @@ public:
 		m_copy_mod = 0;
 		m_msg = nullptr;
 	}
+	void set_active_layer(int l) {
+
+		char buf[5] = {'1' + l, '-'};
+		m_layer = l;
+		switch(m_layers[m_layer].m_mode) {
+			case CSequenceLayer::NOTE_SEQUENCE: buf[2] = 'N'; buf[3] = 'O'; buf[4] = 'T'; break;
+			case CSequenceLayer::MOD_SEQUENCE: buf[2] = 'M'; buf[3] = 'O'; buf[4] = 'D'; break;
+			case CSequenceLayer::VELOCITY_SEQUENCE: buf[2] = 'V'; buf[3] = 'E'; buf[4] = 'L'; break;
+			case CSequenceLayer::TRANSPOSE_SEQUENCE: buf[2] = 'T'; buf[3] = 'R'; buf[4] = 'N'; break;
+		}
+		g_popup.align(CPopup::ALIGN_RIGHT);
+		g_popup.text(buf,5);
+	}
 	void event(int evt, uint32_t param) {
 		CSequenceLayer *layer = &m_layers[m_layer];
 		switch(evt) {
@@ -231,6 +244,7 @@ public:
 				if(m_row > 12) {
 					m_row = 12;
 				}
+				g_popup.note_name(m_base_note + m_row);
 				layer->set_step(m_cursor, m_base_note + m_row);
 				m_popup = POPUP_MS;
 			}
@@ -264,6 +278,7 @@ public:
 						m_cursor = MAX_CURSOR;
 					}
 				}
+				g_popup.avoid(m_cursor);
 				if(m_action == ACTION_MOD_CLONE) {
 					layer->set_step(m_cursor, m_copy_mod);
 				}
@@ -278,9 +293,9 @@ public:
 			}
 			break;
 		case EV_KEY_PRESS:
-			switch(param) {
-			case KEY_B1:
-				if(m_action == ACTION_NONE) {
+			if(m_action == ACTION_NONE) {
+				switch(param) {
+				case KEY_B1:
 					switch(layer->m_mode) {
 						case CSequenceLayer::NOTE_SEQUENCE:
 							if(!layer->get_step(m_cursor)) {
@@ -289,7 +304,8 @@ public:
 							else {
 								m_row = layer->get_step(m_cursor) - m_base_note;
 							}
-							m_popup = POPUP_MS;
+							g_popup.avoid(m_cursor);
+							g_popup.note_name(m_base_note + m_row);
 							m_action = ACTION_NOTE_DRAG;
 							break;
 						default:
@@ -297,10 +313,8 @@ public:
 							m_popup = 0;
 							m_action = ACTION_MOD_DRAG;
 					}
-				}
-				break;
-			case KEY_B2:
-				if(m_action == ACTION_NONE) {
+					break;
+				case KEY_B2:
 					switch(layer->m_mode) {
 						case CSequenceLayer::NOTE_SEQUENCE:
 							m_row = layer->get_step(m_cursor) - m_base_note;
@@ -313,20 +327,28 @@ public:
 							m_popup = 0;
 							break;
 					}
-				}
-				break;
-			case KEY_B3:
-				if(m_action == ACTION_NONE) {
+					break;
+				case KEY_B3:
 					layer->clear_step(m_cursor);
 					m_action = ACTION_ERASE;
-				}
-				break;
-			case KEY_B6:
-				if(m_action == ACTION_NONE) {
+					break;
+				case KEY_B6:
 					layer->set_pos(m_cursor);
 					m_action = ACTION_SET_LOOP;
+					break;
+				case KEY_L5:
+					set_active_layer(0);
+					break;
+				case KEY_L6:
+					set_active_layer(1);
+					break;
+				case KEY_L7:
+					set_active_layer(2);
+					break;
+				case KEY_L8:
+					set_active_layer(3);
+					break;
 				}
-				break;
 			}
 			break;
 		case EV_KEY_RELEASE:
@@ -339,8 +361,8 @@ public:
 		uint32_t mask;
 		CSequenceLayer *layer = &m_layers[m_layer];
 
-		CRenderBuf::lock();
-		CRenderBuf::clear();
+		//CRenderBuf::lock();
+		//CRenderBuf::clear();
 
 		// displaying the cursor
 		switch(layer->m_mode) {
@@ -411,6 +433,7 @@ public:
 				break;
 		}
 
+		/*
 		if(m_popup) {
 			int flags = 0;
 			if(m_cursor > 16) {
@@ -431,17 +454,18 @@ public:
 				break;
 			}
 		}
+*/
 
-
-		CRenderBuf::unlock();
+		//CRenderBuf::unlock();
 	}
+	/*
 	void run() {
 		repaint();
 		if(m_popup) {
 			--m_popup;
 		}
 	}
-
+*/
 };
 
 extern CSequencer g_sequencer;
