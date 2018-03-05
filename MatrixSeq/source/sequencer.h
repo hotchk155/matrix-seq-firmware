@@ -8,6 +8,7 @@
 #ifndef SEQUENCER_H_
 #define SEQUENCER_H_
 
+#include <clock.h>
 #include "cv_gate.h"
 #include "sequence_layer.h"
 #include "midi.h"
@@ -32,8 +33,8 @@ public:
 
 
 	/////////////////////////////////////////////////////////////////////////////////////////////
-	// Once per millisecond tick
-	void tick(uint32_t millis) {
+	void tick(uint32_t ticks, byte parts_tick) {
+
 		//byte midi_velocity = m_midi_velocity;
 		//uint16_t midi_note_action[NUM_LAYERS];
 		int note_layer = -1;
@@ -48,7 +49,7 @@ public:
 			if(CSequenceLayer::NOTE_SEQUENCE == m_layer[i].m_mode) {
 				note_layer = i; // remember last note layer
 			}
-			stepped |= m_layer[i].tick(millis);
+			stepped |= m_layer[i].tick(ticks, parts_tick);
 		}
 		if(!stepped) {
 			// if nothing has changed, no need to go further

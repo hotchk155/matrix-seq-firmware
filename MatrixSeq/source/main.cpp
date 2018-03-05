@@ -43,7 +43,7 @@
 #define MAIN_INCLUDE
 #include "defs.h"
 #include "i2c_bus.h"
-#include "seq_clock.h"
+#include <clock.h>
 #include "midi.h"
 #include "cv_gate.h"
 #include "digital_out.h"
@@ -128,16 +128,10 @@ int main(void) {
     		g_clock.m_ms_tick = 0;
     		g_grid.run();
         	g_cv_gate.run();
-
+        	g_sequencer.tick(g_clock.m_ticks, (byte)(256*g_clock.m_part_tick));
 
     		if(!OffSwitch.get()) {
     			PowerControl.set(0);
-    		}
-    		if(g_clock.is_pending(CSeqClock::CHANNEL_BEAT_LED)) {
-    			LED3.blink(2);
-    		}
-    		else {
-    			LED3.run();
     		}
 
 /*       		if(j<500) {
@@ -173,7 +167,6 @@ int main(void) {
     		g_seq[3].step();
     	}
 */
-    	g_clock.run();
 
     }
     return 0 ;

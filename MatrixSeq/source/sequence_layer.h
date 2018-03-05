@@ -8,7 +8,7 @@
 #ifndef SEQUENCE_LAYER_H_
 #define SEQUENCE_LAYER_H_
 
-#include "seq_clock.h"
+#include <clock.h>
 
 #define SEQ_STEP(a) ((a) & 0x7F)
 #define SEQ_GATE(a) ((a) & 0x80)
@@ -40,6 +40,10 @@ public:
 	byte m_last_midi_note;
 	byte m_midi_channel;
 	uint32_t m_next_step_millis;
+
+	uint32_t m_next_tick;
+	byte m_step_rate;
+
 	CSequenceLayer() {
 		clear();
 		m_play_pos = 0;
@@ -51,6 +55,8 @@ public:
 		m_next_step_millis = 0;
 		m_mode = NOTE_SEQUENCE;
 		m_stepped = 0;
+		m_next_tick = 0;
+		m_step_rate = CClock::RATE_16;
 	}
 	void clear() {
 		for(int i=0; i<MAX_STEPS; ++i) {
@@ -72,9 +78,9 @@ public:
 		m_play_pos = pos;
 	}
 
-	byte tick(uint32_t millis) {
-		if(millis >= m_next_step_millis) {
-			m_next_step_millis = m_next_step_millis + 500; //TODO
+	byte tick(uint32_t ticks, byte parts_tick) {
+		if(ticks >= m_next_tick) {
+			m_next_tick += m_step_rate;
 			++m_play_pos;
 			if(m_play_pos < m_loop_from) {
 				m_play_pos = m_loop_from;

@@ -5,8 +5,8 @@
  *      Author: jason
  */
 
-#ifndef SEQ_CLOCK_H_
-#define SEQ_CLOCK_H_
+#ifndef CLOCK_H_
+#define CLOCK_H_
 
 #include "fsl_common.h"
 #include "fsl_clock.h"
@@ -16,13 +16,17 @@
 
 
 /*
- 24ppqn ticks interval is stored as
+
+ 65536 for 32 beats
+ 2048 ticks per beat
+
+
  */
 //
 
 
 
-class CSeqClock {
+class CClock {
 public:
 
 	enum
@@ -42,38 +46,26 @@ public:
 	  RATE_16T  = 4,
 	  RATE_32   = 3
 	};
-	enum {
-		CHANNEL_BEAT_LED,
-		CHANNEL_SEQ1,
-		CHANNEL_SEQ2,
-		CHANNEL_SEQ3,
-		CHANNEL_SEQ4,
-		CHANNEL_MAX
-	};
-	typedef struct {
-		byte ticks_per_step;
-		byte pending_steps;
-		double tick_period;
-		double next_tick;
-	} CHANNEL;
 
-	CHANNEL m_chan[CHANNEL_MAX] = {0};
 
-	volatile uint32_t m_millis; 	// millisecond counter
-	volatile uint32_t m_ticks;
-	volatile byte m_ms_tick;
 	float m_bpm;
-	CSeqClock() {
-		m_millis = 0;
-//		m_ticks = 0;
-		m_chan[0].ticks_per_step = RATE_4;
-		for(int i=1; i<CHANNEL_MAX; ++i) {
-			m_chan[i].ticks_per_step = RATE_16;
-		}
+
+
+	volatile double m_part_tick;
+	volatile double m_ticks_per_ms;
+	volatile byte m_ms_tick;
+	volatile uint32_t m_ticks;
+
+	CClock() {
+		reset();
 		set_bpm(120);
 	}
 
-
+	void reset() {
+		m_part_tick = 0.0;
+		m_ms_tick = 0;
+		m_ticks = 0;
+	}
 
 	void init() {
 
@@ -98,32 +90,13 @@ public:
 
 	void set_bpm(float bpm) {
 		m_bpm = bpm;
-//		m_tick_rate = 125; // 6 * (60 * 1000) / (bpm*24);
-		for(int i=0; i<CHANNEL_MAX; ++i) {
-			m_chan[i].tick_period = m_chan[i].ticks_per_step * ((double)60*1000) / ((double)bpm * 24);
-		}
-	}
-
-	void run() {
-
-		for(int i=0; i<CHANNEL_MAX; ++i) {
-			while(m_millis >= m_chan[i].next_tick) {
-				++m_chan[i].pending_steps;
-				m_chan[i].next_tick = m_chan[i].next_tick + m_chan[i].tick_period;
-			}
-		}
-	}
-	byte is_pending(int chan) {
-		if(m_chan[chan].pending_steps) {
-			return m_chan[chan].pending_steps--;
-		}
-		return 0;
+		m_ticks_per_ms = ((double)bpm * RATE_4) / (60.0 * 1000.0);
 	}
 
 	void wait_ms(int ms) {
 		while(ms) {
-			uint32_t m = m_millis;
-			while(m_millis==m);
+			m_ms_tick = 0;
+			while(!m_ms_tick);
 			--ms;
 		}
 	}
@@ -132,13 +105,13 @@ public:
 };
 
 // declare global instance of the sequencer clock
-extern CSeqClock g_clock;
+extern CClock g_clock;
 
 
 #ifdef MAIN_INCLUDE
 
 // define the clock instance
-CSeqClock g_clock;
+CClock g_clock;
 
 // define the GPIO pins used for clock (will initialise the port)
 CDigitalIn<kGPIO_PORTA, 0> pClockIn;
@@ -147,8 +120,14 @@ CDigitalOut<kGPIO_PORTC, 5> pClockOut;
 // ISR for the millisecond timer
 extern "C" void PIT_CH0_IRQHandler(void) {
 	PIT_ClearStatusFlags(PIT, kPIT_Chnl_0, kPIT_TimerFlag);
-	++g_clock.m_millis;
 	g_clock.m_ms_tick = 1;
+
+	g_clock.m_part_tick += g_clock.m_ticks_per_ms;
+	int int_part = (int)g_clock.m_part_tick;
+	if(int_part) {
+		++g_clock.m_ticks;
+		g_clock.m_part_tick -= (int)g_clock.m_part_tick;
+	}
 }
 
 // ISR for the KBI interrupt (SYNC IN)
@@ -162,4 +141,4 @@ extern "C" void KBI0_IRQHandler(void)
 #endif
 
 
-#endif /* SEQ_CLOCK_H_ */
+#endif /* CLOCK_H_ */
