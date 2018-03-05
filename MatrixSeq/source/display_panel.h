@@ -256,6 +256,34 @@ public:
 		col += 4;
 		print_char('0' + (value%10), col, 1, CHAR_RASTER);
 	}
+
+
+	static void print_text(char *sz, int flags) {
+		int col;
+		uint32_t mask;
+		char *q;
+		for(q=sz; *q; ++q);
+		if(flags & POPUP_LEFT) {
+			col = 0;
+			mask = make_mask(0,4*(q-sz));
+		}
+		else {
+			col = 33-4*(q-sz);
+			mask = make_mask(25,32);
+		}
+
+		for(int i=1; i<6; ++i) {
+			g_render_buf[i] &= ~mask;
+			g_render_buf[i+16] |= mask;
+		}
+
+		while(*sz) {
+			print_char(*sz, col, 1, CHAR_RASTER);
+			col += 4;
+			++sz;
+		}
+	}
+
 };
 
 

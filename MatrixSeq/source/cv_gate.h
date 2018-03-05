@@ -8,17 +8,12 @@
 #ifndef CV_GATE_H_
 #define CV_GATE_H_
 
-#ifdef MAIN_INCLUDE
-CDigitalOut<kGPIO_PORTA, 6> pGate4;
-CDigitalOut<kGPIO_PORTD, 4> pGate3;
-CDigitalOut<kGPIO_PORTD, 3> pGate2;
-CDigitalOut<kGPIO_PORTD, 2> pGate1;
-#endif
 
 #define BIT_GATE1		MK_GPIOA_BIT(PORTD_BASE, 2)
 #define BIT_GATE2		MK_GPIOA_BIT(PORTD_BASE, 3)
 #define BIT_GATE3		MK_GPIOA_BIT(PORTD_BASE, 4)
 #define BIT_GATE4		MK_GPIOA_BIT(PORTA_BASE, 6)
+
 
 class CCVGate {
 
@@ -29,8 +24,20 @@ class CCVGate {
 	uint16_t m_dac[MAX_CV];
 	uint16_t m_gate[MAX_GATE];
 
+
 	byte m_pending;
 public:
+	enum {
+		TXN_TRIG	= 0x01,	// generate rising edge trig
+		TXN_GATE	= 0x02, // maintain gate
+		TXN_CV		= 0x04,  // update CV
+		TXN_PITCH	= 0x08  // interpret CV as a pitch value
+	};
+	typedef struct {
+		byte flags[4];
+		uint16_t cv[4];	// midi note * 256 with fractional part OR 16 bit scaled to full output V
+	} TRANSACTION;
+
 
 	// pitch is defined a 256 * midi note number + fractional part
 	typedef uint16_t PITCH_TYPE;
@@ -99,8 +106,21 @@ public:
 			}
 		}
 	}
+
+	void set(TRANSACTION& txn) {
+
+	}
+
 };
 
+extern CCVGate g_cv_gate;
+#ifdef MAIN_INCLUDE
+CCVGate g_cv_gate;
+CDigitalOut<kGPIO_PORTA, 6> pGate4;
+CDigitalOut<kGPIO_PORTD, 4> pGate3;
+CDigitalOut<kGPIO_PORTD, 3> pGate2;
+CDigitalOut<kGPIO_PORTD, 2> pGate1;
+#endif
 
 
 #endif /* CV_GATE_H_ */

@@ -48,7 +48,8 @@
 #include "cv_gate.h"
 #include "digital_out.h"
 #include "display_panel.h"
-#include "sequence.h"
+#include "sequence_layer.h"
+#include "sequencer.h"
 #include "grid.h"
 
 
@@ -60,17 +61,27 @@
  CDigitalOut<kGPIO_PORTE, 2> PowerControl;
  CDigitalIn<kGPIO_PORTE, 1> OffSwitch;
 
-CI2CBus g_i2c_bus;
-CCVGate g_cv_gate;
-CMidi m_midi;
 
-CGrid *g_grid = nullptr;
+
+
+
+
+
+
 void fire_event(int event, uint32_t param) {
-	g_grid->event(event, param);
+	if(event == EV_KEY_PRESS) {
+		switch(param) {
+		case KEY_L5: g_grid.set_layer(3); return;
+		case KEY_L6: g_grid.set_layer(2); return;
+		case KEY_L7: g_grid.set_layer(1); return;
+		case KEY_L8: g_grid.set_layer(0); return;
+		}
+	}
+	g_grid.event(event, param);
 }
 
 void fire_note(byte midi_note, byte midi_vel) {
-	m_midi.send_note(0, midi_note, midi_vel);
+	g_midi.send_note(0, midi_note, midi_vel);
 	//LED1.set(!!midi_vel);
 }
 
@@ -88,10 +99,7 @@ int main(void) {
     //printf("Hello World\n");
     /* Force the counter to be placed into memory. */
 
-    CSequence sequence;
-    CGrid grid(sequence);
 
-    g_grid = &grid;
 
     g_i2c_bus.init();
     g_i2c_bus.dac_init();
@@ -105,7 +113,7 @@ int main(void) {
     /* Enter an infinite loop, just incrementing a counter.
      * */
     panelInit();
-    sequence.test();
+    g_sequencer.m_layer[0].test();
 
     /*for(;;) {
     LED1.set(0);
@@ -118,7 +126,7 @@ int main(void) {
 
     	if(g_clock.m_ms_tick) {
     		g_clock.m_ms_tick = 0;
-    		grid.run();
+    		g_grid.run();
         	g_cv_gate.run();
 
 
@@ -151,10 +159,20 @@ int main(void) {
         //if(++j>4095) j = 0;
 
    		//sequence.run();
+    	/*
     	if(g_clock.is_pending(CSeqClock::CHANNEL_SEQ1)) {
-    		sequence.step();
+    		g_seq[0].step();
     	}
-
+    	if(g_clock.is_pending(CSeqClock::CHANNEL_SEQ2)) {
+    		g_seq[1].step();
+    	}
+    	if(g_clock.is_pending(CSeqClock::CHANNEL_SEQ3)) {
+    		g_seq[2].step();
+    	}
+    	if(g_clock.is_pending(CSeqClock::CHANNEL_SEQ4)) {
+    		g_seq[3].step();
+    	}
+*/
     	g_clock.run();
 
     }
