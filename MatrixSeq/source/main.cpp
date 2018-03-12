@@ -41,16 +41,20 @@
 #include "MKE02Z4.h"
 /* TODO: insert other include files here. */
 #define MAIN_INCLUDE
+
+
 #include "defs.h"
+#include "params.h"
+#include "clock.h"
 #include "i2c_bus.h"
-#include <clock.h>
-#include "midi.h"
 #include "cv_gate.h"
+#include "sequence_layer.h"
+#include "midi.h"
 #include "digital_out.h"
 #include "display_panel.h"
-#include "sequence_layer.h"
 #include "popup.h"
 #include "sequencer.h"
+#include "menu.h"
 
 
 
@@ -64,22 +68,61 @@
 
 
 
+ enum {
+	 VIEW_SEQUENCER,
+	 VIEW_MENU
+ };
 
+byte g_view = VIEW_SEQUENCER;
 
+void set_param(PARAM_ID param, int value) {
+	if(param < P_SQL_MAX) {
+		g_sequencer.set(param,value);
+	}
+	else if(param < P_CVGATE_MAX) {
+		g_cv_gate.set(g_sequencer.get_active_layer(),param,value);
+	}
+}
+int get_param(PARAM_ID param) {
+	if(param < P_SQL_MAX) {
+		return g_sequencer.get(param);
+	}
+	else if(param < P_CVGATE_MAX) {
+		return g_cv_gate.get(g_sequencer.get_active_layer(),param);
+	}
+	return 0;
+}
 
 
 
 void fire_event(int event, uint32_t param) {
-	/*
+
 	if(event == EV_KEY_PRESS) {
 		switch(param) {
-		case KEY_L5: g_grid.set_layer(3); return;
-		case KEY_L6: g_grid.set_layer(2); return;
-		case KEY_L7: g_grid.set_layer(1); return;
-		case KEY_L8: g_grid.set_layer(0); return;
+		case KEY_L1:
+			if(g_view == VIEW_SEQUENCER) {
+				g_view = VIEW_MENU;
+				g_menu.update();
+			}
+			else {
+				g_view = VIEW_SEQUENCER;
+			}
+			return;
+		case KEY_L5: g_sequencer.set_active_layer(3); g_menu.update(); return;
+		case KEY_L6: g_sequencer.set_active_layer(2); g_menu.update(); return;
+		case KEY_L7: g_sequencer.set_active_layer(1); g_menu.update(); return;
+		case KEY_L8: g_sequencer.set_active_layer(0); g_menu.update(); return;
 		}
-	}*/
-	g_sequencer.event(event, param);
+	}
+
+	switch(g_view) {
+	case VIEW_SEQUENCER:
+		g_sequencer.event(event, param);
+		break;
+	case VIEW_MENU:
+		g_menu.event(event, param);
+		break;
+	}
 }
 
 void fire_note(byte midi_note, byte midi_vel) {
@@ -149,9 +192,16 @@ int main(void) {
         	panelRun();
 
     		CRenderBuf::lock();
-    		CRenderBuf::clear();
-    		g_sequencer.repaint();
-    		g_popup.repaint();
+    		switch(g_view) {
+    		case VIEW_SEQUENCER:
+    			CRenderBuf::clear();
+    			g_sequencer.repaint();
+    			g_popup.repaint();
+    			break;
+    		case VIEW_MENU:
+    			g_menu.repaint();
+    			break;
+    		}
     		CRenderBuf::unlock();
 
 

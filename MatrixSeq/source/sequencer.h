@@ -8,10 +8,7 @@
 #ifndef SEQUENCER_H_
 #define SEQUENCER_H_
 
-#include <clock.h>
-#include "cv_gate.h"
-#include "sequence_layer.h"
-#include "midi.h"
+#include "matrix_seq.h"
 class CSequencer {
 public:
 
@@ -40,6 +37,27 @@ public:
 
 
 
+	void set(PARAM_ID param, int value) {
+		CSequenceLayer::CONFIG& cfg = m_layers[m_layer].m_cfg;
+		switch(param) {
+		case P_SQL_SEQ_MODE: cfg.m_mode = value; break;
+		case P_SQL_STEP_RATE: cfg.m_step_rate = value; break;
+		case P_SQL_MIDI_CHAN: cfg.m_midi_channel = value; break;
+		case P_SQL_MIDI_CC: cfg.m_midi_cc = value; break;
+		default: break;
+		}
+	}
+	int get(PARAM_ID param) {
+		CSequenceLayer::CONFIG& cfg = m_layers[m_layer].m_cfg;
+		switch(param) {
+		case P_SQL_SEQ_MODE: return cfg.m_mode;
+		case P_SQL_STEP_RATE: return cfg.m_step_rate;
+		case P_SQL_MIDI_CHAN: return cfg.m_midi_channel;
+		case P_SQL_MIDI_CC: return cfg.m_midi_cc;
+		default:return 0;
+		}
+	}
+
 
 
 
@@ -56,10 +74,10 @@ public:
 
 		// run the clock on each sequencer layer
 		for(int i=0; i<NUM_LAYERS; ++i) {
-			if(CSequenceLayer::VELOCITY_SEQUENCE == m_layers[i].m_mode) {
+			if(V_SQL_SEQ_MODE_VEL == m_layers[i].m_cfg.m_mode) {
 				velocity_layer = i; // remember if there is a velocity layer (only 1 allowed)
 			}
-			if(CSequenceLayer::NOTE_SEQUENCE == m_layers[i].m_mode) {
+			if(V_SQL_SEQ_MODE_NOTE == m_layers[i].m_cfg.m_mode) {
 				note_layer = i; // remember last note layer
 			}
 			stepped |= m_layers[i].tick(ticks, parts_tick);
@@ -73,7 +91,7 @@ public:
 		for(int i=0; i<NUM_LAYERS; ++i) {
 			CSequenceLayer& layer = m_layers[i];
 			txn.flags[i] = 0;
-			if(CSequenceLayer::NOTE_SEQUENCE == m_layers[i].m_mode) {
+			if(V_SQL_SEQ_MODE_NOTE == m_layers[i].m_cfg.m_mode) {
 				note_layer = i; // preceding note layer for a transpose layer
 			}
 
@@ -90,14 +108,14 @@ public:
 				}
 
 				// what type of layer?
-				switch(layer.m_mode)
+				switch(layer.m_cfg.m_mode)
 				{
 					////////////////////////////////////////////////////////////////////
-					case CSequenceLayer::NOTE_SEQUENCE:
-					case CSequenceLayer::TRANSPOSE_SEQUENCE:
+					case V_SQL_SEQ_MODE_NOTE:
+					case V_SQL_SEQ_MODE_TRANSPOSE:
 					{
 						int midi_note;
-						if(layer.m_mode == CSequenceLayer::TRANSPOSE_SEQUENCE) {
+						if(layer.m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
 							if(note_layer >= 0) {
 								// get note from the note layer and transpose it
 								midi_note = (byte)m_layers[note_layer].m_value;
@@ -132,18 +150,18 @@ public:
 						if(layer.m_value & CSequenceLayer::IS_TRIG) {
 							if(layer.m_last_midi_note) {
 								// stop previous note
-								g_midi.send_note(layer.m_midi_channel, layer.m_last_midi_note, 0);
+								g_midi.send_note(layer.m_cfg.m_midi_channel, layer.m_last_midi_note, 0);
 							}
 							// play new note and remember it
 							layer.m_last_midi_note = (byte)midi_note;
-							g_midi.send_note(layer.m_midi_channel, layer.m_last_midi_note, midi_velocity);
+							g_midi.send_note(layer.m_cfg.m_midi_channel, layer.m_last_midi_note, midi_velocity);
 						}
 						// is the current step LEGATO?
 						else if(layer.m_value & CSequenceLayer::IS_ACTIVE) {
 							if(layer.m_last_midi_note != (byte)midi_note) {
-								g_midi.send_note(layer.m_midi_channel, (byte)midi_note, midi_velocity);
+								g_midi.send_note(layer.m_cfg.m_midi_channel, (byte)midi_note, midi_velocity);
 								if(layer.m_last_midi_note) {
-									g_midi.send_note(layer.m_midi_channel, layer.m_last_midi_note, 0);
+									g_midi.send_note(layer.m_cfg.m_midi_channel, layer.m_last_midi_note, 0);
 								}
 								layer.m_last_midi_note = (byte)midi_note;
 							}
@@ -151,7 +169,7 @@ public:
 						// current step is MUTED
 						else {
 							if(layer.m_last_midi_note) {
-								g_midi.send_note(layer.m_midi_channel, layer.m_last_midi_note, 0);
+								g_midi.send_note(layer.m_cfg.m_midi_channel, layer.m_last_midi_note, 0);
 								layer.m_last_midi_note = 0;
 							}
 						}
@@ -159,14 +177,14 @@ public:
 					}
 
 					////////////////////////////////////////////////////////////////////
-					case CSequenceLayer::VELOCITY_SEQUENCE:
+					case V_SQL_SEQ_MODE_VEL:
 						// A velocity layer sends no MIDI out by itself
 						txn.flags[i] |= CCVGate::TXN_CV;
 						txn.cv[i] = (layer.m_value & 0x7F)<<8;
 						break;
 
 					////////////////////////////////////////////////////////////////////
-					case CSequenceLayer::MOD_SEQUENCE:
+					case V_SQL_SEQ_MODE_MOD:
 						txn.flags[i] |= CCVGate::TXN_CV;
 						txn.cv[i] = (layer.m_value & 0x7F)<<8;
 						break;
@@ -219,15 +237,18 @@ public:
 		m_copy_mod = 0;
 		m_msg = nullptr;
 	}
+	inline byte get_active_layer() {
+		return m_layer;
+	}
 	void set_active_layer(int l) {
 
 		char buf[5] = {'1' + l, '-'};
 		m_layer = l;
-		switch(m_layers[m_layer].m_mode) {
-			case CSequenceLayer::NOTE_SEQUENCE: buf[2] = 'N'; buf[3] = 'O'; buf[4] = 'T'; break;
-			case CSequenceLayer::MOD_SEQUENCE: buf[2] = 'M'; buf[3] = 'O'; buf[4] = 'D'; break;
-			case CSequenceLayer::VELOCITY_SEQUENCE: buf[2] = 'V'; buf[3] = 'E'; buf[4] = 'L'; break;
-			case CSequenceLayer::TRANSPOSE_SEQUENCE: buf[2] = 'T'; buf[3] = 'R'; buf[4] = 'N'; break;
+		switch(m_layers[m_layer].m_cfg.m_mode) {
+			case V_SQL_SEQ_MODE_NOTE: buf[2] = 'N'; buf[3] = 'O'; buf[4] = 'T'; break;
+			case V_SQL_SEQ_MODE_MOD: buf[2] = 'M'; buf[3] = 'O'; buf[4] = 'D'; break;
+			case V_SQL_SEQ_MODE_VEL: buf[2] = 'V'; buf[3] = 'E'; buf[4] = 'L'; break;
+			case V_SQL_SEQ_MODE_TRANSPOSE: buf[2] = 'T'; buf[3] = 'R'; buf[4] = 'N'; break;
 		}
 		g_popup.align(CPopup::ALIGN_RIGHT);
 		g_popup.text(buf,5);
@@ -296,8 +317,8 @@ public:
 			if(m_action == ACTION_NONE) {
 				switch(param) {
 				case KEY_B1:
-					switch(layer->m_mode) {
-						case CSequenceLayer::NOTE_SEQUENCE:
+					switch(layer->m_cfg.m_mode) {
+						case V_SQL_SEQ_MODE_NOTE:
 							if(!layer->get_step(m_cursor)) {
 								layer->set_step(m_cursor, m_base_note + m_row);
 							}
@@ -315,8 +336,8 @@ public:
 					}
 					break;
 				case KEY_B2:
-					switch(layer->m_mode) {
-						case CSequenceLayer::NOTE_SEQUENCE:
+					switch(layer->m_cfg.m_mode) {
+						case V_SQL_SEQ_MODE_NOTE:
 							m_row = layer->get_step(m_cursor) - m_base_note;
 							m_action = ACTION_NOTE_CLONE;
 							m_popup = POPUP_MS;
@@ -336,7 +357,7 @@ public:
 					layer->set_pos(m_cursor);
 					m_action = ACTION_SET_LOOP;
 					break;
-				case KEY_L5:
+/*				case KEY_L5:
 					set_active_layer(0);
 					break;
 				case KEY_L6:
@@ -347,7 +368,7 @@ public:
 					break;
 				case KEY_L8:
 					set_active_layer(3);
-					break;
+					break;*/
 				}
 			}
 			break;
@@ -365,8 +386,8 @@ public:
 		//CRenderBuf::clear();
 
 		// displaying the cursor
-		switch(layer->m_mode) {
-			case CSequenceLayer::NOTE_SEQUENCE:
+		switch(layer->m_cfg.m_mode) {
+			case V_SQL_SEQ_MODE_NOTE:
 				mask = CRenderBuf::bit(m_cursor);
 				for(i=0; i<13; ++i) {
 					CRenderBuf::raster(i) &= ~mask;
@@ -382,7 +403,7 @@ public:
 		}
 
 		// the loop points
-		mask = CRenderBuf::make_mask(layer->m_loop_from, layer->m_loop_to + 1);
+		mask = CRenderBuf::make_mask(layer->m_cfg.m_loop_from, layer->m_cfg.m_loop_to + 1);
 
 		CRenderBuf::raster(15) |= (c_ruler & mask);
   		CRenderBuf::hilite(15) |= (~c_ruler & mask);
@@ -391,11 +412,11 @@ public:
 		CRenderBuf::hilite(15) |= mask;
 
 		// displaying the cursor
-		switch(layer->m_mode) {
-			case CSequenceLayer::NOTE_SEQUENCE:
+		switch(layer->m_cfg.m_mode) {
+			case V_SQL_SEQ_MODE_NOTE:
 				mask = CRenderBuf::bit(0);
 				for(i=0; i<32; ++i) {
-					int n = SEQ_STEP(layer->m_step[i]);
+					int n = SEQ_STEP(layer->m_cfg.m_step[i]);
 					if(n) {
 						n = 12 - n + m_base_note;
 						if(n >= 0 && n <= 12) {
@@ -408,7 +429,7 @@ public:
 							}
 						}
 
-						if(SEQ_GATE(layer->m_step[i])) {
+						if(SEQ_GATE(layer->m_cfg.m_step[i])) {
 							CRenderBuf::set_raster(14, mask); // trig
 						}
 						else {
@@ -421,7 +442,7 @@ public:
 			default:
 				mask = CRenderBuf::bit(0);
 				for(i=0; i<32; ++i) {
-					int n = (5+SEQ_STEP(layer->m_step[i]))/10;
+					int n = (5+SEQ_STEP(layer->m_cfg.m_step[i]))/10;
 					if(n>0) {
 						CRenderBuf::raster(13-n) |= mask;
 					}

@@ -50,11 +50,40 @@ public:
 
 	typedef uint16_t DAC_TYPE;
 
+	typedef struct {
+		byte cv_range[4];
+		byte cv_scale[4];
+	} CONFIG;
+	CONFIG m_cfg;
+
 	CCVGate() {
 		memset((byte*)m_dac,0,sizeof m_dac);
 		memset((byte*)m_gate,0,sizeof m_gate);
+		memset((byte*)m_cfg.cv_range,5,sizeof m_cfg.cv_range);
+		memset((byte*)m_cfg.cv_scale,V_CVGATE_VSCALE_1VOCT,sizeof m_cfg.cv_scale);
 		m_pending = 0;
 	}
+
+
+
+
+
+	void set(int which, PARAM_ID param, int value) {
+		switch(param) {
+			case P_CVGATE_VSCALE: m_cfg.cv_scale[which] = value; break;
+			case P_CVGATE_VRANGE: m_cfg.cv_range[which] = value; break;
+			default: break;
+		}
+	}
+	int get(int which, PARAM_ID param) {
+		switch(param) {
+			case P_CVGATE_VSCALE: return m_cfg.cv_scale[which];
+			case P_CVGATE_VRANGE: return m_cfg.cv_scale[which];
+			default: return 0;
+		}
+	}
+
+
 	void dac_send() {
 		if(m_pending && !g_i2c_bus.busy()) {
 			g_i2c_bus.dac_write(m_dac);

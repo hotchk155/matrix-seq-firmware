@@ -51,6 +51,7 @@ extern const uint32_t char4x5[];
 #define CHAR4X5_HASH		26
 #define CHAR4X5_NUMERIC		32
 #define CHAR4X5_MINUS		42
+#define CHAR4X5_DOT			43
 #define CHAR4X5_BLOCK		47
 
 
@@ -121,6 +122,7 @@ public:
 		case '#': ch = CHAR4X5_HASH; break;
 		case '-': ch = CHAR4X5_MINUS; break;
 		case '~': ch = CHAR4X5_BLOCK; break;
+		case '.': ch = CHAR4X5_DOT; break;
 		default:
 			if(ch >= '0' && ch <= '9') {
 				ch = CHAR4X5_NUMERIC + ch - '0';
