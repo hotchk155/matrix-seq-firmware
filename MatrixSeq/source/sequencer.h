@@ -109,8 +109,12 @@ public:
 	///////////////////////////////////////////////////////////////////////////////
 	void set_scroll_for(CSequenceLayer::STEP_TYPE step, CSequenceLayer *layer) {
 		int v = STEP_VALUE(step);
-		v = v/12;
-		layer->m_scroll_ofs = 12 * v;
+		if(v<layer->m_scroll_ofs) {
+			layer->m_scroll_ofs = v;
+		}
+		else if(v>layer->m_scroll_ofs+12) {
+			layer->m_scroll_ofs = v-12;
+		}
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////////////////
@@ -129,10 +133,10 @@ public:
 				step_info(m_copy_step, layer);
 			}
 			else {
-//				if(m_action == ACTION_SET_LOOP) {
-//					layer->set_loop_start(m_cursor);
-//					m_action = ACTION_DRAG_LOOP;
-//				}
+				if(m_action == ACTION_SET_LOOP) {
+					layer->set_loop_start(m_cursor);
+					m_action = ACTION_DRAG_LOOP;
+				}
 				if(m_action == ACTION_ERASE_STEP) {
 					layer->clear_step(m_cursor);
 				}
@@ -150,19 +154,20 @@ public:
 				if(m_action == ACTION_CLONE_STEP) {
 					layer->set_step(m_cursor, m_copy_step);
 				}
-//				else if(m_action == ACTION_NOTE_CLONE) {
-//					layer->set_step(m_cursor, layer->m_scroll_ofs + m_row);
-//					//m_popup = POPUP_MS;
-//				}
-//				else if(m_action == ACTION_DRAG_LOOP) {
-//					layer->set_loop_end(m_cursor);
-//					//m_popup = POPUP_MS;
-//				}
+				else if(m_action == ACTION_DRAG_LOOP) {
+					layer->set_loop_end(m_cursor);
+				}
 			}
 			break;
 		/////////////////////////////////////////////////////////////////////////////////////////////
 		// BUTTON PRESS
 		case EV_KEY_PRESS:
+			if(m_action == ACTION_EDIT_STEP && param == KEY_B2) {
+				step = layer->get_step(m_cursor);
+				if(!layer->is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
+					layer->set_step(m_cursor, step ^ CSequenceLayer::IS_TRIG);
+				}
+			}
 			if(m_action == ACTION_NONE) {
 				switch(param) {
 
@@ -192,6 +197,11 @@ public:
 
 
 				case KEY_B2:
+					step = layer->get_step(m_cursor);
+					if(m_action == ACTION_EDIT_STEP && (!layer->is_note_mode() || (step & CSequenceLayer::IS_ACTIVE))) {
+						layer->set_step(m_cursor, step ^ CSequenceLayer::IS_TRIG);
+					}
+
 					m_copy_step = layer->get_step(m_cursor);
 					if(!layer->is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
 						m_action = ACTION_CLONE_STEP;
@@ -200,12 +210,11 @@ public:
 				case KEY_B3:
 					layer->clear_step(m_cursor);
 					m_action = ACTION_ERASE_STEP;
-					break;/*
-				case KEY_B6:
+					break;
+				case KEY_B4:
 					layer->set_pos(m_cursor);
 					m_action = ACTION_SET_LOOP;
 					break;
-*/
 				}
 
 			} // if m_action == ACTION_NONE
@@ -214,9 +223,12 @@ public:
 		/////////////////////////////////////////////////////////////////////////////////////////////
 		// BUTTON RELEASE
 		case EV_KEY_RELEASE:
+			if(m_action == ACTION_EDIT_STEP && param == KEY_B2) {
+				break;
+			}
 			m_action = ACTION_NONE;
 			break;
-		}
+                                                                                         		}
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////////////////
@@ -243,17 +255,23 @@ public:
 			}
 		}
 
-		// the loop points
-		mask = CRenderBuf::make_mask(layer->m_cfg.m_loop_from, layer->m_cfg.m_loop_to + 1);
 
-		CRenderBuf::raster(15) |= (c_ruler & mask);
-  		CRenderBuf::hilite(15) |= (~c_ruler & mask);
 		mask = CRenderBuf::bit(layer->m_play_pos);
 		CRenderBuf::raster(15) |= mask;
 		CRenderBuf::hilite(15) |= mask;
 
 		mask = CRenderBuf::bit(0);
+		int c = 0;
 		for(i=0; i<32; ++i) {
+			if(i >= layer->m_cfg.m_loop_from && i <= layer->m_cfg.m_loop_to) {
+				if(!(c & 0x03)) {
+					CRenderBuf::raster(15) |= mask;
+				}
+				else {
+					CRenderBuf::hilite(15) |= mask;
+				}
+				++c;
+			}
 			CSequenceLayer::STEP_TYPE step = layer->get_step(i);
 			if(step & CSequenceLayer::IS_ACTIVE) {
 				int n = STEP_VALUE(step);

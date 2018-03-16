@@ -102,7 +102,7 @@ void fire_event(int event, uint32_t param) {
 	if(event == EV_KEY_PRESS) {
 		int new_layer = -1;
 		switch(param) {
-		case KEY_L1:
+		case KEY_B7:
 			if(g_view == VIEW_SEQUENCER) {
 				g_view = VIEW_MENU;
 				g_menu.update();
