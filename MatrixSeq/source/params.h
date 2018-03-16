@@ -11,6 +11,8 @@
 typedef enum {
 	P_NONE = 0,
 
+	P_LAYER,
+
 	P_SQL_SEQ_MODE,
 	P_SQL_STEP_RATE,
 	P_SQL_MIDI_CHAN,

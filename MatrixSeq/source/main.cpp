@@ -78,73 +78,48 @@ byte g_view = VIEW_SEQUENCER;
 byte g_current_layer = 0;
 
 void set_param(PARAM_ID param, int value) {
-	if(param < P_SQL_MAX) {
-		g_sequencer.set(param,value);
-	}
-	else if(param < P_CVGATE_MAX) {
-		g_cv_gate.set(g_current_layer,param,value);
+	switch(param) {
+	case P_LAYER:
+		if(value != g_current_layer) {
+			g_current_layer = value;
+			//g_popup.layer(g_current_layer);
+			g_sequencer.set_active_layer(g_current_layer);
+			g_menu.update();
+		}
+		break;
+	default:
+		if(param < P_SQL_MAX) {
+			g_sequencer.set(param,value);
+		}
+		else if(param < P_CVGATE_MAX) {
+			g_cv_gate.set(g_current_layer,param,value);
+		}
+		break;
 	}
 }
 int get_param(PARAM_ID param) {
-	if(param < P_SQL_MAX) {
-		return g_sequencer.get(param);
-	}
-	else if(param < P_CVGATE_MAX) {
-		return g_cv_gate.get(g_current_layer,param);
+	switch(param) {
+	case P_LAYER:
+		return g_current_layer;
+	default:
+		if(param < P_SQL_MAX) {
+			return g_sequencer.get(param);
+		}
+		else if(param < P_CVGATE_MAX) {
+			return g_cv_gate.get(g_current_layer,param);
+		}
 	}
 	return 0;
 }
 
 
-
-void fire_event(int event, uint32_t param) {
-
-	if(event == EV_KEY_PRESS) {
-		int new_layer = -1;
-		switch(param) {
-		case KEY_B7:
-			if(g_view == VIEW_SEQUENCER) {
-				g_view = VIEW_MENU;
-				g_menu.update();
-			}
-			else {
-				g_view = VIEW_SEQUENCER;
-			}
-			return;
-		case KEY_L5:
-			new_layer = 3;
-			break;
-		case KEY_L6:
-			new_layer = 2;
-			break;
-		case KEY_L7:
-			new_layer = 1;
-			break;
-		case KEY_L8:
-			new_layer = 0;
-			break;
-		}
-
-		if(new_layer >= 0) {
-			g_current_layer = new_layer;
-			g_popup.layer(new_layer);
-			g_sequencer.set_active_layer(new_layer);
-			g_menu.update();
-			return;
-		}
-	}
-	else if(event == EV_KEY_RELEASE) {
-		switch(param) {
-		case KEY_L5:
-		case KEY_L6:
-		case KEY_L7:
-		case KEY_L8:
-			g_popup.hide();
-			g_menu.update();
-			return;
-		}
-	}
-
+enum {
+	ACTION_NONE,
+	ACTION_MENU_PRESS,
+	ACTION_MENU_DRAG
+};
+int g_action = ACTION_NONE;
+void dispatch_event(int event, uint32_t param) {
 	switch(g_view) {
 	case VIEW_SEQUENCER:
 		g_sequencer.event(event, param);
@@ -152,6 +127,30 @@ void fire_event(int event, uint32_t param) {
 	case VIEW_MENU:
 		g_menu.event(event, param);
 		break;
+	}
+}
+void fire_event(int event, uint32_t param) {
+
+	switch(event) {
+	case EV_KEY_PRESS:
+		if(param == KEY_B7 && g_view == VIEW_SEQUENCER) {
+			g_view = VIEW_MENU;
+			g_menu.activate();
+		}
+		else {
+			dispatch_event(event,param);
+		}
+		break;
+	case EV_KEY_RELEASE:
+		dispatch_event(event,param);
+		break;
+	case EV_ENCODER:
+		dispatch_event(event,param);
+		break;
+	}
+	if(g_view == VIEW_MENU && g_menu.m_done) {
+		g_view = VIEW_SEQUENCER;
+		g_sequencer.activate();
 	}
 }
 

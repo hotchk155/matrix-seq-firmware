@@ -23,19 +23,22 @@ public:
 		MIDI_CHANNEL,
 		NUMBER_7BIT,
 		VOLT_RANGE,
-		NUM_OPTS = 7,
+		NUM_OPTS = 8,
 
 		ACTION_NONE = 0,
-		ACTION_VALUE_SELECTED = 1,
-		ACTION_VALUE_CHANGED = 2
+		ACTION_ACTIVATED,
+		ACTION_VALUE_SELECTED,
+		ACTION_VALUE_CHANGED
 	};
 	static const CMenu::OPTION m_opts[NUM_OPTS];
 
+	byte m_done;
 	byte m_item;
 	byte m_value;
 	byte m_repaint;
 	byte m_action;
 	CMenu() {
+		m_done = 1;
 		m_item = 0;
 		m_repaint = 1;
 		m_action = ACTION_NONE;
@@ -123,11 +126,16 @@ public:
 			return 0;
 		}
 	}
+	void activate() {
+		m_action = ACTION_ACTIVATED;
+		m_done = 0;
+		m_repaint = 1;
+	}
 	void event(int evt, uint32_t param) {
 		int i;
 		switch(evt) {
 		case EV_ENCODER:
-			if(m_action == ACTION_VALUE_SELECTED || m_action == ACTION_VALUE_CHANGED) {
+			if(m_action == ACTION_VALUE_SELECTED || m_action == ACTION_VALUE_CHANGED || m_action == ACTION_ACTIVATED) {
 				i = m_value + (int)param;
 				if(i >= 0 && i <= get_max_value(m_opts[m_item])) {
 					m_value = i;
@@ -144,7 +152,7 @@ public:
 			}
 			break;
 		case EV_KEY_PRESS:
-			if(param == KEY_B1) {
+			if(param == KEY_B7) {
 				m_value = get_param(m_opts[m_item].param);
 				m_action = ACTION_VALUE_SELECTED;
 			}
@@ -153,6 +161,9 @@ public:
 			if(m_action == ACTION_VALUE_CHANGED) {
 				set_param(m_opts[m_item].param, m_value);
 				m_repaint = 1;
+			}
+			else if(m_action != ACTION_ACTIVATED) {
+				m_done = 1;
 			}
 			m_action = ACTION_NONE;
 			break;
@@ -234,6 +245,7 @@ public:
 extern CMenu g_menu;
 #ifdef MAIN_INCLUDE
 const CMenu::OPTION CMenu::m_opts[NUM_OPTS] = {
+		{"LAYR", P_LAYER, CMenu::ENUMERATED, ".A.|.B.|.C.|.D."},
 		{"TYP", P_SQL_SEQ_MODE, CMenu::ENUMERATED, "NOTE|MOD|VEL|TRAN"},
 		{"RTE", P_SQL_STEP_RATE, CMenu::ENUMERATED, "1|2D|2|4D|2T|4|8D|4T|8|16D|8T|16|16T|32"},
 		{"CHN", P_SQL_MIDI_CHAN, CMenu::MIDI_CHANNEL},
