@@ -16,7 +16,8 @@ void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle, status_t s
 class CI2CBus{
 	enum {
 		BUFFER_SIZE = 100,
-		DAC_ADDRESS = 0b1100000
+		DAC_ADDRESS = 0b1100000,
+		EEPROM_ADDRESS = 0b1010000
 	};
 	i2c_master_handle_t m_handle;
 	i2c_master_transfer_t m_xfer;
@@ -59,6 +60,61 @@ public:
 		I2C_MasterTransferNonBlocking(I2C0, &m_handle, &m_xfer);
 		return txn;
 	}
+
+	//M24256 EEPROM
+	status_t write_eeprom(uint16_t eeprom_addr, byte *data, int size) {
+		status_t result = kStatus_Fail;
+		while(size > 0) {
+
+			// get the target EEPROM page base address (64 bytes per page)
+			uint16_t page_mask = (eeprom_addr & 0xFFC0);
+
+			// set up transfer block
+			i2c_master_transfer_t xfer;
+			xfer.slaveAddress = EEPROM_ADDRESS;
+			xfer.direction = kI2C_Write;
+			xfer.subaddress = eeprom_addr;
+			xfer.subaddressSize = 2;
+			xfer.data = data;
+			xfer.dataSize = 0;
+			xfer.flags = kI2C_TransferDefaultFlag;
+
+			// we can only send continuous bytes up until the EEPROM page boundary
+			// then we'll need to start a new transaction
+			while(size > 0 && ((eeprom_addr & 0xFFC0) == page_mask)) {
+				++eeprom_addr;
+				++data;
+				--size;
+				xfer.dataSize++;
+			}
+
+			// the EEPROM can NAK us while internal write cycle takes place
+			for(int retries = 20;retries>0;--retries) {
+				result = I2C_MasterTransferBlocking(I2C0, &xfer);
+				if(result != kStatus_I2C_Addr_Nak) {
+					break;
+				}
+				g_clock.wait_ms(1);
+			}
+		    if(result != kStatus_Success) {
+		    	break;
+		    }
+		}
+		return result;
+	}
+
+	status_t read_eeprom(uint16_t eeprom_addr, byte *data, int size) {
+		i2c_master_transfer_t xfer;
+		xfer.slaveAddress = EEPROM_ADDRESS;
+		xfer.direction = kI2C_Read;
+		xfer.subaddress = eeprom_addr;
+		xfer.subaddressSize = 2;
+		xfer.data = data;
+		xfer.dataSize = size;
+		xfer.flags = kI2C_TransferDefaultFlag;
+	    return I2C_MasterTransferBlocking(I2C0, &xfer);
+	}
+
 	void write_blocking(byte addr, int len) {
 		write(addr, len);
 		wait();

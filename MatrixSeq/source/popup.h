@@ -64,6 +64,7 @@ public:
 	void format_number(int value, int msd) {
 		if(value<0) {
 			m_text[m_len++] = '-';
+			value = -value;
 		}
 		//value%=msd;
 		while(msd>0) {
@@ -90,6 +91,15 @@ public:
 			m_align = ALIGN_LEFT;
 			m_render = 1;
 		}
+	}
+	void layer(byte layer) {
+		m_len = 0;
+		m_text[m_len++] = 'L';
+		m_text[m_len++] = '-';
+		m_text[m_len++] = '0' + layer;
+		m_align = ALIGN_RIGHT;
+		m_timeout = DISPLAY_TIMEOUT;
+		m_render = 1;
 	}
 	// for popup showing note name
 	void note_name(byte note) {
@@ -172,11 +182,14 @@ public:
 			++row;
 		}
 	}
+	void hide() {
+		m_len = 0;
+		m_render = 1;
+	}
 	void run() {
 		if(m_timeout) {
 			if(!--m_timeout) {
-				m_len = 0;
-				m_render = 1;
+				hide();
 			}
 		}
 	}

@@ -1,52 +1,86 @@
-/*
- * sequence.h
- *
- *  Created on: 4 Mar 2018
- *      Author: jason
- */
+///////////////////////////////////////////////////////////////////////////////
+// MATRIX SEQUENCER
+// Sixty four pixels Ltd	March 2018
+//
+// SEQUENCER
 
 #ifndef SEQUENCER_H_
 #define SEQUENCER_H_
 
 #include "matrix_seq.h"
+
+
+///////////////////////////////////////////////////////////////////////////////
+// SEQUENCER CLASS
 class CSequencer {
 public:
 
-	int m_layer;
-	int m_cursor;
-	int m_row;
-	int m_base_note;
-	int m_action;
-	int m_popup;
-	//byte m_layer;
-	byte m_flags;
-	uint16_t m_copy_mod;
-	char *m_msg;
+	enum {
+		NUM_LAYERS = 4,	// number of layers in the sequence
+		GRID_WIDTH = 32,
+		MAX_CURSOR = 31,
+		POPUP_MS = 2000
+	};
+	enum {
+		ACTION_NONE,
+		ACTION_EDIT_STEP,
+		ACTION_ERASE_STEP,
+		ACTION_CLONE_STEP,
+		ACTION_SET_LOOP,
+		ACTION_DRAG_LOOP
+	};
+
 	static const uint32_t c_ruler = 0x88888888U;
 
-	enum {
-		NUM_LAYERS = 4
-	};
+	// Config info that forms part of the patch
+	typedef struct {
+		V_SQL_SCALE_TYPE scale_type;
+	} CONFIG;
+	CONFIG m_cfg;
+
 	CSequenceLayer m_layers[NUM_LAYERS];
-	byte m_midi_velocity = 127;
 	CSequencer() {
-		m_midi_velocity = 127;
-		m_layer = 0;
-		init();
+		init_config();
+		init_state();
 	}
 
+	int m_layer;			// this is the current layer being viewed/edited
+	int m_cursor;			// this is the position of the edit cursor
+	int m_row;
+	int m_action;
+	byte m_flags;
+	CSequenceLayer::STEP_TYPE m_copy_step;
 
 
+	///////////////////////////////////////////////////////////////////////////////
+	void init_config() {
+		m_cfg.scale_type = V_SQL_SCALE_TYPE_IONIAN;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	void init_state() {
+		m_cursor = 0;
+		m_row = 0;
+		m_flags = 0;
+		m_action = ACTION_NONE;
+		//m_popup = 0;
+		m_copy_step = 0;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
 	void set(PARAM_ID param, int value) {
 		CSequenceLayer::CONFIG& cfg = m_layers[m_layer].m_cfg;
 		switch(param) {
-		case P_SQL_SEQ_MODE: cfg.m_mode = value; break;
-		case P_SQL_STEP_RATE: cfg.m_step_rate = value; break;
-		case P_SQL_MIDI_CHAN: cfg.m_midi_channel = value; break;
+		case P_SQL_SEQ_MODE: cfg.m_mode = (V_SQL_SEQ_MODE)value; break;
+		case P_SQL_STEP_RATE: cfg.m_step_rate = (V_SQL_STEP_RATE)value; break;
+		case P_SQL_MIDI_CHAN: cfg.m_midi_channel = (V_SQL_MIDI_CHAN)value; break;
 		case P_SQL_MIDI_CC: cfg.m_midi_cc = value; break;
+		case P_SQL_SCALE_TYPE: m_cfg.scale_type = (V_SQL_SCALE_TYPE)value; break;
 		default: break;
 		}
 	}
+
+	///////////////////////////////////////////////////////////////////////////////
 	int get(PARAM_ID param) {
 		CSequenceLayer::CONFIG& cfg = m_layers[m_layer].m_cfg;
 		switch(param) {
@@ -54,14 +88,195 @@ public:
 		case P_SQL_STEP_RATE: return cfg.m_step_rate;
 		case P_SQL_MIDI_CHAN: return cfg.m_midi_channel;
 		case P_SQL_MIDI_CC: return cfg.m_midi_cc;
+		case P_SQL_SCALE_TYPE: return m_cfg.scale_type;
 		default:return 0;
 		}
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
+	void set_active_layer(int l) {
+		m_layer = l;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	void step_info(CSequenceLayer::STEP_TYPE step, CSequenceLayer *layer) {
+		if(layer->is_note_mode()) {
+			g_popup.note_name(STEP_VALUE(step));
+			g_popup.avoid(m_cursor);
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	void set_scroll_for(CSequenceLayer::STEP_TYPE step, CSequenceLayer *layer) {
+		int v = STEP_VALUE(step);
+		v = v/12;
+		layer->m_scroll_ofs = 12 * v;
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	void event(int evt, uint32_t param) {
+		CSequenceLayer *layer = &m_layers[m_layer];
+		CSequenceLayer::STEP_TYPE step;
+		switch(evt) {
+		/////////////////////////////////////////////////////////////////////////////////////////////
+		// ENCODER INC/DEC
+		case EV_ENCODER:
+			if(m_action == ACTION_EDIT_STEP) {
+				m_copy_step = layer->get_step(m_cursor);
+				layer->inc_step(&m_copy_step, (int)param);
+				layer->set_step(m_cursor, m_copy_step);
+				set_scroll_for(m_copy_step, layer);
+				step_info(m_copy_step, layer);
+			}
+			else {
+//				if(m_action == ACTION_SET_LOOP) {
+//					layer->set_loop_start(m_cursor);
+//					m_action = ACTION_DRAG_LOOP;
+//				}
+				if(m_action == ACTION_ERASE_STEP) {
+					layer->clear_step(m_cursor);
+				}
+				if((int)param < 0) {
+					if(m_cursor > 0) {
+						--m_cursor;
+					}
+				}
+				else {
+					if(++m_cursor >=  MAX_CURSOR) {
+						m_cursor = MAX_CURSOR;
+					}
+				}
+				g_popup.avoid(m_cursor);
+				if(m_action == ACTION_CLONE_STEP) {
+					layer->set_step(m_cursor, m_copy_step);
+				}
+//				else if(m_action == ACTION_NOTE_CLONE) {
+//					layer->set_step(m_cursor, layer->m_scroll_ofs + m_row);
+//					//m_popup = POPUP_MS;
+//				}
+//				else if(m_action == ACTION_DRAG_LOOP) {
+//					layer->set_loop_end(m_cursor);
+//					//m_popup = POPUP_MS;
+//				}
+			}
+			break;
+		/////////////////////////////////////////////////////////////////////////////////////////////
+		// BUTTON PRESS
+		case EV_KEY_PRESS:
+			if(m_action == ACTION_NONE) {
+				switch(param) {
+
+				//////////////////////////////////////////////////////////
+				// STEP EDIT
+				case KEY_B1:
+					// check if there is a step in this column
+					step = layer->get_step(m_cursor);
+					if(layer->is_note_mode() && !(step & CSequenceLayer::IS_ACTIVE)) {
+
+						// no active note step - do we have a previous step to copy?
+						if(!m_copy_step) {
+							// nope so simply create a step at the bottom of the active range
+							m_copy_step = layer->m_scroll_ofs | CSequenceLayer::IS_ACTIVE | CSequenceLayer::IS_TRIG;
+						}
+
+						// store the step
+						layer->set_step(m_cursor, m_copy_step);
+						step = m_copy_step;
+					}
+
+					set_scroll_for(step, layer);
+					step_info(step, layer);
+					// we are now in edit step mode!
+					m_action = ACTION_EDIT_STEP;
+					break;
 
 
+				case KEY_B2:
+					m_copy_step = layer->get_step(m_cursor);
+					if(!layer->is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
+						m_action = ACTION_CLONE_STEP;
+					}
+					break;
+				case KEY_B3:
+					layer->clear_step(m_cursor);
+					m_action = ACTION_ERASE_STEP;
+					break;/*
+				case KEY_B6:
+					layer->set_pos(m_cursor);
+					m_action = ACTION_SET_LOOP;
+					break;
+*/
+				}
 
+			} // if m_action == ACTION_NONE
+			break;
 
+		/////////////////////////////////////////////////////////////////////////////////////////////
+		// BUTTON RELEASE
+		case EV_KEY_RELEASE:
+			m_action = ACTION_NONE;
+			break;
+		}
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	void repaint() {
+		int i;
+		uint32_t mask;
+		CSequenceLayer *layer = &m_layers[m_layer];
+
+		CRenderBuf::clear();
+
+		// displaying the cursor
+		if(layer->m_cfg.m_mode) {
+			mask = CRenderBuf::bit(m_cursor);
+			for(i=0; i<14; ++i) {
+				CRenderBuf::raster(i) &= ~mask;
+				CRenderBuf::hilite(i) |= mask;
+			}
+		}
+		else {
+			mask = CRenderBuf::bit(m_cursor);
+			for(i=0; i<13; ++i) {
+				CRenderBuf::raster(i) &= ~mask;
+				CRenderBuf::hilite(i) |= mask;
+			}
+		}
+
+		// the loop points
+		mask = CRenderBuf::make_mask(layer->m_cfg.m_loop_from, layer->m_cfg.m_loop_to + 1);
+
+		CRenderBuf::raster(15) |= (c_ruler & mask);
+  		CRenderBuf::hilite(15) |= (~c_ruler & mask);
+		mask = CRenderBuf::bit(layer->m_play_pos);
+		CRenderBuf::raster(15) |= mask;
+		CRenderBuf::hilite(15) |= mask;
+
+		mask = CRenderBuf::bit(0);
+		for(i=0; i<32; ++i) {
+			CSequenceLayer::STEP_TYPE step = layer->get_step(i);
+			if(step & CSequenceLayer::IS_ACTIVE) {
+				int n = STEP_VALUE(step);
+				n = 12 - n + layer->m_scroll_ofs;
+				if(n >= 0 && n <= 12) {
+					CRenderBuf::raster(n) |= mask;
+					if(i == layer->m_play_pos) {
+						CRenderBuf::set_hilite(n, mask);
+					}
+					else {
+						CRenderBuf::clear_hilite(n, mask);
+					}
+				}
+				if(step & CSequenceLayer::IS_TRIG) {
+					CRenderBuf::set_raster(14, mask); // trig
+				}
+				else {
+					CRenderBuf::set_hilite(14, mask); // legato
+				}
+			}
+			mask>>=1;
+		}
+	}
 
 	/////////////////////////////////////////////////////////////////////////////////////////////
 	void tick(uint32_t ticks, byte parts_tick) {
@@ -74,19 +289,19 @@ public:
 
 		// run the clock on each sequencer layer
 		for(int i=0; i<NUM_LAYERS; ++i) {
-			if(V_SQL_SEQ_MODE_VEL == m_layers[i].m_cfg.m_mode) {
-				velocity_layer = i; // remember if there is a velocity layer (only 1 allowed)
-			}
-			if(V_SQL_SEQ_MODE_NOTE == m_layers[i].m_cfg.m_mode) {
-				note_layer = i; // remember last note layer
-			}
+//			if(V_SQL_SEQ_MODE_VEL == m_layers[i].m_cfg.m_mode) {
+				//velocity_layer = i; // remember if there is a velocity layer (only 1 allowed)
+			//}
+			//if(V_SQL_SEQ_MODE_NOTE == m_layers[i].m_cfg.m_mode) {
+				//note_layer = i; // remember last note layer
+			//}
 			stepped |= m_layers[i].tick(ticks, parts_tick);
 		}
 		if(!stepped) {
 			// if nothing has changed, no need to go further
 			return;
 		}
-
+/*
 		CCVGate::TRANSACTION txn;
 		for(int i=0; i<NUM_LAYERS; ++i) {
 			CSequenceLayer& layer = m_layers[i];
@@ -112,7 +327,7 @@ public:
 				{
 					////////////////////////////////////////////////////////////////////
 					case V_SQL_SEQ_MODE_NOTE:
-					case V_SQL_SEQ_MODE_TRANSPOSE:
+					//case V_SQL_SEQ_MODE_TRANSPOSE:
 					{
 						int midi_note;
 						if(layer.m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
@@ -177,16 +392,19 @@ public:
 					}
 
 					////////////////////////////////////////////////////////////////////
-					case V_SQL_SEQ_MODE_VEL:
-						// A velocity layer sends no MIDI out by itself
-						txn.flags[i] |= CCVGate::TXN_CV;
-						txn.cv[i] = (layer.m_value & 0x7F)<<8;
-						break;
+					//case V_SQL_SEQ_MODE_VEL:
+					//	// A velocity layer sends no MIDI out by itself
+					//	txn.flags[i] |= CCVGate::TXN_CV;
+					//	txn.cv[i] = (layer.m_value & 0x7F)<<8;
+					//	break;
 
 					////////////////////////////////////////////////////////////////////
 					case V_SQL_SEQ_MODE_MOD:
 						txn.flags[i] |= CCVGate::TXN_CV;
 						txn.cv[i] = (layer.m_value & 0x7F)<<8;
+						break;
+
+					default:
 						break;
 				}
 			}
@@ -199,294 +417,9 @@ public:
 				g_cv_gate.set(txn);
 				break;
 			}
-		}
+		}*/
 	}
 
-
-
-public:
-	enum {
-		GRID_WIDTH = 32,
-		MAX_CURSOR = 31,
-		POPUP_MS = 2000
-	};
-	/*enum {
-		LAYER_0,
-		LAYER_1,
-		LAYER_2,
-		LAYER_3,
-		LAYER_MOD = 0x80
-	};*/
-	enum {
-		ACTION_NONE,
-		ACTION_NOTE_DRAG,
-		ACTION_MOD_DRAG,
-		ACTION_ERASE,
-		ACTION_MOD_CLONE,
-		ACTION_NOTE_CLONE,
-		ACTION_SET_LOOP,
-		ACTION_DRAG_LOOP
-	};
-	void init() {
-		m_cursor = 0;
-		m_row = 0;
-		m_flags = 0;
-		m_base_note = 48;
-		m_action = ACTION_NONE;
-		m_popup = 0;
-		m_copy_mod = 0;
-		m_msg = nullptr;
-	}
-	inline byte get_active_layer() {
-		return m_layer;
-	}
-	void set_active_layer(int l) {
-
-		char buf[5] = {'1' + l, '-'};
-		m_layer = l;
-		switch(m_layers[m_layer].m_cfg.m_mode) {
-			case V_SQL_SEQ_MODE_NOTE: buf[2] = 'N'; buf[3] = 'O'; buf[4] = 'T'; break;
-			case V_SQL_SEQ_MODE_MOD: buf[2] = 'M'; buf[3] = 'O'; buf[4] = 'D'; break;
-			case V_SQL_SEQ_MODE_VEL: buf[2] = 'V'; buf[3] = 'E'; buf[4] = 'L'; break;
-			case V_SQL_SEQ_MODE_TRANSPOSE: buf[2] = 'T'; buf[3] = 'R'; buf[4] = 'N'; break;
-		}
-		g_popup.align(CPopup::ALIGN_RIGHT);
-		g_popup.text(buf,5);
-	}
-	void event(int evt, uint32_t param) {
-		CSequenceLayer *layer = &m_layers[m_layer];
-		switch(evt) {
-		case EV_ENCODER:
-			if(m_action == ACTION_NOTE_DRAG) {
-				m_row += (int)param;
-				if(m_row < 0) {
-					m_row = 0;
-				}
-				if(m_row > 12) {
-					m_row = 12;
-				}
-				g_popup.note_name(m_base_note + m_row);
-				layer->set_step(m_cursor, m_base_note + m_row);
-				m_popup = POPUP_MS;
-			}
-			else if(m_action == ACTION_MOD_DRAG) {
-				m_copy_mod += 10 * (int)param;
-				if(m_copy_mod < 0) {
-					m_copy_mod = 0;
-				}
-				if(m_copy_mod > 127) {
-					m_copy_mod = 127;
-				}
-				layer->set_step(m_cursor, m_copy_mod);
-				m_popup = 0;
-			}
-			else {
-				if(m_action == ACTION_SET_LOOP) {
-					layer->set_loop_start(m_cursor);
-					m_action = ACTION_DRAG_LOOP;
-				}
-				if(m_action == ACTION_ERASE) {
-					layer->clear_step(m_cursor);
-					m_popup = 0;
-				}
-				if((int)param < 0) {
-					if(m_cursor > 0) {
-						--m_cursor;
-					}
-				}
-				else {
-					if(++m_cursor >=  MAX_CURSOR) {
-						m_cursor = MAX_CURSOR;
-					}
-				}
-				g_popup.avoid(m_cursor);
-				if(m_action == ACTION_MOD_CLONE) {
-					layer->set_step(m_cursor, m_copy_mod);
-				}
-				else if(m_action == ACTION_NOTE_CLONE) {
-					layer->set_step(m_cursor, m_base_note + m_row);
-					m_popup = POPUP_MS;
-				}
-				else if(m_action == ACTION_DRAG_LOOP) {
-					layer->set_loop_end(m_cursor);
-					m_popup = POPUP_MS;
-				}
-			}
-			break;
-		case EV_KEY_PRESS:
-			if(m_action == ACTION_NONE) {
-				switch(param) {
-				case KEY_B1:
-					switch(layer->m_cfg.m_mode) {
-						case V_SQL_SEQ_MODE_NOTE:
-							if(!layer->get_step(m_cursor)) {
-								layer->set_step(m_cursor, m_base_note + m_row);
-							}
-							else {
-								m_row = layer->get_step(m_cursor) - m_base_note;
-							}
-							g_popup.avoid(m_cursor);
-							g_popup.note_name(m_base_note + m_row);
-							m_action = ACTION_NOTE_DRAG;
-							break;
-						default:
-							m_copy_mod = layer->get_step(m_cursor);
-							m_popup = 0;
-							m_action = ACTION_MOD_DRAG;
-					}
-					break;
-				case KEY_B2:
-					switch(layer->m_cfg.m_mode) {
-						case V_SQL_SEQ_MODE_NOTE:
-							m_row = layer->get_step(m_cursor) - m_base_note;
-							m_action = ACTION_NOTE_CLONE;
-							m_popup = POPUP_MS;
-							break;
-						default:
-							m_copy_mod = layer->get_step(m_cursor);
-							m_action = ACTION_MOD_CLONE;
-							m_popup = 0;
-							break;
-					}
-					break;
-				case KEY_B3:
-					layer->clear_step(m_cursor);
-					m_action = ACTION_ERASE;
-					break;
-				case KEY_B6:
-					layer->set_pos(m_cursor);
-					m_action = ACTION_SET_LOOP;
-					break;
-/*				case KEY_L5:
-					set_active_layer(0);
-					break;
-				case KEY_L6:
-					set_active_layer(1);
-					break;
-				case KEY_L7:
-					set_active_layer(2);
-					break;
-				case KEY_L8:
-					set_active_layer(3);
-					break;*/
-				}
-			}
-			break;
-		case EV_KEY_RELEASE:
-			m_action = ACTION_NONE;
-			break;
-		}
-	}
-	void repaint() {
-		int i;
-		uint32_t mask;
-		CSequenceLayer *layer = &m_layers[m_layer];
-
-		//CRenderBuf::lock();
-		//CRenderBuf::clear();
-
-		// displaying the cursor
-		switch(layer->m_cfg.m_mode) {
-			case V_SQL_SEQ_MODE_NOTE:
-				mask = CRenderBuf::bit(m_cursor);
-				for(i=0; i<13; ++i) {
-					CRenderBuf::raster(i) &= ~mask;
-					CRenderBuf::hilite(i) |= mask;
-				}
-				break;
-			default:
-				mask = CRenderBuf::bit(m_cursor);
-				for(i=0; i<14; ++i) {
-					CRenderBuf::raster(i) &= ~mask;
-					CRenderBuf::hilite(i) |= mask;
-				}
-		}
-
-		// the loop points
-		mask = CRenderBuf::make_mask(layer->m_cfg.m_loop_from, layer->m_cfg.m_loop_to + 1);
-
-		CRenderBuf::raster(15) |= (c_ruler & mask);
-  		CRenderBuf::hilite(15) |= (~c_ruler & mask);
-		mask = CRenderBuf::bit(layer->m_play_pos);
-		CRenderBuf::raster(15) |= mask;
-		CRenderBuf::hilite(15) |= mask;
-
-		// displaying the cursor
-		switch(layer->m_cfg.m_mode) {
-			case V_SQL_SEQ_MODE_NOTE:
-				mask = CRenderBuf::bit(0);
-				for(i=0; i<32; ++i) {
-					int n = SEQ_STEP(layer->m_cfg.m_step[i]);
-					if(n) {
-						n = 12 - n + m_base_note;
-						if(n >= 0 && n <= 12) {
-							CRenderBuf::raster(n) |= mask;
-							if(i == layer->m_play_pos) {
-								CRenderBuf::set_hilite(n, mask);
-							}
-							else {
-								CRenderBuf::clear_hilite(n, mask);
-							}
-						}
-
-						if(SEQ_GATE(layer->m_cfg.m_step[i])) {
-							CRenderBuf::set_raster(14, mask); // trig
-						}
-						else {
-							CRenderBuf::set_hilite(14, mask); // legato
-						}
-					}
-					mask>>=1;
-				}
-				break;
-			default:
-				mask = CRenderBuf::bit(0);
-				for(i=0; i<32; ++i) {
-					int n = (5+SEQ_STEP(layer->m_cfg.m_step[i]))/10;
-					if(n>0) {
-						CRenderBuf::raster(13-n) |= mask;
-					}
-					else {
-						CRenderBuf::hilite(13) |= mask;
-					}
-					mask>>=1;
-				}
-				break;
-		}
-
-		/*
-		if(m_popup) {
-			int flags = 0;
-			if(m_cursor > 16) {
-				flags = CRenderBuf::POPUP_LEFT;
-			}
-			switch(m_action) {
-			case ACTION_NOTE_DRAG:
-			case ACTION_NOTE_CLONE:
-				CRenderBuf::print_note_name(m_row + m_base_note,flags);
-				break;
-			case ACTION_DRAG_LOOP:
-				CRenderBuf::print_number2(1 + layer->m_loop_to -layer->m_loop_from,flags);
-				break;
-			default:
-				if(m_msg) {
-					CRenderBuf::print_text(m_msg,flags);
-				}
-				break;
-			}
-		}
-*/
-
-		//CRenderBuf::unlock();
-	}
-	/*
-	void run() {
-		repaint();
-		if(m_popup) {
-			--m_popup;
-		}
-	}
-*/
 };
 
 extern CSequencer g_sequencer;

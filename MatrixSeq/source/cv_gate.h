@@ -78,7 +78,7 @@ public:
 	int get(int which, PARAM_ID param) {
 		switch(param) {
 			case P_CVGATE_VSCALE: return m_cfg.cv_scale[which];
-			case P_CVGATE_VRANGE: return m_cfg.cv_scale[which];
+			case P_CVGATE_VRANGE: return m_cfg.cv_range[which];
 			default: return 0;
 		}
 	}

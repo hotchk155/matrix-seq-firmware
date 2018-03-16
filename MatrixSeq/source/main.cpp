@@ -47,6 +47,7 @@
 #include "params.h"
 #include "clock.h"
 #include "i2c_bus.h"
+#include <storage.h>
 #include "cv_gate.h"
 #include "sequence_layer.h"
 #include "midi.h"
@@ -74,13 +75,14 @@
  };
 
 byte g_view = VIEW_SEQUENCER;
+byte g_current_layer = 0;
 
 void set_param(PARAM_ID param, int value) {
 	if(param < P_SQL_MAX) {
 		g_sequencer.set(param,value);
 	}
 	else if(param < P_CVGATE_MAX) {
-		g_cv_gate.set(g_sequencer.get_active_layer(),param,value);
+		g_cv_gate.set(g_current_layer,param,value);
 	}
 }
 int get_param(PARAM_ID param) {
@@ -88,7 +90,7 @@ int get_param(PARAM_ID param) {
 		return g_sequencer.get(param);
 	}
 	else if(param < P_CVGATE_MAX) {
-		return g_cv_gate.get(g_sequencer.get_active_layer(),param);
+		return g_cv_gate.get(g_current_layer,param);
 	}
 	return 0;
 }
@@ -98,6 +100,7 @@ int get_param(PARAM_ID param) {
 void fire_event(int event, uint32_t param) {
 
 	if(event == EV_KEY_PRESS) {
+		int new_layer = -1;
 		switch(param) {
 		case KEY_L1:
 			if(g_view == VIEW_SEQUENCER) {
@@ -108,10 +111,37 @@ void fire_event(int event, uint32_t param) {
 				g_view = VIEW_SEQUENCER;
 			}
 			return;
-		case KEY_L5: g_sequencer.set_active_layer(3); g_menu.update(); return;
-		case KEY_L6: g_sequencer.set_active_layer(2); g_menu.update(); return;
-		case KEY_L7: g_sequencer.set_active_layer(1); g_menu.update(); return;
-		case KEY_L8: g_sequencer.set_active_layer(0); g_menu.update(); return;
+		case KEY_L5:
+			new_layer = 3;
+			break;
+		case KEY_L6:
+			new_layer = 2;
+			break;
+		case KEY_L7:
+			new_layer = 1;
+			break;
+		case KEY_L8:
+			new_layer = 0;
+			break;
+		}
+
+		if(new_layer >= 0) {
+			g_current_layer = new_layer;
+			g_popup.layer(new_layer);
+			g_sequencer.set_active_layer(new_layer);
+			g_menu.update();
+			return;
+		}
+	}
+	else if(event == EV_KEY_RELEASE) {
+		switch(param) {
+		case KEY_L5:
+		case KEY_L6:
+		case KEY_L7:
+		case KEY_L8:
+			g_popup.hide();
+			g_menu.update();
+			return;
 		}
 	}
 
@@ -145,15 +175,16 @@ int main(void) {
     /* Force the counter to be placed into memory. */
 
 
+    g_clock.init();
+    g_clock.wait_ms(500);
+    PowerControl.set(1);
 
     g_i2c_bus.init();
     g_i2c_bus.dac_init();
     g_midi.init();
-    g_clock.init();
 
+    g_storage.test();
 
-    g_clock.wait_ms(500);
-    PowerControl.set(1);
 
     /* Enter an infinite loop, just incrementing a counter.
      * */
@@ -194,14 +225,13 @@ int main(void) {
     		CRenderBuf::lock();
     		switch(g_view) {
     		case VIEW_SEQUENCER:
-    			CRenderBuf::clear();
     			g_sequencer.repaint();
-    			g_popup.repaint();
     			break;
     		case VIEW_MENU:
     			g_menu.repaint();
     			break;
     		}
+			g_popup.repaint();
     		CRenderBuf::unlock();
 
 
