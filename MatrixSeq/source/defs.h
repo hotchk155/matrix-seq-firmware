@@ -34,6 +34,7 @@ extern const uint32_t char4x5[];
 
 extern void fire_event(int event, uint32_t param);
 extern void fire_note(byte midi_note, byte midi_vel);
+extern void force_full_repaint();
 
 
 

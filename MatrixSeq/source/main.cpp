@@ -47,10 +47,10 @@
 #include "params.h"
 #include "clock.h"
 #include "i2c_bus.h"
-#include <storage.h>
+#include "storage.h"
+#include "midi.h"
 #include "cv_gate.h"
 #include "sequence_layer.h"
-#include "midi.h"
 #include "digital_out.h"
 #include "display_panel.h"
 #include "popup.h"
@@ -76,16 +76,15 @@
 
 byte g_view = VIEW_SEQUENCER;
 byte g_current_layer = 0;
+byte g_is_running = 0;
 
 void set_param(PARAM_ID param, int value) {
 	switch(param) {
 	case P_LAYER:
-		if(value != g_current_layer) {
-			g_current_layer = value;
-			//g_popup.layer(g_current_layer);
-			g_sequencer.set_active_layer(g_current_layer);
-			g_menu.update();
-		}
+		g_current_layer = value;
+		g_popup.layer(g_current_layer);
+		g_sequencer.set_active_layer(g_current_layer);
+		force_full_repaint();
 		break;
 	default:
 		if(param < P_SQL_MAX) {
@@ -93,6 +92,9 @@ void set_param(PARAM_ID param, int value) {
 		}
 		else if(param < P_CVGATE_MAX) {
 			g_cv_gate.set(g_current_layer,param,value);
+		}
+		else if(param < P_CLOCK_MAX) {
+			g_clock.set(param,value);
 		}
 		break;
 	}
@@ -107,6 +109,9 @@ int get_param(PARAM_ID param) {
 		}
 		else if(param < P_CVGATE_MAX) {
 			return g_cv_gate.get(g_current_layer,param);
+		}
+		else if(param < P_CLOCK_MAX) {
+			return g_clock.get(param);
 		}
 	}
 	return 0;
@@ -129,34 +134,107 @@ void dispatch_event(int event, uint32_t param) {
 		break;
 	}
 }
+
+enum {
+	MENU_PRESS_DOWN = 1, // menu key has been pressed but no action specified yet
+	MENU_PRESS_SHIFT = 2
+};
+byte g_menu_press= 0;
 void fire_event(int event, uint32_t param) {
 
 	switch(event) {
+	//////////////////////////////////////////////////////////////
 	case EV_KEY_PRESS:
-		if(param == KEY_B7 && g_view == VIEW_SEQUENCER) {
-			g_view = VIEW_MENU;
-			g_menu.activate();
+		// when menu key initially pressed, remember but do not take action yet
+		if(param == KEY_MENU && !g_menu_press) {
+			g_menu_press = MENU_PRESS_DOWN;
+		}
+		// layers 1..4 are pressed while menu button is held. Activate layer
+		// and record shifted menu key action
+		if(param == KEY2_LAYER1 && g_menu_press) {
+			set_param(P_LAYER, 0);
+			g_menu_press = MENU_PRESS_SHIFT;
+		}
+		else if(param == KEY2_LAYER2 && g_menu_press) {
+			set_param(P_LAYER, 1);
+			g_menu_press = MENU_PRESS_SHIFT;
+		}
+		else if(param == KEY2_LAYER3 && g_menu_press) {
+			set_param(P_LAYER, 2);
+			g_menu_press = MENU_PRESS_SHIFT;
+		}
+		else if(param == KEY2_LAYER4 && g_menu_press) {
+			set_param(P_LAYER, 3);
+			g_menu_press = MENU_PRESS_SHIFT;
+		}
+		else if(param == KEY_STARTSTOP) {
+			if(g_is_running) {
+				g_sequencer.stop();
+				g_is_running = 0;
+				g_popup.text("STOP", 4);
+			}
+			else {
+				g_sequencer.start(g_clock.m_ticks, (byte)(256*g_clock.m_part_tick));
+				g_is_running = 1;
+				g_popup.text("RUN", 3);
+			}
+			g_popup.align(CPopup::ALIGN_RIGHT);
+		}
+		else {
+			// pass event to active view
+			dispatch_event(event, param);
+		}
+		break;
+
+	//////////////////////////////////////////////////////////////
+	case EV_KEY_RELEASE:
+		// is menu button pressed and released without any action?
+		// if so we use that to toggle between menu and sequencer
+		// views
+		if(param == KEY_MENU && g_menu_press == MENU_PRESS_DOWN) {
+			if(g_view == VIEW_MENU) {
+				g_view = VIEW_SEQUENCER;
+				g_sequencer.activate();
+			}
+			else {
+				g_view = VIEW_MENU;
+				g_menu.activate();
+			}
+		}
+		else {
+			// pass event to active view
+			dispatch_event(event,param);
+		}
+		// in any case remember when menu button is released
+		if(param == KEY_MENU) {
+			g_menu_press = 0;
+		}
+		break;
+
+	//////////////////////////////////////////////////////////////
+	case EV_ENCODER:
+		if(g_menu_press && g_view == VIEW_SEQUENCER) {
+			g_sequencer.scroll((int)param);
 		}
 		else {
 			dispatch_event(event,param);
 		}
+		if(g_menu_press) {
+			g_menu_press = MENU_PRESS_SHIFT;
+		}
 		break;
-	case EV_KEY_RELEASE:
-		dispatch_event(event,param);
-		break;
-	case EV_ENCODER:
-		dispatch_event(event,param);
-		break;
-	}
-	if(g_view == VIEW_MENU && g_menu.m_done) {
-		g_view = VIEW_SEQUENCER;
-		g_sequencer.activate();
 	}
 }
 
 void fire_note(byte midi_note, byte midi_vel) {
 	g_midi.send_note(0, midi_note, midi_vel);
 	//LED1.set(!!midi_vel);
+}
+
+void force_full_repaint() {
+	g_popup.force_repaint();
+	g_sequencer.force_repaint();
+	g_menu.force_repaint();
 }
 
 
@@ -172,6 +250,7 @@ int main(void) {
 
     //printf("Hello World\n");
     /* Force the counter to be placed into memory. */
+
 
 
     g_clock.init();
@@ -203,7 +282,10 @@ int main(void) {
     		g_popup.run();
     		g_clock.m_ms_tick = 0;
         	g_cv_gate.run();
-        	g_sequencer.tick(g_clock.m_ticks, (byte)(256*g_clock.m_part_tick));
+
+        	if(g_is_running) {
+        		g_sequencer.tick(g_clock.m_ticks, (byte)(256*g_clock.m_part_tick));
+        	}
     		//g_sequencer.run();
 
     		if(!OffSwitch.get()) {

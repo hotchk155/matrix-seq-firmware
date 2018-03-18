@@ -49,22 +49,29 @@ public:
 
 
 	float m_bpm;
-
-
 	volatile double m_part_tick;
 	volatile double m_ticks_per_ms;
 	volatile byte m_ms_tick;
 	volatile uint32_t m_ticks;
 
+	typedef struct {
+		V_CLOCK_SRC m_source;
+	} CONFIG;
+	CONFIG m_cfg;
+
 	CClock() {
-		reset();
-		set_bpm(120);
+		init_config();
+		init_state();
 	}
 
-	void reset() {
+	void init_state() {
 		m_part_tick = 0.0;
 		m_ms_tick = 0;
 		m_ticks = 0;
+		set_bpm(120);
+	}
+	void init_config() {
+		m_cfg.m_source = V_CLOCK_SRC_INTERNAL;
 	}
 
 	void init() {
@@ -86,6 +93,26 @@ public:
 		kbiConfig.pinsEnabled = 0x01; // KBI0 pin 0
 		kbiConfig.pinsEdge = 0; // Falling Edge
 		KBI_Init(KBI0, &kbiConfig);
+	}
+
+
+	///////////////////////////////////////////////////////////////////////////////
+	void set(PARAM_ID param, int value) {
+		switch(param) {
+			case P_CLOCK_BPM: set_bpm(value); break;
+			case P_CLOCK_SRC: m_cfg.m_source = (V_CLOCK_SRC)value;
+		default:
+			break;
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	int get(PARAM_ID param) {
+		switch(param) {
+		case P_CLOCK_BPM: return m_bpm;
+		case P_CLOCK_SRC: return m_cfg.m_source;
+		default: return 0;
+		}
 	}
 
 	void set_bpm(float bpm) {

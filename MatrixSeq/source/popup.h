@@ -159,7 +159,7 @@ public:
 		m_timeout = DISPLAY_TIMEOUT;
 	}
 
-	void text(char *sz, int len) {
+	void text(const char *sz, int len) {
 		m_len = 0;
 		while(m_len < len) {
 			m_text[m_len++] = *sz++;
@@ -184,8 +184,12 @@ public:
 	}
 	void hide() {
 		m_len = 0;
+		force_full_repaint();
+	}
+	void force_repaint() {
 		m_render = 1;
 	}
+
 	void run() {
 		if(m_timeout) {
 			if(!--m_timeout) {

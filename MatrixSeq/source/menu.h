@@ -9,7 +9,9 @@
 #define MENU_H_
 
 
+#define NUM_MENU_OPTS (int)(sizeof(CMenu::m_opts)/sizeof(CMenu::OPTION))
 
+/////////////////////////////////////////////////////////////////////////////////////////////////
 class CMenu {
 public:
 	typedef struct {
@@ -23,46 +25,39 @@ public:
 		MIDI_CHANNEL,
 		NUMBER_7BIT,
 		VOLT_RANGE,
-		NUM_OPTS = 8,
+		BPM,
+		DURATION,
 
 		ACTION_NONE = 0,
-		ACTION_ACTIVATED,
 		ACTION_VALUE_SELECTED,
 		ACTION_VALUE_CHANGED
 	};
-	static const CMenu::OPTION m_opts[NUM_OPTS];
+	const OPTION m_opts[10] = {
+			{"TYP", P_SQL_SEQ_MODE, CMenu::ENUMERATED, "NOTE|MOD|VEL|TRAN"},
+			{"RTE", P_SQL_STEP_RATE, CMenu::ENUMERATED, "1|2D|2|4D|2T|4|8D|4T|8|16D|8T|16|16T|32"},
+			{"DUR", P_SQL_STEP_DUR, CMenu::ENUMERATED, "FULL|NONE|32|16T|16|8T|16D|8|4T|8D|4|2T|4D|2|2D|1"},
+			{"CHN", P_SQL_MIDI_CHAN, CMenu::MIDI_CHANNEL},
+			{"CC", P_SQL_MIDI_CC, CMenu::NUMBER_7BIT},
+			{"CV", P_CVGATE_VRANGE, CMenu::VOLT_RANGE},
+			{"TUN", P_CVGATE_VSCALE, CMenu::ENUMERATED, "1V|1.2V|HZV"},
+			{"SCL", P_SQL_SCALE_TYPE, CMenu::ENUMERATED, "IONI|DORI|PHRY|LYDI|MIXO|AEOL|LOCR"},
+			{"BPM", P_CLOCK_BPM, CMenu::BPM},
+			{"CLK", P_CLOCK_SRC, CMenu::ENUMERATED, "INT|MIDI"}
+	};
 
-	byte m_done;
 	byte m_item;
 	byte m_value;
 	byte m_repaint;
 	byte m_action;
+
+	/////////////////////////////////////////////////////////////////////////////////////////////////
 	CMenu() {
-		m_done = 1;
 		m_item = 0;
 		m_repaint = 1;
 		m_action = ACTION_NONE;
 	}
-	/*
 
-	 00     Y
-	 01     YY
-	 02     Y
-	 03     YYYY
-	 04
-	 05		XXXXX
-	 06     X
-	 07     XXX
-	 08     X
-	 09     XXXX
-	 10
-	 11     ZZZZ
-	 12     Z
-	 13     ZZZ
-	 14     Z
-
-
-	 */
+	/////////////////////////////////////////////////////////////////////////////////////////////////
 	void format_number(int value, char *buf, int digits) {
 		if(digits > 2) {
 			*buf++ = '0' + value/100;
@@ -75,6 +70,8 @@ public:
 		*buf++ = '0' + value;
 		*buf = 0;
 	}
+
+	/////////////////////////////////////////////////////////////////////////////////////////////////
 	const char *get_value_string(const CMenu::OPTION &opt, int value) {
 		static char buf[5];
 		switch(opt.mode) {
@@ -91,7 +88,11 @@ public:
 		case MIDI_CHANNEL:
 			format_number(value + 1, buf, 2);
 			return buf;
+		case DURATION:
+			format_number(value, buf, 2);
+			return buf;
 		case NUMBER_7BIT:
+		case BPM:
 			format_number(value, buf, 3);
 			return buf;
 		case VOLT_RANGE:
@@ -103,6 +104,8 @@ public:
 			return buf;
 		}
 	}
+
+	/////////////////////////////////////////////////////////////////////////////////////////////////
 	int get_max_value(const CMenu::OPTION &opt) {
 		switch(opt.mode) {
 		case ENUMERATED: {
@@ -122,22 +125,36 @@ public:
 			return 127;
 		case VOLT_RANGE:
 			return 8;
+		case BPM:
+			return 300;
 		default:
 			return 0;
 		}
 	}
+	/////////////////////////////////////////////////////////////////////////////////////////////////
+	int get_min_value(const CMenu::OPTION &opt) {
+		switch(opt.mode) {
+		case BPM:
+			return 30;
+		default:
+			return 0;
+		}
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////////////////////
 	void activate() {
-		m_action = ACTION_ACTIVATED;
-		m_done = 0;
+		m_action = ACTION_NONE;
 		m_repaint = 1;
 	}
+
+	/////////////////////////////////////////////////////////////////////////////////////////////////
 	void event(int evt, uint32_t param) {
 		int i;
 		switch(evt) {
 		case EV_ENCODER:
-			if(m_action == ACTION_VALUE_SELECTED || m_action == ACTION_VALUE_CHANGED || m_action == ACTION_ACTIVATED) {
+			if(m_action == ACTION_VALUE_SELECTED || m_action == ACTION_VALUE_CHANGED) {
 				i = m_value + (int)param;
-				if(i >= 0 && i <= get_max_value(m_opts[m_item])) {
+				if(i >= get_min_value(m_opts[m_item]) && i <= get_max_value(m_opts[m_item])) {
 					m_value = i;
 					m_action = ACTION_VALUE_CHANGED;
 					m_repaint = 1;
@@ -145,14 +162,14 @@ public:
 			}
 			else {
 				i = m_item + (int)param;
-				if(i>=0 && i<NUM_OPTS) {
+				if(i>=0 && i<NUM_MENU_OPTS) {
 					m_item = i;
 					m_repaint = 1;
 				}
 			}
 			break;
 		case EV_KEY_PRESS:
-			if(param == KEY_B7) {
+			if(param == KEY_MENU) {
 				m_value = get_param(m_opts[m_item].param);
 				m_action = ACTION_VALUE_SELECTED;
 			}
@@ -162,18 +179,18 @@ public:
 				set_param(m_opts[m_item].param, m_value);
 				m_repaint = 1;
 			}
-			else if(m_action != ACTION_ACTIVATED) {
-				m_done = 1;
-			}
 			m_action = ACTION_NONE;
 			break;
 
 		}
 	}
 
-	void update() {
+	/////////////////////////////////////////////////////////////////////////////////////////////////
+	void force_repaint() {
 		m_repaint = 1;
 	}
+
+	/////////////////////////////////////////////////////////////////////////////////////////////////
 	void repaint() {
 		if(m_repaint) {
 			CRenderBuf::clear();
@@ -182,7 +199,7 @@ public:
 
 				uint32_t buf[5] = {0};
 				int state = 0;
-				if(opt >= 0 && opt < NUM_OPTS) {
+				if(opt >= 0 && opt < NUM_MENU_OPTS) {
 					const CMenu::OPTION &this_opt = m_opts[opt];
 
 					int value;
@@ -238,22 +255,11 @@ public:
 			m_repaint = 0;
 		}
 	}
-
-
 };
 
 extern CMenu g_menu;
 #ifdef MAIN_INCLUDE
-const CMenu::OPTION CMenu::m_opts[NUM_OPTS] = {
-		{"LAYR", P_LAYER, CMenu::ENUMERATED, ".A.|.B.|.C.|.D."},
-		{"TYP", P_SQL_SEQ_MODE, CMenu::ENUMERATED, "NOTE|MOD|VEL|TRAN"},
-		{"RTE", P_SQL_STEP_RATE, CMenu::ENUMERATED, "1|2D|2|4D|2T|4|8D|4T|8|16D|8T|16|16T|32"},
-		{"CHN", P_SQL_MIDI_CHAN, CMenu::MIDI_CHANNEL},
-		{"CC", P_SQL_MIDI_CC, CMenu::NUMBER_7BIT},
-		{"CV", P_CVGATE_VRANGE, CMenu::VOLT_RANGE},
-		{"TUN", P_CVGATE_VSCALE, CMenu::ENUMERATED, "1V|1.2V|HZV"},
-		{"SCL", P_SQL_SCALE_TYPE, CMenu::ENUMERATED, "IONI|DORI|PHRY|LYDI|MIXO|AEOL|LOCR"},
-};
 CMenu g_menu;
 #endif
-#endif /* MENU_H_ */
+
+#endif

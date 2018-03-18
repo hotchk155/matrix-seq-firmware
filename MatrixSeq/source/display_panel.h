@@ -46,6 +46,16 @@ extern volatile byte g_disp_update;
 
 #define KEY_MAXBIT	(1U<<23)
 
+// map specific key functions
+#define KEY_MENU	KEY_B8
+#define KEY_STARTSTOP	KEY_B7
+#define KEY2_LAYER1	KEY_B1
+#define KEY2_LAYER2	KEY_B2
+#define KEY2_LAYER3	KEY_B3
+#define KEY2_LAYER4	KEY_B4
+
+
+
 extern const uint32_t char4x5[];
 #define CHAR4X5_ALPHA		0
 #define CHAR4X5_HASH		26
