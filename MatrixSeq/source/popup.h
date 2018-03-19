@@ -92,11 +92,13 @@ public:
 			m_render = 1;
 		}
 	}
-	void layer(byte layer) {
+	void layer(byte layer, byte enabled) {
 		m_len = 0;
 		m_text[m_len++] = 'L';
-		m_text[m_len++] = '-';
-		m_text[m_len++] = '0' + layer;
+		m_text[m_len++] = '1' + layer;
+		if(!enabled) {
+			m_text[m_len++] = '$';
+		}
 		m_align = ALIGN_RIGHT;
 		m_timeout = DISPLAY_TIMEOUT;
 		m_render = 1;
@@ -154,6 +156,16 @@ public:
 
 	void num2digits(int value) {
 		m_len = 0;
+		format_number(value, 10);
+		m_render = 1;
+		m_timeout = DISPLAY_TIMEOUT;
+	}
+
+	void show_offset(int value) {
+		m_len = 0;
+		if(value >= 0) {
+			m_text[m_len++] = '+';
+		}
 		format_number(value, 10);
 		m_render = 1;
 		m_timeout = DISPLAY_TIMEOUT;

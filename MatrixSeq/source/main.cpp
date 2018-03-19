@@ -79,51 +79,37 @@ byte g_current_layer = 0;
 byte g_is_running = 0;
 
 void set_param(PARAM_ID param, int value) {
-	switch(param) {
-	case P_LAYER:
-		g_current_layer = value;
-		g_popup.layer(g_current_layer);
-		g_sequencer.set_active_layer(g_current_layer);
-		force_full_repaint();
-		break;
-	default:
-		if(param < P_SQL_MAX) {
-			g_sequencer.set(param,value);
-		}
-		else if(param < P_CVGATE_MAX) {
-			g_cv_gate.set(g_current_layer,param,value);
-		}
-		else if(param < P_CLOCK_MAX) {
-			g_clock.set(param,value);
-		}
-		break;
+	if(param < P_SQL_MAX) {
+		g_sequencer.set(param,value);
+	}
+	else if(param < P_CVGATE_MAX) {
+		g_cv_gate.set(g_current_layer,param,value);
+	}
+	else if(param < P_CLOCK_MAX) {
+		g_clock.set(param,value);
 	}
 }
 int get_param(PARAM_ID param) {
-	switch(param) {
-	case P_LAYER:
-		return g_current_layer;
-	default:
-		if(param < P_SQL_MAX) {
-			return g_sequencer.get(param);
-		}
-		else if(param < P_CVGATE_MAX) {
-			return g_cv_gate.get(g_current_layer,param);
-		}
-		else if(param < P_CLOCK_MAX) {
-			return g_clock.get(param);
-		}
+	if(param < P_SQL_MAX) {
+		return g_sequencer.get(param);
+	}
+	else if(param < P_CVGATE_MAX) {
+		return g_cv_gate.get(g_current_layer,param);
+	}
+	else if(param < P_CLOCK_MAX) {
+		return g_clock.get(param);
 	}
 	return 0;
 }
 
 
+/*
 enum {
 	ACTION_NONE,
 	ACTION_MENU_PRESS,
 	ACTION_MENU_DRAG
 };
-int g_action = ACTION_NONE;
+int g_action = ACTION_NONE;*/
 void dispatch_event(int event, uint32_t param) {
 	switch(g_view) {
 	case VIEW_SEQUENCER:
@@ -137,9 +123,48 @@ void dispatch_event(int event, uint32_t param) {
 
 enum {
 	MENU_PRESS_DOWN = 1, // menu key has been pressed but no action specified yet
-	MENU_PRESS_SHIFT = 2
+	MENU_PRESS_SHIFT = 2,
+	MENU_PRESS_LAYER_COPY = 3 // a shifted layer button has been pressed
 };
 byte g_menu_press= 0;
+char g_selected_layer = -1;
+
+//////////////////////////////////////////////////////////////
+// one of the layer buttons has been pressed while the menu button
+// is held
+void layer_button_event(int event, uint32_t param) {
+	byte layer = 0;
+	switch(param) {
+	case KEY2_LAYER2: layer = 1; break;
+	case KEY2_LAYER3: layer = 2; break;
+	case KEY2_LAYER4: layer = 3; break;
+	}
+	if(event == EV_KEY_PRESS) {
+		//
+		if(g_menu_press == MENU_PRESS_LAYER_COPY) {
+			char text[4] = {(char)('1'+g_current_layer), '-', '>', (char)('1'+layer)};
+			g_sequencer.copy_layer(g_current_layer, layer);
+			g_popup.text(text,4);
+			g_popup.align(CPopup::ALIGN_RIGHT);
+		}
+		else {
+			// the current layer button is not currently
+			// held so we are selecting a new layer
+			g_current_layer = layer;
+			g_popup.layer(g_current_layer, g_sequencer.is_layer_enabled(g_current_layer));
+			g_sequencer.set_active_layer(g_current_layer);
+			force_full_repaint();
+			g_menu_press = MENU_PRESS_LAYER_COPY;
+		}
+	}
+	else {
+		if(layer == g_current_layer) {
+			// the button for the current layer has been
+			// released, so copying is no longer active
+			g_menu_press = MENU_PRESS_SHIFT;
+		}
+	}
+}
 void fire_event(int event, uint32_t param) {
 
 	switch(event) {
@@ -149,34 +174,27 @@ void fire_event(int event, uint32_t param) {
 		if(param == KEY_MENU && !g_menu_press) {
 			g_menu_press = MENU_PRESS_DOWN;
 		}
-		// layers 1..4 are pressed while menu button is held. Activate layer
-		// and record shifted menu key action
-		if(param == KEY2_LAYER1 && g_menu_press) {
-			set_param(P_LAYER, 0);
-			g_menu_press = MENU_PRESS_SHIFT;
-		}
-		else if(param == KEY2_LAYER2 && g_menu_press) {
-			set_param(P_LAYER, 1);
-			g_menu_press = MENU_PRESS_SHIFT;
-		}
-		else if(param == KEY2_LAYER3 && g_menu_press) {
-			set_param(P_LAYER, 2);
-			g_menu_press = MENU_PRESS_SHIFT;
-		}
-		else if(param == KEY2_LAYER4 && g_menu_press) {
-			set_param(P_LAYER, 3);
-			g_menu_press = MENU_PRESS_SHIFT;
+		if(g_menu_press && (param == KEY2_LAYER1 || param == KEY2_LAYER2 || param == KEY2_LAYER3 ||  param == KEY2_LAYER4)) {
+			layer_button_event(event,param);
 		}
 		else if(param == KEY_STARTSTOP) {
-			if(g_is_running) {
-				g_sequencer.stop();
-				g_is_running = 0;
-				g_popup.text("STOP", 4);
+			if(g_menu_press) {
+				g_sequencer.enable_layer(g_current_layer,!g_sequencer.is_layer_enabled(g_current_layer));
+				g_popup.layer(g_current_layer, g_sequencer.is_layer_enabled(g_current_layer));
+				force_full_repaint();
+				g_menu_press = MENU_PRESS_SHIFT;
 			}
 			else {
-				g_sequencer.start(g_clock.m_ticks, (byte)(256*g_clock.m_part_tick));
-				g_is_running = 1;
-				g_popup.text("RUN", 3);
+				if(g_is_running) {
+					g_sequencer.stop();
+					g_is_running = 0;
+					g_popup.text("STOP", 4);
+				}
+				else {
+					g_sequencer.start(g_clock.m_ticks, (byte)(256*g_clock.m_part_tick));
+					g_is_running = 1;
+					g_popup.text("RUN", 3);
+				}
 			}
 			g_popup.align(CPopup::ALIGN_RIGHT);
 		}
@@ -201,6 +219,9 @@ void fire_event(int event, uint32_t param) {
 				g_menu.activate();
 			}
 		}
+		if(g_menu_press && (param == KEY2_LAYER1 || param == KEY2_LAYER2 || param == KEY2_LAYER3 || param == KEY2_LAYER4)) {
+			layer_button_event(event,param);
+		}
 		else {
 			// pass event to active view
 			dispatch_event(event,param);
@@ -208,6 +229,7 @@ void fire_event(int event, uint32_t param) {
 		// in any case remember when menu button is released
 		if(param == KEY_MENU) {
 			g_menu_press = 0;
+			g_selected_layer = -1;
 		}
 		break;
 

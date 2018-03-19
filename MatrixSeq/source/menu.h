@@ -169,7 +169,7 @@ public:
 			}
 			break;
 		case EV_KEY_PRESS:
-			if(param == KEY_MENU) {
+			if(param == KEY_EDIT) {
 				m_value = get_param(m_opts[m_item].param);
 				m_action = ACTION_VALUE_SELECTED;
 			}

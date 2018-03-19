@@ -47,6 +47,7 @@ extern volatile byte g_disp_update;
 #define KEY_MAXBIT	(1U<<23)
 
 // map specific key functions
+#define KEY_EDIT	KEY_B1
 #define KEY_MENU	KEY_B8
 #define KEY_STARTSTOP	KEY_B7
 #define KEY2_LAYER1	KEY_B1
@@ -62,6 +63,9 @@ extern const uint32_t char4x5[];
 #define CHAR4X5_NUMERIC		32
 #define CHAR4X5_MINUS		42
 #define CHAR4X5_DOT			43
+#define CHAR4X5_GT			44
+#define CHAR4X5_CROSS		45
+#define CHAR4X5_PLUS		46
 #define CHAR4X5_BLOCK		47
 
 
@@ -131,8 +135,11 @@ public:
 		switch(ch) {
 		case '#': ch = CHAR4X5_HASH; break;
 		case '-': ch = CHAR4X5_MINUS; break;
+		case '+': ch = CHAR4X5_PLUS; break;
 		case '~': ch = CHAR4X5_BLOCK; break;
 		case '.': ch = CHAR4X5_DOT; break;
+		case '>': ch = CHAR4X5_GT; break;
+		case '$': ch = CHAR4X5_CROSS; break;
 		default:
 			if(ch >= '0' && ch <= '9') {
 				ch = CHAR4X5_NUMERIC + ch - '0';

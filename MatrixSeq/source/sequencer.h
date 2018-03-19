@@ -27,7 +27,9 @@ public:
 		ACTION_ERASE_STEP,
 		ACTION_CLONE_STEP,
 		ACTION_SET_LOOP,
-		ACTION_DRAG_LOOP
+		ACTION_DRAG_LOOP,
+		ACTION_MOVE_VERT,
+		ACTION_MOVE_HORZ
 	};
 
 	static const uint32_t c_ruler = 0x88888888U;
@@ -46,7 +48,8 @@ public:
 
 	int m_layer;			// this is the current layer being viewed/edited
 	int m_cursor;			// this is the position of the edit cursor
-	int m_row;
+	//int m_row;
+	int m_value;			// value ebign edited in drag mode
 	int m_action;
 	byte m_flags;
 	CSequenceLayer::STEP_TYPE m_copy_step;
@@ -60,11 +63,12 @@ public:
 	///////////////////////////////////////////////////////////////////////////////
 	void init_state() {
 		m_cursor = 0;
-		m_row = 0;
+		//m_row = 0;
 		m_flags = 0;
 		m_action = ACTION_NONE;
 		//m_popup = 0;
 		m_copy_step = 0;
+		m_value = 0;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -95,6 +99,14 @@ public:
 		}
 	}
 
+
+	byte is_layer_enabled(byte layer) {
+		return m_layers[layer].m_cfg.m_enabled;
+	}
+	void enable_layer(byte layer, byte enable) {
+		m_layers[layer].m_cfg.m_enabled = enable;
+	}
+
 	///////////////////////////////////////////////////////////////////////////////
 	void force_repaint() {
 
@@ -109,6 +121,10 @@ public:
 		m_layer = l;
 	}
 
+	void copy_layer(int from, int to) {
+		m_layers[to].copy_from(m_layers[from]);
+	}
+
 	///////////////////////////////////////////////////////////////////////////////
 	void step_info(CSequenceLayer::STEP_TYPE step, CSequenceLayer *layer) {
 		if(layer->is_note_mode()) {
@@ -119,7 +135,7 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	void scroll(int dist) {
-		int scroll_ofs = m_layers[m_layer].m_scroll_ofs + dist;
+		int scroll_ofs = m_layers[m_layer].m_state.m_scroll_ofs + dist;
 		if(scroll_ofs < 0) {
 			scroll_ofs = 0;
 		}
@@ -127,17 +143,17 @@ public:
 //TODO: for each type of layer
 			scroll_ofs = 114;
 		}
-		m_layers[m_layer].m_scroll_ofs = scroll_ofs;
+		m_layers[m_layer].m_state.m_scroll_ofs = scroll_ofs;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void set_scroll_for(CSequenceLayer::STEP_TYPE step, CSequenceLayer *layer) {
 		int v = STEP_VALUE(step);
-		if(v<layer->m_scroll_ofs) {
-			layer->m_scroll_ofs = v;
+		if(v<layer->m_state.m_scroll_ofs) {
+			layer->m_state.m_scroll_ofs = v;
 		}
-		else if(v>layer->m_scroll_ofs+12) {
-			layer->m_scroll_ofs = v-12;
+		else if(v>layer->m_state.m_scroll_ofs+12) {
+			layer->m_state.m_scroll_ofs = v-12;
 		}
 	}
 
@@ -155,6 +171,23 @@ public:
 				layer->set_step(m_cursor, m_copy_step);
 				set_scroll_for(m_copy_step, layer);
 				step_info(m_copy_step, layer);
+			}
+			else if(m_action == ACTION_MOVE_VERT) {
+				if(layer->vertical_move((int)param)) {
+					m_value += (int)param;
+				}
+				g_popup.show_offset(m_value);
+			}
+			else if(m_action == ACTION_MOVE_HORZ) {
+				if((int)param < 0 && m_value > -31) {
+					layer->shift_left();
+					--m_value;
+				}
+				else if((int)param > 0 && m_value < 31) {
+					layer->shift_right();
+					++m_value;
+				}
+				g_popup.show_offset(m_value);
 			}
 			else {
 				if(m_action == ACTION_SET_LOOP) {
@@ -186,13 +219,27 @@ public:
 		/////////////////////////////////////////////////////////////////////////////////////////////
 		// BUTTON PRESS
 		case EV_KEY_PRESS:
-			if(m_action == ACTION_EDIT_STEP && param == KEY_B2) {
-				step = layer->get_step(m_cursor);
-				if(!layer->is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
-					layer->set_step(m_cursor, step ^ CSequenceLayer::IS_TRIG);
+			if(m_action == ACTION_EDIT_STEP) {
+				switch(param) {
+				case KEY_B2:
+					step = layer->get_step(m_cursor);
+					if(!layer->is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
+						layer->set_step(m_cursor, step ^ CSequenceLayer::IS_TRIG);
+					}
+					break;
+				case KEY_B3:
+					m_value = 0;
+					g_popup.show_offset(m_value);
+					m_action = ACTION_MOVE_VERT;
+					break;
+				case KEY_B4:
+					m_value = 0;
+					g_popup.show_offset(m_value);
+					m_action = ACTION_MOVE_HORZ;
+					break;
 				}
 			}
-			if(m_action == ACTION_NONE) {
+			else if(m_action == ACTION_NONE) {
 				switch(param) {
 
 				//////////////////////////////////////////////////////////
@@ -205,7 +252,7 @@ public:
 						// no active note step - do we have a previous step to copy?
 						if(!m_copy_step) {
 							// nope so simply create a step at the bottom of the active range
-							m_copy_step = layer->m_scroll_ofs | CSequenceLayer::IS_ACTIVE | CSequenceLayer::IS_TRIG;
+							m_copy_step = layer->m_state.m_scroll_ofs | CSequenceLayer::IS_ACTIVE | CSequenceLayer::IS_TRIG;
 						}
 
 						// store the step
@@ -280,7 +327,7 @@ public:
 		}
 
 
-		mask = CRenderBuf::bit(layer->m_play_pos);
+		mask = CRenderBuf::bit(layer->m_state.m_play_pos);
 		CRenderBuf::raster(15) |= mask;
 		CRenderBuf::hilite(15) |= mask;
 
@@ -299,10 +346,10 @@ public:
 			CSequenceLayer::STEP_TYPE step = layer->get_step(i);
 			if(step & CSequenceLayer::IS_ACTIVE) {
 				int n = STEP_VALUE(step);
-				n = 12 - n + layer->m_scroll_ofs;
+				n = 12 - n + layer->m_state.m_scroll_ofs;
 				if(n >= 0 && n <= 12) {
 					CRenderBuf::raster(n) |= mask;
-					if(i == layer->m_play_pos) {
+					if(i == layer->m_state.m_play_pos) {
 						CRenderBuf::set_hilite(n, mask);
 					}
 					else {
@@ -339,7 +386,7 @@ public:
 		// is known, since other layers might provide modulation
 		for(int i=0; i<NUM_LAYERS; ++i) {
 			CSequenceLayer& layer = m_layers[i];
-			if(layer.m_stepped) {
+			if(layer.m_state.m_stepped && layer.m_cfg.m_enabled) {
 				layer.play_step();
 			}
 		}

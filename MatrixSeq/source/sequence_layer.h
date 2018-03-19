@@ -21,6 +21,8 @@ public:
 		MAX_STEPS = 32,					// number of steps in the layer
 		IS_ACTIVE = (uint16_t)0x100,	// is step active
 		IS_TRIG = (uint16_t)0x200, 	// is step a trigger
+		IS_VEL0 = (uint16_t)0x400, 	// velocity type bit 0
+		IS_VEL1 = (uint16_t)0x800, 	// velocity type bit 1
 		MAX_PLAYING_NOTES = 8,
 	};
 
@@ -28,12 +30,6 @@ public:
 	static const byte c_tick_rates[V_SQL_STEP_RATE_MAX];
 	static const byte c_step_duration[V_SQL_STEP_DUR_MAX];
 
-
-	typedef struct {
-		byte note;
-		byte count;
-	} PLAYING_NOTE;
-	PLAYING_NOTE m_playing[MAX_PLAYING_NOTES];
 
 	// step word contains both gate and CV info
 	// CV info is 1 byte. Interpretation depends on mode. Always 1 unit per grid cell
@@ -57,23 +53,33 @@ public:
 		V_SQL_STEP_DUR	m_note_dur;
 		byte 			m_midi_vel;			// MIDI velocity
 		V_SQL_VEL_MOD	m_midi_vel_mod;		// MIDI velocity modulation
+		byte 			m_enabled;
 		V_SQL_MIDI_CHAN m_midi_channel;		// MIDI channel
 		byte 			m_midi_cc;			// MIDI CC
-
 	} CONFIG;
 
 
+	typedef struct {
+		byte note;
+		byte count;
+	} PLAYING_NOTE;
+
+
+
+	typedef struct {
+		byte m_scroll_ofs;			// lowest step value shown on grid
+		STEP_TYPE m_step_value;			// the last value output by sequencer
+		byte m_stepped;				// stepped flag
+		int m_play_pos;
+		byte m_last_note_index;
+		//uint32_t m_next_step_millis;
+		uint32_t m_next_tick;
+		byte m_last_tick_lsb;
+		PLAYING_NOTE m_playing[MAX_PLAYING_NOTES];
+	} STATE;
 
 	CONFIG m_cfg;				// instance of config
-	byte m_scroll_ofs;			// lowest step value shown on grid
-	STEP_TYPE m_step_value;			// the last value output by sequencer
-	byte m_stepped;				// stepped flag
-	int m_play_pos;
-	byte m_last_note_index;
-	//uint32_t m_next_step_millis;
-	uint32_t m_next_tick;
-	byte m_last_tick_lsb;
-
+	STATE m_state;
 	///////////////////////////////////////////////////////////////////////////////
 	CSequenceLayer() {
 		init_config();
@@ -96,22 +102,35 @@ public:
 		m_cfg.m_midi_vel_mod = V_SQL_VEL_MOD_OFF;
 		m_cfg.m_midi_channel = V_SQL_MIDI_CHAN_1;
 		m_cfg.m_midi_cc = 1;
+		m_cfg.m_enabled = 1;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void init_state() {
-		m_step_value = 0;
-		m_stepped = 0;
-		m_play_pos = 0;
-		//m_last_midi_note = 0;
-		//m_next_step_millis = 0;
-		m_next_tick = 0;
-		m_scroll_ofs = 48;
-		m_last_tick_lsb = 0;
-		memset(m_playing,0,sizeof(m_playing));
-		m_last_note_index = 0xFF;
+		m_state.m_step_value = 0;
+		m_state.m_stepped = 0;
+		m_state.m_play_pos = 0;
+		m_state.m_next_tick = 0;
+		m_state.m_scroll_ofs = 48;
+		m_state.m_last_tick_lsb = 0;
+		m_state.m_last_note_index = 0xFF;
+		memset(m_state.m_playing,0,sizeof(m_state.m_playing));
 	}
 
+	void copy_from(const CSequenceLayer& layer) {
+		CONFIG cfg = m_cfg;
+
+		m_cfg = layer.m_cfg;
+		m_cfg.m_enabled = cfg.m_enabled;
+		m_cfg.m_midi_channel = cfg.m_midi_channel;
+		m_cfg.m_midi_cc = cfg.m_midi_cc;
+
+		m_state = layer.m_state;
+		m_state.m_last_note_index = 0xFF;
+		memset(m_state.m_playing,0,sizeof(m_state.m_playing));
+
+
+	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void set(PARAM_ID param, int value) {
@@ -142,7 +161,7 @@ public:
 	void set_loop_start(int pos) {
 		if(pos <= m_cfg.m_loop_to) {
 			m_cfg.m_loop_from = pos;
-			m_play_pos = pos;
+			m_state.m_play_pos = pos;
 		}
 	}
 
@@ -155,51 +174,51 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	void set_pos(int pos) {
-		m_play_pos = pos;
+		m_state.m_play_pos = pos;
 	}
 
 	void start(uint32_t ticks, byte parts_tick) {
-		m_next_tick = ticks;
+		m_state.m_next_tick = ticks;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	byte tick(uint32_t ticks, byte parts_tick) {
-		if(ticks >= m_next_tick) {
-			m_next_tick += c_tick_rates[m_cfg.m_step_rate];
-			++m_play_pos;
-			if(m_play_pos < m_cfg.m_loop_from) {
-				m_play_pos = m_cfg.m_loop_from;
+		if(ticks >= m_state.m_next_tick) {
+			m_state.m_next_tick += c_tick_rates[m_cfg.m_step_rate];
+			++m_state.m_play_pos;
+			if(m_state.m_play_pos < m_cfg.m_loop_from) {
+				m_state.m_play_pos = m_cfg.m_loop_from;
 			}
-			else if(m_play_pos > m_cfg.m_loop_to) {
-				m_play_pos = m_cfg.m_loop_from;
+			else if(m_state.m_play_pos > m_cfg.m_loop_to) {
+				m_state.m_play_pos = m_cfg.m_loop_from;
 			}
-			m_step_value = m_cfg.m_step[m_play_pos];
-			m_stepped = 1;
+			m_state.m_step_value = m_cfg.m_step[m_state.m_play_pos];
+			m_state.m_stepped = 1;
 		}
 		else {
-			m_stepped = 0;
+			m_state.m_stepped = 0;
 		}
 
 		// every whole tick, check the playing notes
-		if(m_last_tick_lsb != (byte)ticks) {
-			m_last_tick_lsb = (byte)ticks;
+		if(m_state.m_last_tick_lsb != (byte)ticks) {
+			m_state.m_last_tick_lsb = (byte)ticks;
 			for(int i=0; i<MAX_PLAYING_NOTES;++i) {
-				if(m_playing[i].count) {
-					if(!--m_playing[i].count) {
-						g_midi.send_note(m_cfg.m_midi_channel, m_playing[i].note, 0);
+				if(m_state.m_playing[i].count) {
+					if(!--m_state.m_playing[i].count) {
+						g_midi.send_note(m_cfg.m_midi_channel, m_state.m_playing[i].note, 0);
 					}
 				}
 			}
 		}
-		return m_stepped;
+		return m_state.m_stepped;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void start_note(byte note, byte velocity, byte duration, byte legato) {
 		// if playing legato we replace the most recent note
 		byte stop_note = 0;
-		if(legato && m_last_note_index != 0xFF) {
-			stop_note = m_playing[m_last_note_index].note;
+		if(legato && m_state.m_last_note_index != 0xFF) {
+			stop_note = m_state.m_playing[m_state.m_last_note_index].note;
 		}
 		else {
 			int free = -1;
@@ -207,35 +226,35 @@ public:
 			int steal = -1;
 			byte steal_count = 255;
 			for(int i=0; i<MAX_PLAYING_NOTES;++i) {
-				if(m_playing[i].note == note) {
+				if(m_state.m_playing[i].note == note) {
 					same = i;
 					break;
 				}
-				if(!m_playing[i].count) {
+				if(!m_state.m_playing[i].count) {
 					free = i;
 					break;
 				}
-				if(m_playing[i].count < steal_count) {
-					steal_count = m_playing[i].count;
+				if(m_state.m_playing[i].count < steal_count) {
+					steal_count = m_state.m_playing[i].count;
 					steal = i;
 				}
 			}
 			if(same>=0) {
-				m_last_note_index = same;
+				m_state.m_last_note_index = same;
 			}
 			else if(free>=0) {
-				m_last_note_index = free;
+				m_state.m_last_note_index = free;
 			}
 			else if(steal>=0) {
-				g_midi.send_note(m_cfg.m_midi_channel, m_playing[steal].note, 0);
-				m_last_note_index = steal;
+				g_midi.send_note(m_cfg.m_midi_channel, m_state.m_playing[steal].note, 0);
+				m_state.m_last_note_index = steal;
 			}
 			else {
 				return;
 			}
 		}
-		m_playing[m_last_note_index].note = note;
-		m_playing[m_last_note_index].count = duration;
+		m_state.m_playing[m_state.m_last_note_index].note = note;
+		m_state.m_playing[m_state.m_last_note_index].count = duration;
 		g_midi.send_note(m_cfg.m_midi_channel, note, velocity);
 		if(stop_note) {
 			g_midi.send_note(m_cfg.m_midi_channel, stop_note, 0);
@@ -245,9 +264,9 @@ public:
 	///////////////////////////////////////////////////////////////////////////////
 	void stop_all_notes() {
 		for(int i=0; i<MAX_PLAYING_NOTES;++i) {
-			if(m_playing[i].count) {
-				g_midi.send_note(m_cfg.m_midi_channel, m_playing[i].note, 0);
-				m_playing[i].count = 0;
+			if(m_state.m_playing[i].count) {
+				g_midi.send_note(m_cfg.m_midi_channel, m_state.m_playing[i].note, 0);
+				m_state.m_playing[i].count = 0;
 			}
 		}
 	}
@@ -255,9 +274,9 @@ public:
 	void play_step() {
 		switch(m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_CHROMATIC:
-			if(m_step_value & IS_ACTIVE) {
+			if(m_state.m_step_value & IS_ACTIVE) {
 				byte dur = (m_cfg.m_note_dur == V_SQL_STEP_DUR_FULL)? c_tick_rates[m_cfg.m_step_rate] : c_step_duration[m_cfg.m_note_dur];
-				start_note((byte)m_step_value, m_cfg.m_midi_vel, dur, !(m_step_value & IS_TRIG));
+				start_note((byte)m_state.m_step_value, m_cfg.m_midi_vel, dur, !(m_state.m_step_value & IS_TRIG));
 			}
 			break;
 		default:
@@ -314,6 +333,39 @@ public:
 	///////////////////////////////////////////////////////////////////////////////
 	inline void set_step(int index, uint16_t step) {
 		m_cfg.m_step[index] =step;
+	}
+
+	byte vertical_move(int offset) {
+		for(int i = 0; i<MAX_STEPS; ++i) {
+			STEP_TYPE step = m_cfg.m_step[i];
+			if(step & IS_ACTIVE) {
+				int v = (int)STEP_VALUE(step) + offset;
+				if(v < 0 || v > 127) {
+					return 0;
+				}
+			}
+		}
+		for(int i = 0; i<MAX_STEPS; ++i) {
+			STEP_TYPE step = m_cfg.m_step[i];
+			if(step & IS_ACTIVE) {
+				m_cfg.m_step[i] = (step & 0xFF00) | (STEP_VALUE(step) + offset);
+			}
+		}
+		return 1;
+	}
+	void shift_left() {
+		STEP_TYPE step = m_cfg.m_step[0];
+		for(int i = 0; i<MAX_STEPS-1; ++i) {
+			m_cfg.m_step[i] = m_cfg.m_step[i+1];
+		}
+		m_cfg.m_step[MAX_STEPS-1] = step;
+	}
+	void shift_right() {
+		STEP_TYPE step = m_cfg.m_step[MAX_STEPS-1];
+		for(int i = MAX_STEPS-1; i>0; --i) {
+			m_cfg.m_step[i] = m_cfg.m_step[i-1];
+		}
+		m_cfg.m_step[0] = step;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
