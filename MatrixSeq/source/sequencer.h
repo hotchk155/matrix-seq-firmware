@@ -23,7 +23,9 @@ public:
 	};
 	enum {
 		ACTION_NONE,
+		ACTION_CREATE_STEP,
 		ACTION_EDIT_STEP,
+		ACTION_EDIT_TRIG,
 		ACTION_ERASE_STEP,
 		ACTION_CLONE_STEP,
 		ACTION_SET_LOOP,
@@ -37,6 +39,7 @@ public:
 	// Config info that forms part of the patch
 	typedef struct {
 		V_SQL_SCALE_TYPE scale_type;
+		byte scale_root;
 	} CONFIG;
 	CONFIG m_cfg;
 
@@ -52,12 +55,16 @@ public:
 	int m_value;			// value ebign edited in drag mode
 	int m_action;
 	byte m_flags;
+	byte m_scale[11];
+	byte m_scale_size;
 	CSequenceLayer::STEP_TYPE m_copy_step;
+
 
 
 	///////////////////////////////////////////////////////////////////////////////
 	void init_config() {
 		m_cfg.scale_type = V_SQL_SCALE_TYPE_IONIAN;
+		m_cfg.scale_root = 0;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -69,6 +76,7 @@ public:
 		//m_popup = 0;
 		m_copy_step = 0;
 		m_value = 0;
+		m_scale_size = 0;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -87,15 +95,19 @@ public:
 		}
 	}
 
-	void start(uint32_t ticks, byte parts_tick) {
+	void start() {
 		for(int i=0; i<NUM_LAYERS; ++i) {
-			m_layers[i].start(ticks, parts_tick);
+			m_layers[i].start(g_clock.get_ticks(), g_clock.get_part_ticks());
 		}
 	}
-
 	void stop() {
 		for(int i=0; i<NUM_LAYERS; ++i) {
 			m_layers[i].stop_all_notes();
+		}
+	}
+	void reset() {
+		for(int i=0; i<NUM_LAYERS; ++i) {
+			m_layers[i].reset();
 		}
 	}
 
@@ -165,12 +177,30 @@ public:
 		/////////////////////////////////////////////////////////////////////////////////////////////
 		// ENCODER INC/DEC
 		case EV_ENCODER:
-			if(m_action == ACTION_EDIT_STEP) {
+			if(m_action == ACTION_CREATE_STEP) {
+				m_copy_step = layer->get_step(m_cursor) | CSequenceLayer::IS_ACTIVE;
+				layer->set_step(m_cursor, m_copy_step);
+				set_scroll_for(m_copy_step, layer);
+				step_info(m_copy_step, layer);
+				m_action = ACTION_EDIT_STEP;
+			}
+			else if(m_action == ACTION_EDIT_STEP) {
 				m_copy_step = layer->get_step(m_cursor);
 				layer->inc_step(&m_copy_step, (int)param);
 				layer->set_step(m_cursor, m_copy_step);
 				set_scroll_for(m_copy_step, layer);
 				step_info(m_copy_step, layer);
+			}
+			else if(m_action == ACTION_EDIT_TRIG) {
+				CSequenceLayer::STEP_TYPE step = layer->get_step(m_cursor);
+				int vel = CSequenceLayer::get_velocity(step);
+				if(vel > CSequenceLayer::VELOCITY_OFF && ((int)param) < 0) {
+					CSequenceLayer::set_velocity(step, vel-1);
+				}
+				else if(vel < CSequenceLayer::VELOCITY_HIGH && ((int)param) > 0) {
+					CSequenceLayer::set_velocity(step, vel+1);
+				}
+				layer->set_step(m_cursor, step);
 			}
 			else if(m_action == ACTION_MOVE_VERT) {
 				if(layer->vertical_move((int)param)) {
@@ -194,7 +224,7 @@ public:
 					layer->set_loop_start(m_cursor);
 					m_action = ACTION_DRAG_LOOP;
 				}
-				if(m_action == ACTION_ERASE_STEP) {
+				else if(m_action == ACTION_ERASE_STEP) {
 					layer->clear_step(m_cursor);
 				}
 				if((int)param < 0) {
@@ -219,13 +249,14 @@ public:
 		/////////////////////////////////////////////////////////////////////////////////////////////
 		// BUTTON PRESS
 		case EV_KEY_PRESS:
-			if(m_action == ACTION_EDIT_STEP) {
+			if(m_action == ACTION_EDIT_STEP || m_action == ACTION_CREATE_STEP) {
 				switch(param) {
 				case KEY_B2:
-					step = layer->get_step(m_cursor);
-					if(!layer->is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
-						layer->set_step(m_cursor, step ^ CSequenceLayer::IS_TRIG);
-					}
+//					step = layer->get_step(m_cursor);
+//					if(!layer->is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
+//						layer->set_step(m_cursor, step ^ CSequenceLayer::IS_TRIG);
+//					}
+					m_action = ACTION_EDIT_TRIG;
 					break;
 				case KEY_B3:
 					m_value = 0;
@@ -247,32 +278,26 @@ public:
 				case KEY_B1:
 					// check if there is a step in this column
 					step = layer->get_step(m_cursor);
-					if(layer->is_note_mode() && !(step & CSequenceLayer::IS_ACTIVE)) {
-
-						// no active note step - do we have a previous step to copy?
-						if(!m_copy_step) {
-							// nope so simply create a step at the bottom of the active range
-							m_copy_step = layer->m_state.m_scroll_ofs | CSequenceLayer::IS_ACTIVE | CSequenceLayer::IS_TRIG;
-						}
-
-						// store the step
-						layer->set_step(m_cursor, m_copy_step);
-						step = m_copy_step;
+					if(step & CSequenceLayer::IS_ACTIVE) {
+						set_scroll_for(step, layer);
+						step_info(step, layer);
+						m_action = ACTION_EDIT_STEP;
 					}
-
-					set_scroll_for(step, layer);
-					step_info(step, layer);
-					// we are now in edit step mode!
-					m_action = ACTION_EDIT_STEP;
+					else {
+						// no active note step - do we have a previous step to copy?
+						if(m_copy_step) {
+							layer->set_step(m_cursor, STEP_VALUE(m_copy_step)|CSequenceLayer::IS_VEL1);
+						}
+						else {
+							layer->set_step(m_cursor, layer->m_state.m_scroll_ofs|CSequenceLayer::IS_VEL1);
+						}
+						m_action = ACTION_CREATE_STEP;
+					}
 					break;
 
 
 				case KEY_B2:
 					step = layer->get_step(m_cursor);
-					if(m_action == ACTION_EDIT_STEP && (!layer->is_note_mode() || (step & CSequenceLayer::IS_ACTIVE))) {
-						layer->set_step(m_cursor, step ^ CSequenceLayer::IS_TRIG);
-					}
-
 					m_copy_step = layer->get_step(m_cursor);
 					if(!layer->is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
 						m_action = ACTION_CLONE_STEP;
@@ -294,10 +319,12 @@ public:
 		/////////////////////////////////////////////////////////////////////////////////////////////
 		// BUTTON RELEASE
 		case EV_KEY_RELEASE:
-			if(m_action == ACTION_EDIT_STEP && param == KEY_B2) {
-				break;
+			if(m_action == ACTION_EDIT_TRIG && param == KEY_B2) {
+				m_action = ACTION_EDIT_STEP;
 			}
-			m_action = ACTION_NONE;
+			else {
+				m_action = ACTION_NONE;
+			}
 			break;
                                                                                          		}
 	}
@@ -310,22 +337,14 @@ public:
 
 		CRenderBuf::clear();
 
-		// displaying the cursor
-		if(layer->m_cfg.m_mode) {
-			mask = CRenderBuf::bit(m_cursor);
-			for(i=0; i<14; ++i) {
-				CRenderBuf::raster(i) &= ~mask;
-				CRenderBuf::hilite(i) |= mask;
-			}
-		}
-		else {
-			mask = CRenderBuf::bit(m_cursor);
-			for(i=0; i<13; ++i) {
-				CRenderBuf::raster(i) &= ~mask;
-				CRenderBuf::hilite(i) |= mask;
-			}
-		}
+		int max_row = (m_action == ACTION_EDIT_TRIG)? 11 : 14;
 
+		// displaying the cursor
+		mask = CRenderBuf::bit(m_cursor);
+		for(i=0; i<max_row; ++i) {
+			CRenderBuf::raster(i) &= ~mask;
+			CRenderBuf::hilite(i) |= mask;
+		}
 
 		mask = CRenderBuf::bit(layer->m_state.m_play_pos);
 		CRenderBuf::raster(15) |= mask;
@@ -343,11 +362,14 @@ public:
 				}
 				++c;
 			}
+
+			// Display the actual steps
+			//max_row = (m_action == ACTION_EDIT_TRIG)? 9 : 12;
 			CSequenceLayer::STEP_TYPE step = layer->get_step(i);
 			if(step & CSequenceLayer::IS_ACTIVE) {
 				int n = STEP_VALUE(step);
 				n = 12 - n + layer->m_state.m_scroll_ofs;
-				if(n >= 0 && n <= 12) {
+				if(n >= 0 && n <= max_row) {
 					CRenderBuf::raster(n) |= mask;
 					if(i == layer->m_state.m_play_pos) {
 						CRenderBuf::set_hilite(n, mask);
@@ -356,11 +378,15 @@ public:
 						CRenderBuf::clear_hilite(n, mask);
 					}
 				}
-				if(step & CSequenceLayer::IS_TRIG) {
-					CRenderBuf::set_raster(14, mask); // trig
+
+				int vel = CSequenceLayer::get_velocity(step);
+				if(m_action == ACTION_EDIT_TRIG) {
+					if(vel == CSequenceLayer::VELOCITY_HIGH) CRenderBuf::set_raster(12, mask); else CRenderBuf::set_hilite(12, mask);
+					if(vel == CSequenceLayer::VELOCITY_MEDIUM) CRenderBuf::set_raster(13, mask); else CRenderBuf::set_hilite(13, mask);
+					if(vel == CSequenceLayer::VELOCITY_LOW) CRenderBuf::set_raster(14, mask); else CRenderBuf::set_hilite(14, mask);
 				}
 				else {
-					CRenderBuf::set_hilite(14, mask); // legato
+					if(vel >= CSequenceLayer::VELOCITY_LOW) CRenderBuf::set_raster(14, mask); else CRenderBuf::set_hilite(14, mask);
 				}
 			}
 			mask>>=1;
@@ -371,15 +397,9 @@ public:
 	void tick(uint32_t ticks, byte parts_tick) {
 
 
-		byte stepped = 0;
-
 		// run the clock on each sequencer layer
 		for(int i=0; i<NUM_LAYERS; ++i) {
-			stepped |= m_layers[i].tick(ticks, parts_tick);
-		}
-		if(!stepped) {
-			// if nothing has changed, no need to go further
-			return;
+			m_layers[i].tick(ticks, parts_tick);
 		}
 
 		// Step is "played" only after the state from all layers
@@ -387,8 +407,9 @@ public:
 		for(int i=0; i<NUM_LAYERS; ++i) {
 			CSequenceLayer& layer = m_layers[i];
 			if(layer.m_state.m_stepped && layer.m_cfg.m_enabled) {
-				layer.play_step();
+				layer.play_step(m_cfg.scale_type);
 			}
+			layer.manage(ticks);
 		}
 
 /*
@@ -409,6 +430,9 @@ public:
 		}*/
 
 	}
+
+
+
 };
 
 extern CSequencer g_sequencer;

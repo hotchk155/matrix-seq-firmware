@@ -183,20 +183,11 @@ void fire_event(int event, uint32_t param) {
 				g_popup.layer(g_current_layer, g_sequencer.is_layer_enabled(g_current_layer));
 				force_full_repaint();
 				g_menu_press = MENU_PRESS_SHIFT;
+				g_popup.align(CPopup::ALIGN_RIGHT);
 			}
 			else {
-				if(g_is_running) {
-					g_sequencer.stop();
-					g_is_running = 0;
-					g_popup.text("STOP", 4);
-				}
-				else {
-					g_sequencer.start(g_clock.m_ticks, (byte)(256*g_clock.m_part_tick));
-					g_is_running = 1;
-					g_popup.text("RUN", 3);
-				}
+				fire_event(g_is_running ? EV_SEQ_STOP : EV_SEQ_START, 0);
 			}
-			g_popup.align(CPopup::ALIGN_RIGHT);
 		}
 		else {
 			// pass event to active view
@@ -245,6 +236,25 @@ void fire_event(int event, uint32_t param) {
 			g_menu_press = MENU_PRESS_SHIFT;
 		}
 		break;
+	case EV_SEQ_STOP:
+		g_sequencer.stop();
+		g_is_running = 0;
+		g_popup.text("STOP", 4);
+		g_popup.align(CPopup::ALIGN_RIGHT);
+		break;
+	case EV_SEQ_RESTART:
+		g_sequencer.reset();
+		g_sequencer.start();
+		g_is_running = 1;
+		g_popup.text("RST", 3);
+		g_popup.align(CPopup::ALIGN_RIGHT);
+		break;
+	case EV_SEQ_START:
+		g_sequencer.start();
+		g_is_running = 1;
+		g_popup.text("RUN", 3);
+		g_popup.align(CPopup::ALIGN_RIGHT);
+		break;
 	}
 }
 
@@ -283,7 +293,7 @@ int main(void) {
     g_i2c_bus.dac_init();
     g_midi.init();
 
-    g_storage.test();
+    //g_storage.test();
 
 
     /* Enter an infinite loop, just incrementing a counter.
@@ -304,9 +314,10 @@ int main(void) {
     		g_popup.run();
     		g_clock.m_ms_tick = 0;
         	g_cv_gate.run();
+        	g_midi.run();
 
         	if(g_is_running) {
-        		g_sequencer.tick(g_clock.m_ticks, (byte)(256*g_clock.m_part_tick));
+        		g_sequencer.tick(g_clock.get_ticks(), g_clock.get_part_ticks());
         	}
     		//g_sequencer.run();
 

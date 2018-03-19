@@ -53,6 +53,7 @@ public:
 	volatile double m_ticks_per_ms;
 	volatile byte m_ms_tick;
 	volatile uint32_t m_ticks;
+	uint32_t m_midi_ticks;
 
 	typedef struct {
 		V_CLOCK_SRC m_source;
@@ -68,6 +69,7 @@ public:
 		m_part_tick = 0.0;
 		m_ms_tick = 0;
 		m_ticks = 0;
+		m_midi_ticks = 0;
 		set_bpm(120);
 	}
 	void init_config() {
@@ -128,7 +130,37 @@ public:
 		}
 	}
 
+	inline uint32_t get_ticks() {
+		if(m_cfg.m_source == V_CLOCK_SRC_INTERNAL) {
+			return m_ticks;
+		}
+		else {
+			return m_midi_ticks;
+		}
+	}
+	inline byte get_part_ticks() {
+		if(m_cfg.m_source == V_CLOCK_SRC_INTERNAL) {
+			return (byte)(256*m_part_tick);
+		}
+		else {
+			return 0;
+		}
+	}
+	void on_midi_tick() {
+		++m_midi_ticks;
+	}
 
+	inline void tick_isr() {
+		m_ms_tick = 1;
+
+		m_part_tick += m_ticks_per_ms;
+		int int_part = (int)m_part_tick;
+		if(int_part) {
+			++m_ticks;
+			m_part_tick -= (int)m_part_tick;
+		}
+
+	}
 };
 
 // declare global instance of the sequencer clock
@@ -147,14 +179,7 @@ CDigitalOut<kGPIO_PORTC, 5> pClockOut;
 // ISR for the millisecond timer
 extern "C" void PIT_CH0_IRQHandler(void) {
 	PIT_ClearStatusFlags(PIT, kPIT_Chnl_0, kPIT_TimerFlag);
-	g_clock.m_ms_tick = 1;
-
-	g_clock.m_part_tick += g_clock.m_ticks_per_ms;
-	int int_part = (int)g_clock.m_part_tick;
-	if(int_part) {
-		++g_clock.m_ticks;
-		g_clock.m_part_tick -= (int)g_clock.m_part_tick;
-	}
+	g_clock.tick_isr();
 }
 
 // ISR for the KBI interrupt (SYNC IN)

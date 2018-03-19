@@ -14,7 +14,10 @@ enum {
 	EV_NONE,
 	EV_ENCODER,
 	EV_KEY_PRESS,
-	EV_KEY_RELEASE
+	EV_KEY_RELEASE,
+	EV_SEQ_START,
+	EV_SEQ_STOP,
+	EV_SEQ_RESTART
 };
 
 typedef unsigned char byte;

@@ -17,6 +17,9 @@ typedef enum {
 	P_SQL_MIDI_CHAN,
 	P_SQL_MIDI_CC,
 	P_SQL_SCALE_TYPE,
+	P_SQL_MIDI_VEL_HI,
+	P_SQL_MIDI_VEL_MED,
+	P_SQL_MIDI_VEL_LO,
 	P_SQL_MAX,
 
 	P_CVGATE_VSCALE,
@@ -37,6 +40,7 @@ typedef enum:byte {
 	V_SQL_SEQ_MODE_MOD_FINE,			// One grid row is one CC increment (127 rows for all)
 	V_SQL_SEQ_MODE_MAX
 } V_SQL_SEQ_MODE;
+
 
 typedef enum:byte {
 	V_SQL_SCALE_TYPE_IONIAN,
@@ -107,7 +111,8 @@ typedef enum:byte {
 } V_SQL_STEP_RATE;
 
 typedef enum:byte {
-	V_SQL_STEP_DUR_FULL,
+	V_SQL_STEP_DUR_STEP,	// Play for exactly one sequencer step unless extended by legato step(s)
+	V_SQL_STEP_DUR_FULL,	// Play up until the next active sequencer step
 	V_SQL_STEP_DUR_NONE,
 	V_SQL_STEP_DUR_32,
 	V_SQL_STEP_DUR_16T,
