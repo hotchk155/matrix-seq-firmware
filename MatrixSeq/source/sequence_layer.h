@@ -234,13 +234,9 @@ public:
 			for(int i=0; i<MAX_PLAYING_NOTES;++i) {
 				if(m_state.m_playing[i].count) {
 					if(!--m_state.m_playing[i].count) {
-						g_midi.send_note(m_cfg.m_midi_channel, m_state.m_playing[i].note, 0);
+						send_midi_note(m_state.m_playing[i].note, 0);
 						m_state.m_playing[i].note = 0;
 					}
-				}
-				else if(m_state.m_playing[i].note) {
-					g_midi.send_note(m_cfg.m_midi_channel, m_state.m_playing[i].note, 0);
-					m_state.m_playing[i].note = 0;
 				}
 			}
 		}
@@ -326,10 +322,19 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
+	void send_midi_note(byte note, byte velocity) {
+		if(m_cfg.m_midi_channel > V_SQL_MIDI_CHAN_NONE) {
+			g_midi.send_note(m_cfg.m_midi_channel-V_SQL_MIDI_CHAN_1, note, velocity);
+		}
+	}
+
+
+	///////////////////////////////////////////////////////////////////////////////
 	void stop_all_notes() {
 		for(int i=0; i<MAX_PLAYING_NOTES;++i) {
 			if(m_state.m_playing[i].count) {
-				g_midi.send_note(m_cfg.m_midi_channel, m_state.m_playing[i].note, 0);
+				send_midi_note(m_state.m_playing[i].note, 0);
+				m_state.m_playing[i].note = 0;
 				m_state.m_playing[i].count = 0;
 			}
 		}
@@ -461,13 +466,6 @@ public:
 	byte get_note_from_scale(byte note, V_SQL_SCALE_TYPE scale) {
 		// TODO
 		return note;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	void send_midi_note(byte note, byte velocity) {
-		if(m_cfg.m_midi_channel > V_SQL_MIDI_CHAN_NONE) {
-			g_midi.send_note(m_cfg.m_midi_channel-V_SQL_MIDI_CHAN_1, note, velocity);
-		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
