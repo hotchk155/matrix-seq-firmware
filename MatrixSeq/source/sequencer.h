@@ -407,7 +407,15 @@ public:
 		for(int i=0; i<NUM_LAYERS; ++i) {
 			CSequenceLayer& layer = m_layers[i];
 			if(layer.m_state.m_stepped && layer.m_cfg.m_enabled) {
-				layer.play_step(m_cfg.scale_type);
+				switch(layer.m_cfg.m_mode) {
+					case V_SQL_SEQ_MODE_CHROMATIC:
+					case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
+					case V_SQL_SEQ_MODE_SCALE:
+						layer.play_note_step(m_cfg.scale_type);
+						break;
+					default:
+						break;
+				}
 			}
 			layer.manage(ticks);
 		}
