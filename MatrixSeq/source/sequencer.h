@@ -140,7 +140,11 @@ public:
 	///////////////////////////////////////////////////////////////////////////////
 	void step_info(CSequenceLayer::STEP_TYPE step, CSequenceLayer *layer) {
 		if(layer->is_note_mode()) {
-			g_popup.note_name(STEP_VALUE(step));
+			byte note = STEP_VALUE(step);
+			if(layer->m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
+				note = layer->get_note_from_scale(note, m_cfg.scale_type);
+			}
+			g_popup.note_name(note);
 			g_popup.avoid(m_cursor);
 		}
 	}

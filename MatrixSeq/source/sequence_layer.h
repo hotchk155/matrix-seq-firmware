@@ -211,13 +211,22 @@ public:
 	void tick(uint32_t ticks, byte parts_tick) {
 		if(ticks >= m_state.m_next_tick) {
 			m_state.m_next_tick += c_tick_rates[m_cfg.m_step_rate];
-			++m_state.m_play_pos;
+			if(m_state.m_play_pos == m_cfg.m_loop_to) {
+				m_state.m_play_pos = m_cfg.m_loop_from;
+			}
+			else {
+				if(++m_state.m_play_pos > MAX_STEPS-1) {
+					m_state.m_play_pos = 0;
+				}
+			}
+
+			/*
 			if(m_state.m_play_pos < m_cfg.m_loop_from) {
 				m_state.m_play_pos = m_cfg.m_loop_from;
 			}
 			else if(m_state.m_play_pos > m_cfg.m_loop_to) {
 				m_state.m_play_pos = m_cfg.m_loop_from;
-			}
+			}*/
 			m_state.m_step_value = m_cfg.m_step[m_state.m_play_pos];
 			m_state.m_stepped = 1;
 		}
@@ -374,6 +383,7 @@ public:
 			break;
 		case V_SQL_SEQ_MODE_CHROMATIC:
 		case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
+		case V_SQL_SEQ_MODE_SCALE:
 		case V_SQL_SEQ_MODE_MOD_FINE:
 		default:
 			if(v < 0) {
@@ -394,7 +404,7 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	inline byte is_note_mode() {
-		return(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC || m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC_FORCED);
+		return(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC || m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC_FORCED|| m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE);
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -464,8 +474,17 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	byte get_note_from_scale(byte note, V_SQL_SCALE_TYPE scale) {
-		// TODO
-		return note;
+		int result = 12 * (note/12); // octave part
+		int remainder = note % 7; // 7 notes per scale
+		uint16_t scale_mask = c_scale_mask[(int)scale];
+		while(scale_mask && remainder) {
+			if(scale_mask&1) {
+				--remainder;
+			}
+			++result;
+			scale_mask>>=1;
+		}
+		return result;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
