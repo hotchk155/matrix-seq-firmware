@@ -87,11 +87,12 @@ public:
 		STEP_TYPE m_step_value;			// the last value output by sequencer
 		byte m_stepped;				// stepped flag
 		int m_play_pos;
-		byte m_last_note; // last midi note played on channel
+		byte m_last_note; // last midi note played on channel - and output to CV
 		byte m_last_velocity;
 		uint32_t m_next_tick;
 		byte m_last_tick_lsb;
 		PLAYING_NOTE m_playing[MAX_PLAYING_NOTES];
+		byte m_gate;
 	} STATE;
 
 	CONFIG m_cfg;				// instance of config
@@ -127,6 +128,7 @@ public:
 		m_state.m_scroll_ofs = 48;
 		m_state.m_last_tick_lsb = 0;
 		m_state.m_last_note = 0;
+		m_state.m_gate = CCVGate::GATE_CLOSED;
 		memset(m_state.m_playing,0,sizeof(m_state.m_playing));
 		reset();
 	}
@@ -243,6 +245,10 @@ public:
 			for(int i=0; i<MAX_PLAYING_NOTES;++i) {
 				if(m_state.m_playing[i].count) {
 					if(!--m_state.m_playing[i].count) {
+						if(m_state.m_playing[i].note == m_state.m_last_note) {
+							// close the gate
+							m_state.m_gate = CCVGate::GATE_CLOSED;
+						}
 						send_midi_note(m_state.m_playing[i].note, 0);
 						m_state.m_playing[i].note = 0;
 					}
@@ -251,6 +257,7 @@ public:
 		}
 	}
 
+	/*
 	///////////////////////////////////////////////////////////////////////////////
 	void start_midi_note(byte chan, byte note, byte velocity, byte duration, byte legato) {
 
@@ -328,7 +335,7 @@ public:
 			// has been started then stop it now
 			g_midi.send_note(chan, legato_note, 0);
 		}
-	}
+	}*/
 
 	///////////////////////////////////////////////////////////////////////////////
 	void send_midi_note(byte note, byte velocity) {
@@ -514,6 +521,9 @@ public:
 		if(kill_open_notes) {
 			for(int i=0; i<MAX_PLAYING_NOTES;++i) {
 				if(m_state.m_playing[i].note && !m_state.m_playing[i].count) {
+					if(m_state.m_playing[i].note == m_state.m_last_note) {
+						m_state.m_gate = CCVGate::GATE_CLOSED;
+					}
 					send_midi_note(m_state.m_playing[i].note,0);
 					m_state.m_playing[i].note = 0;
 				}
@@ -584,6 +594,7 @@ public:
 					// retrigger the note
 					send_midi_note(note,0);
 					send_midi_note(note,m_state.m_last_velocity);
+					m_state.m_gate = CCVGate::GATE_RETRIG;
 				}
 				slot = same;
 			}
@@ -592,21 +603,25 @@ public:
 				// replace that note, but only stop it after the new note starts
 				send_midi_note(note,m_state.m_last_velocity);
 				send_midi_note(m_state.m_playing[last].note,0);
+				m_state.m_gate = CCVGate::GATE_OPEN;
 				slot = last;
 			}
 			else if(free>=0) {
 				// else a free slot will be used if available
 				send_midi_note(note,m_state.m_last_velocity);
+				m_state.m_gate = legato? CCVGate::GATE_OPEN : CCVGate::GATE_RETRIG;
 				slot = free;
 			}
 			else if(steal>=0) {
 				// final option we'll steal a slot from another note, so we need to stop that note playing
 				send_midi_note(m_state.m_playing[steal].note,0);
 				send_midi_note(note,m_state.m_last_velocity);
+				m_state.m_gate = legato? CCVGate::GATE_OPEN : CCVGate::GATE_RETRIG;
 				slot = steal;
 			}
 
 			if(slot >= 0) {
+				m_state.m_last_note = note;
 				m_state.m_playing[slot].note = note;
 				m_state.m_playing[slot].count = duration;
 			}

@@ -406,6 +406,7 @@ public:
 			m_layers[i].tick(ticks, parts_tick);
 		}
 
+
 		// Step is "played" only after the state from all layers
 		// is known, since other layers might provide modulation
 		for(int i=0; i<NUM_LAYERS; ++i) {
@@ -416,6 +417,7 @@ public:
 					case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
 					case V_SQL_SEQ_MODE_SCALE:
 						layer.play_note_step(m_cfg.scale_type);
+						g_cv_gate.note_gate(i, layer.m_state.m_last_note, layer.m_state.m_gate);
 						break;
 					default:
 						break;
@@ -423,7 +425,6 @@ public:
 			}
 			layer.manage(ticks);
 		}
-
 /*
 		for(int i=0; i<NUM_LAYERS; ++i) {
 			CSequenceLayer& layer = m_layers[i];
