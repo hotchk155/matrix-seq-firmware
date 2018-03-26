@@ -13,6 +13,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // SEQUENCER CLASS
 class CSequencer {
+	byte m_is_running;
 public:
 
 	enum {
@@ -39,7 +40,7 @@ public:
 	// Config info that forms part of the patch
 	typedef struct {
 		V_SQL_SCALE_TYPE scale_type;
-		byte scale_root;
+		V_SQL_SCALE_ROOT scale_root;
 	} CONFIG;
 	CONFIG m_cfg;
 
@@ -64,7 +65,7 @@ public:
 	///////////////////////////////////////////////////////////////////////////////
 	void init_config() {
 		m_cfg.scale_type = V_SQL_SCALE_TYPE_IONIAN;
-		m_cfg.scale_root = 0;
+		m_cfg.scale_root = V_SQL_SCALE_ROOT_C;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -77,12 +78,14 @@ public:
 		m_copy_step = 0;
 		m_value = 0;
 		m_scale_size = 0;
+		m_is_running = 0;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void set(PARAM_ID param, int value) {
 		switch(param) {
 		case P_SQL_SCALE_TYPE: m_cfg.scale_type = (V_SQL_SCALE_TYPE)value; break;
+		case P_SQL_SCALE_ROOT: m_cfg.scale_root = (V_SQL_SCALE_ROOT)value; break;
 		default: m_layers[m_layer].set(param,value);
 		}
 	}
@@ -91,16 +94,19 @@ public:
 	int get(PARAM_ID param) {
 		switch(param) {
 		case P_SQL_SCALE_TYPE: return m_cfg.scale_type;
+		case P_SQL_SCALE_ROOT: return m_cfg.scale_root;
 		default: return m_layers[m_layer].get(param);
 		}
 	}
 
 	void start() {
+		m_is_running = 1;
 		for(int i=0; i<NUM_LAYERS; ++i) {
 			m_layers[i].start(g_clock.get_ticks(), g_clock.get_part_ticks());
 		}
 	}
 	void stop() {
+		m_is_running = 0;
 		for(int i=0; i<NUM_LAYERS; ++i) {
 			m_layers[i].stop_all_notes();
 		}
@@ -110,7 +116,9 @@ public:
 			m_layers[i].reset();
 		}
 	}
-
+	byte is_running() {
+		return m_is_running;
+	}
 
 	byte is_layer_enabled(byte layer) {
 		return m_layers[layer].m_cfg.m_enabled;
@@ -142,7 +150,7 @@ public:
 		if(layer->is_note_mode()) {
 			byte note = STEP_VALUE(step);
 			if(layer->m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
-				note = layer->get_note_from_scale(note, m_cfg.scale_type);
+				note = g_scale.index_to_note(note);
 			}
 			g_popup.note_name(note);
 			g_popup.avoid(m_cursor);
@@ -356,9 +364,16 @@ public:
 
 		mask = CRenderBuf::bit(0);
 		int c = 0;
+		int reference_row = 12 - layer->get_reference_row() + layer->m_state.m_scroll_ofs;
+				//layer->m_state.m_scroll_ofs - 36;
 		for(i=0; i<32; ++i) {
+
+			if(reference_row >= 0 && reference_row<16) {
+				CRenderBuf::hilite(reference_row) |= mask;
+			}
+			// show the "ruler" at the bottom of screen
 			if(i >= layer->m_cfg.m_loop_from && i <= layer->m_cfg.m_loop_to) {
-				if(!(c & 0x03)) {
+				if(!(c & 0x03)) { // steps 0, 4, 8 etc
 					CRenderBuf::raster(15) |= mask;
 				}
 				else {
@@ -367,15 +382,14 @@ public:
 				++c;
 			}
 
-			// Display the actual steps
-			//max_row = (m_action == ACTION_EDIT_TRIG)? 9 : 12;
+			// Display the sequencer steps
 			CSequenceLayer::STEP_TYPE step = layer->get_step(i);
 			if(step & CSequenceLayer::IS_ACTIVE) {
 				int n = STEP_VALUE(step);
 				n = 12 - n + layer->m_state.m_scroll_ofs;
 				if(n >= 0 && n <= max_row) {
 					CRenderBuf::raster(n) |= mask;
-					if(i == layer->m_state.m_play_pos) {
+					if(i == layer->m_state.m_play_pos && m_is_running) {
 						CRenderBuf::set_hilite(n, mask);
 					}
 					else {
@@ -383,14 +397,35 @@ public:
 					}
 				}
 
+				// display trig info
 				int vel = CSequenceLayer::get_velocity(step);
 				if(m_action == ACTION_EDIT_TRIG) {
-					if(vel == CSequenceLayer::VELOCITY_HIGH) CRenderBuf::set_raster(12, mask); else CRenderBuf::set_hilite(12, mask);
-					if(vel == CSequenceLayer::VELOCITY_MEDIUM) CRenderBuf::set_raster(13, mask); else CRenderBuf::set_hilite(13, mask);
-					if(vel == CSequenceLayer::VELOCITY_LOW) CRenderBuf::set_raster(14, mask); else CRenderBuf::set_hilite(14, mask);
+					if(vel == CSequenceLayer::VELOCITY_HIGH) {
+						CRenderBuf::set_raster(12, mask);
+					}
+					else {
+						CRenderBuf::set_hilite(12, mask);
+					}
+					if(vel == CSequenceLayer::VELOCITY_MEDIUM) {
+						CRenderBuf::set_raster(13, mask);
+					}
+					else {
+						CRenderBuf::set_hilite(13, mask);
+					}
+					if(vel == CSequenceLayer::VELOCITY_LOW) {
+						CRenderBuf::set_raster(14, mask);
+					}
+					else {
+						CRenderBuf::set_hilite(14, mask);
+					}
 				}
 				else {
-					if(vel >= CSequenceLayer::VELOCITY_LOW) CRenderBuf::set_raster(14, mask); else CRenderBuf::set_hilite(14, mask);
+					if(vel >= CSequenceLayer::VELOCITY_LOW) {
+						CRenderBuf::set_raster(14, mask);
+					}
+					else {
+						CRenderBuf::set_hilite(14, mask);
+					}
 				}
 			}
 			mask>>=1;
@@ -400,50 +435,50 @@ public:
 	/////////////////////////////////////////////////////////////////////////////////////////////
 	void tick(uint32_t ticks, byte parts_tick) {
 
-
-		// run the clock on each sequencer layer
-		for(int i=0; i<NUM_LAYERS; ++i) {
-			m_layers[i].tick(ticks, parts_tick);
-		}
-
-
-		// Step is "played" only after the state from all layers
-		// is known, since other layers might provide modulation
-		for(int i=0; i<NUM_LAYERS; ++i) {
-			CSequenceLayer& layer = m_layers[i];
-			if(layer.m_state.m_stepped && layer.m_cfg.m_enabled) {
-				switch(layer.m_cfg.m_mode) {
-					case V_SQL_SEQ_MODE_CHROMATIC:
-					case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
-					case V_SQL_SEQ_MODE_SCALE:
-						layer.play_note_step(m_cfg.scale_type);
-						g_cv_gate.note_gate(i, layer.m_state.m_last_note, layer.m_state.m_gate);
-						break;
-					default:
-						break;
-				}
+		if(m_is_running) {
+			// run the clock on each sequencer layer
+			for(int i=0; i<NUM_LAYERS; ++i) {
+				m_layers[i].tick(ticks, parts_tick);
 			}
-			layer.manage(ticks);
-		}
-/*
-		for(int i=0; i<NUM_LAYERS; ++i) {
-			CSequenceLayer& layer = m_layers[i];
-			if(layer.m_stepped) {
-				CSequenceLayer::STEP_TYPE step = layer.get_step(i);
-				switch(layer.m_cfg.m_mode)
-				{
-				////////////////////////////////////////////////////////////////////
-				case V_SQL_SEQ_MODE_CHROMATIC:
-					if(step & CSequenceLayer::IS_ACTIVE) {
-						layer.
+
+
+			// Step is "played" only after the state from all layers
+			// is known, since other layers might provide modulation
+			for(int i=0; i<NUM_LAYERS; ++i) {
+				CSequenceLayer& layer = m_layers[i];
+				if(layer.m_state.m_stepped && layer.m_cfg.m_enabled) {
+					switch(layer.m_cfg.m_mode) {
+						case V_SQL_SEQ_MODE_CHROMATIC:
+						case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
+						case V_SQL_SEQ_MODE_SCALE:
+							layer.play_note_step(m_cfg.scale_type);
+							g_cv_gate.note_gate(i, layer.m_state.m_last_note, layer.m_state.m_gate);
+							break;
+						default:
+							break;
 					}
-					break;
 				}
+				layer.manage(ticks);
 			}
-		}*/
+	/*
+			for(int i=0; i<NUM_LAYERS; ++i) {
+				CSequenceLayer& layer = m_layers[i];
+				if(layer.m_stepped) {
+					CSequenceLayer::STEP_TYPE step = layer.get_step(i);
+					switch(layer.m_cfg.m_mode)
+					{
+					////////////////////////////////////////////////////////////////////
+					case V_SQL_SEQ_MODE_CHROMATIC:
+						if(step & CSequenceLayer::IS_ACTIVE) {
+							layer.
+						}
+						break;
+					}
+				}
+			}*/
 
+		}
 	}
-
 
 
 };

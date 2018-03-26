@@ -24,6 +24,7 @@ public:
 		IS_VEL0 = (uint16_t)0x200, 	// velocity type bit 0
 		IS_VEL1 = (uint16_t)0x400, 	// velocity type bit 1
 		MAX_PLAYING_NOTES = 8,
+		REFERENCE_NOTE = 48
 	};
 
 	enum {
@@ -93,6 +94,7 @@ public:
 		byte m_last_tick_lsb;
 		PLAYING_NOTE m_playing[MAX_PLAYING_NOTES];
 		byte m_gate;
+//		byte m_reference;
 	} STATE;
 
 	CONFIG m_cfg;				// instance of config
@@ -129,6 +131,7 @@ public:
 		m_state.m_last_tick_lsb = 0;
 		m_state.m_last_note = 0;
 		m_state.m_gate = CCVGate::GATE_CLOSED;
+		//m_state.m_reference = 0;
 		memset(m_state.m_playing,0,sizeof(m_state.m_playing));
 		reset();
 	}
@@ -157,7 +160,7 @@ public:
 	///////////////////////////////////////////////////////////////////////////////
 	void set(PARAM_ID param, int value) {
 		switch(param) {
-		case P_SQL_SEQ_MODE: m_cfg.m_mode = (V_SQL_SEQ_MODE)value; break;
+		case P_SQL_SEQ_MODE: set_mode((V_SQL_SEQ_MODE)value); break;
 		case P_SQL_STEP_RATE: m_cfg.m_step_rate = (V_SQL_STEP_RATE)value; break;
 		case P_SQL_STEP_DUR: m_cfg.m_note_dur = (V_SQL_STEP_DUR)value; break;
 		case P_SQL_MIDI_CHAN: m_cfg.m_midi_channel = (V_SQL_MIDI_CHAN)value; break;
@@ -184,6 +187,39 @@ public:
 		}
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
+	void set_mode(V_SQL_SEQ_MODE value) {
+		switch (m_cfg.m_mode) {
+		case V_SQL_SEQ_MODE_CHROMATIC:
+		case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
+			if(value == V_SQL_SEQ_MODE_SCALE) {
+				for(int i=0; i<MAX_STEPS; ++i) {
+					byte value = m_cfg.m_step[i] & 0xFF;
+					value = g_scale.note_to_index(value);
+					m_cfg.m_step[i] &= 0xFF00;
+					m_cfg.m_step[i] |= value;
+				}
+				m_state.m_scroll_ofs = g_scale.note_to_index(m_state.m_scroll_ofs);
+			}
+			break;
+		case V_SQL_SEQ_MODE_SCALE:
+			if(value == V_SQL_SEQ_MODE_CHROMATIC || value == V_SQL_SEQ_MODE_CHROMATIC_FORCED) {
+				for(int i=0; i<MAX_STEPS; ++i) {
+					byte value = m_cfg.m_step[i] & 0xFF;
+					value = g_scale.index_to_note(value);
+					m_cfg.m_step[i] &= 0xFF00;
+					m_cfg.m_step[i] |= value;
+				}
+				m_state.m_scroll_ofs = g_scale.index_to_note(m_state.m_scroll_ofs);
+			}
+			break;
+		case V_SQL_SEQ_MODE_MOD:
+		case V_SQL_SEQ_MODE_MOD_FINE:
+		default:
+			break;
+		}
+		m_cfg.m_mode = value;
+	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void set_loop_start(int pos) {
@@ -494,6 +530,22 @@ public:
 		return result;
 	}
 
+
+	///////////////////////////////////////////////////////////////////////////////
+	inline int get_reference_row() {
+		switch (m_cfg.m_mode) {
+		case V_SQL_SEQ_MODE_CHROMATIC:
+		case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
+			return REFERENCE_NOTE;
+		case V_SQL_SEQ_MODE_SCALE:
+			return g_scale.note_to_index(REFERENCE_NOTE);
+		case V_SQL_SEQ_MODE_MOD:
+		case V_SQL_SEQ_MODE_MOD_FINE:
+		default:
+			return 0;
+		}
+	}
+
 	///////////////////////////////////////////////////////////////////////////////
 	// Play a step for a note mode
 	void play_note_step(V_SQL_SCALE_TYPE scale) {
@@ -627,6 +679,7 @@ public:
 			}
 		}
 	}
+
 
 	///////////////////////////////////////////////////////////////////////////////
 	void test() {
