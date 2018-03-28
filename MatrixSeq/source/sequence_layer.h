@@ -38,7 +38,6 @@ public:
 	// look up table of tick rates
 	static const byte c_tick_rates[V_SQL_STEP_RATE_MAX];
 	static const byte c_step_duration[V_SQL_STEP_DUR_MAX];
-	static const uint16_t c_scale_mask[V_SQL_SCALE_TYPE_MAX];
 
 	static const STEP_TYPE VEL_MASK = (IS_ACTIVE|IS_VEL0|IS_VEL1);
 	static const STEP_TYPE VEL_LEGATO = (IS_ACTIVE);
@@ -415,6 +414,7 @@ public:
 
 	void inc_step(STEP_TYPE *value, int delta) {
 		int v = (byte)(*value) + delta;
+		int max_note = 127;
 		switch(m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_MOD:
 			if(v < 0) {
@@ -424,16 +424,17 @@ public:
 				v = 13;
 			}
 			break;
+		case V_SQL_SEQ_MODE_SCALE:
+			max_note = g_scale.max_index();
+		case V_SQL_SEQ_MODE_MOD_FINE:
 		case V_SQL_SEQ_MODE_CHROMATIC:
 		case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
-		case V_SQL_SEQ_MODE_SCALE:
-		case V_SQL_SEQ_MODE_MOD_FINE:
 		default:
 			if(v < 0) {
 				v = 0;
 			}
-			else if(v > 127) {
-				v = 127;
+			else if(v > max_note) {
+				v = max_note;
 			}
 			break;
 		}
@@ -499,46 +500,22 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	byte force_note_to_scale(byte note, V_SQL_SCALE_TYPE scale) {
-		uint16_t scale_mask = c_scale_mask[(int)scale];
-		uint16_t bit = 1U<<(note % 12);
-		for(int i=0; i<12; ++i) {
-			if(bit & scale_mask) {
-				return note;
-			}
-			bit<<=1;
-			if(!(bit&0xFFF)) {
-				bit = 1U;
-			}
-			++note;
-		}
-		return 0;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	byte get_note_from_scale(byte note, V_SQL_SCALE_TYPE scale) {
-		int result = 12 * (note/12); // octave part
-		int remainder = note % 7; // 7 notes per scale
-		uint16_t scale_mask = c_scale_mask[(int)scale];
-		while(scale_mask && remainder) {
-			if(scale_mask&1) {
-				--remainder;
-			}
-			++result;
-			scale_mask>>=1;
-		}
-		return result;
-	}
-
-
-	///////////////////////////////////////////////////////////////////////////////
-	inline int get_reference_row() {
+	byte get_graticule(int *baseline, int *spacing) {
+		int n;
 		switch (m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_CHROMATIC:
 		case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
-			return REFERENCE_NOTE;
+			n = m_state.m_scroll_ofs + 15; // note at top row of screen
+			n = 12*(n/12); // C at bottom of that octave
+			*baseline = 12 - n + m_state.m_scroll_ofs; // now take scroll offset into account
+			*spacing = 12;
+			return 1;
 		case V_SQL_SEQ_MODE_SCALE:
-			return g_scale.note_to_index(REFERENCE_NOTE);
+			n = m_state.m_scroll_ofs + 15; // note at top row of screen
+			n = 7*(n/7); // C at bottom of that octave
+			*baseline = 12 - n + m_state.m_scroll_ofs; // now take scroll offset into account
+			*spacing = 7;
+			return 1;
 		case V_SQL_SEQ_MODE_MOD:
 		case V_SQL_SEQ_MODE_MOD_FINE:
 		default:
@@ -589,10 +566,10 @@ public:
 			// get note to play and force to scale if needed
 			byte note = STEP_VALUE(m_state.m_step_value);
 			if(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC_FORCED) {
-				note = force_note_to_scale(note, scale);
+				note = g_scale.force_to_scale(note);
 			}
 			else if(m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
-				note = get_note_from_scale(note, scale);
+				note = g_scale.index_to_note(note);
 			}
 
 			// decide duration. a duration 0 is open ended
@@ -697,16 +674,6 @@ public:
 #ifdef MAIN_INCLUDE
 const byte CSequenceLayer::c_tick_rates[V_SQL_STEP_RATE_MAX] = {96,72,48,36,32,24,18,16,12,9,8,6,4,3};
 const byte CSequenceLayer::c_step_duration[] = {3,4,6,8,9,12,16,18,24,32,36,48,72,96};
-const uint16_t CSequenceLayer::c_scale_mask[V_SQL_SCALE_TYPE_MAX] = {
-(uint16_t)0b0000101011010101,  //diatonic modes
-(uint16_t)0b0000101101010110,  //:
-(uint16_t)0b0000110101011010,  //:
-(uint16_t)0b0000101010110101,  //:
-(uint16_t)0b0000101011010110,  //:
-(uint16_t)0b0000101101011010,  //:
-(uint16_t)0b0000110101101010  //:
-};
-
 #endif
 
 #endif /* SEQUENCE_LAYER_H_ */

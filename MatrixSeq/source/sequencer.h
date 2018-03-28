@@ -349,11 +349,22 @@ public:
 
 		CRenderBuf::clear();
 
-		int max_row = (m_action == ACTION_EDIT_TRIG)? 11 : 14;
+		int max_row = (m_action == ACTION_EDIT_TRIG)? 11 : 12;
+
+		int graticule_row;
+		int graticule_spacing;
+		if(layer->get_graticule(&graticule_row, &graticule_spacing)) {
+			while(graticule_row < 16) {
+				if(graticule_row>= 0 && graticule_row<=max_row) {
+					CRenderBuf::hilite(graticule_row) = 0x11111111U;
+				}
+				graticule_row += graticule_spacing;
+			}
+		}
 
 		// displaying the cursor
 		mask = CRenderBuf::bit(m_cursor);
-		for(i=0; i<max_row; ++i) {
+		for(i=0; i<=max_row; ++i) {
 			CRenderBuf::raster(i) &= ~mask;
 			CRenderBuf::hilite(i) |= mask;
 		}
@@ -364,13 +375,9 @@ public:
 
 		mask = CRenderBuf::bit(0);
 		int c = 0;
-		int reference_row = 12 - layer->get_reference_row() + layer->m_state.m_scroll_ofs;
-				//layer->m_state.m_scroll_ofs - 36;
+
 		for(i=0; i<32; ++i) {
 
-			if(reference_row >= 0 && reference_row<16) {
-				CRenderBuf::hilite(reference_row) |= mask;
-			}
 			// show the "ruler" at the bottom of screen
 			if(i >= layer->m_cfg.m_loop_from && i <= layer->m_cfg.m_loop_to) {
 				if(!(c & 0x03)) { // steps 0, 4, 8 etc

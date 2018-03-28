@@ -32,6 +32,9 @@ public:
 		m_align = ALIGN_LEFT;
 		m_timeout = 0;
 		m_row = 2;
+		m_render = 0;
+		memset(m_raster,0,sizeof m_raster);
+		m_mask = 0;
 	}
 
 	// prepare bitmap
