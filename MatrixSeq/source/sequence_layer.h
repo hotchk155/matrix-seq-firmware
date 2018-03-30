@@ -24,7 +24,8 @@ public:
 		IS_VEL0 = (uint16_t)0x200, 	// velocity type bit 0
 		IS_VEL1 = (uint16_t)0x400, 	// velocity type bit 1
 		MAX_PLAYING_NOTES = 8,
-		REFERENCE_NOTE = 48
+		REFERENCE_NOTE = 48,
+		MAX_MOD_VALUE = 12
 	};
 
 	enum {
@@ -187,6 +188,14 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
+	// preserve trigs but clear all data
+	void clear_values() {
+		for(int i=0; i<MAX_STEPS; ++i) {
+			m_cfg.m_step[i] &= 0xFF00;
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
 	void set_mode(V_SQL_SEQ_MODE value) {
 		switch (m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_CHROMATIC:
@@ -200,6 +209,9 @@ public:
 				}
 				m_state.m_scroll_ofs = g_scale.note_to_index(m_state.m_scroll_ofs);
 			}
+			else {
+				clear_values();
+			}
 			break;
 		case V_SQL_SEQ_MODE_SCALE:
 			if(value == V_SQL_SEQ_MODE_CHROMATIC || value == V_SQL_SEQ_MODE_CHROMATIC_FORCED) {
@@ -211,8 +223,13 @@ public:
 				}
 				m_state.m_scroll_ofs = g_scale.index_to_note(m_state.m_scroll_ofs);
 			}
+			else {
+				clear_values();
+			}
 			break;
 		case V_SQL_SEQ_MODE_MOD:
+			clear_values();
+			break;
 		case V_SQL_SEQ_MODE_MOD_FINE:
 		default:
 			break;
@@ -420,8 +437,8 @@ public:
 			if(v < 0) {
 				v = 0;
 			}
-			else if(v > 13) {
-				v = 13;
+			else if(v > MAX_MOD_VALUE) {
+				v = MAX_MOD_VALUE;
 			}
 			break;
 		case V_SQL_SEQ_MODE_SCALE:

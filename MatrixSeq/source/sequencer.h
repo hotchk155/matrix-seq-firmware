@@ -375,6 +375,7 @@ public:
 
 		mask = CRenderBuf::bit(0);
 		int c = 0;
+		int n;
 
 		for(i=0; i<32; ++i) {
 
@@ -389,51 +390,94 @@ public:
 				++c;
 			}
 
-			// Display the sequencer steps
 			CSequenceLayer::STEP_TYPE step = layer->get_step(i);
-			if(step & CSequenceLayer::IS_ACTIVE) {
-				int n = STEP_VALUE(step);
-				n = 12 - n + layer->m_state.m_scroll_ofs;
-				if(n >= 0 && n <= max_row) {
-					CRenderBuf::raster(n) |= mask;
-					if(i == layer->m_state.m_play_pos && m_is_running) {
-						CRenderBuf::set_hilite(n, mask);
-					}
-					else {
-						CRenderBuf::clear_hilite(n, mask);
+
+			// Display the sequencer steps
+			switch(layer->m_cfg.m_mode) {
+			case V_SQL_SEQ_MODE_CHROMATIC:
+			case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
+			case V_SQL_SEQ_MODE_SCALE:
+				if(step & CSequenceLayer::IS_ACTIVE) {
+					n = STEP_VALUE(step);
+					n = 12 - n + layer->m_state.m_scroll_ofs;
+					if(n >= 0 && n <= max_row) {
+						CRenderBuf::raster(n) |= mask;
+						if(i == layer->m_state.m_play_pos && m_is_running) {
+							CRenderBuf::set_hilite(n, mask);
+						}
+						else {
+							CRenderBuf::clear_hilite(n, mask);
+						}
 					}
 				}
-
-				// display trig info
-				int vel = CSequenceLayer::get_velocity(step);
-				if(m_action == ACTION_EDIT_TRIG) {
-					if(vel == CSequenceLayer::VELOCITY_HIGH) {
-						CRenderBuf::set_raster(12, mask);
-					}
-					else {
-						CRenderBuf::set_hilite(12, mask);
-					}
-					if(vel == CSequenceLayer::VELOCITY_MEDIUM) {
-						CRenderBuf::set_raster(13, mask);
-					}
-					else {
-						CRenderBuf::set_hilite(13, mask);
-					}
-					if(vel == CSequenceLayer::VELOCITY_LOW) {
-						CRenderBuf::set_raster(14, mask);
-					}
-					else {
-						CRenderBuf::set_hilite(14, mask);
-					}
+				break;
+			case V_SQL_SEQ_MODE_MOD:
+				n = STEP_VALUE(step);
+				if(n>CSequenceLayer::MAX_MOD_VALUE) {
+					n=0;
 				}
 				else {
-					if(vel >= CSequenceLayer::VELOCITY_LOW) {
-						CRenderBuf::set_raster(14, mask);
+					n=CSequenceLayer::MAX_MOD_VALUE-n;
+				}
+//				for(int j=n; j<=13; ++j) {
+//					CRenderBuf::raster(j) &= ~mask;
+//					CRenderBuf::hilite(j) |= mask;
+//				}
+				if(i == layer->m_state.m_play_pos && m_is_running) {
+					CRenderBuf::raster(n) |= mask;
+					CRenderBuf::hilite(n) |= mask;
+				}
+				else {
+					CRenderBuf::raster(n) |= mask;
+					CRenderBuf::hilite(n) &= ~mask;
+
+				}
+				break;
+			default:
+				break;
+			}
+
+			// Display the sequencer steps
+			int vel;
+			switch(layer->m_cfg.m_mode) {
+			case V_SQL_SEQ_MODE_CHROMATIC:
+			case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
+			case V_SQL_SEQ_MODE_SCALE:
+			case V_SQL_SEQ_MODE_MOD:
+				if(step & CSequenceLayer::IS_ACTIVE) {
+					vel = CSequenceLayer::get_velocity(step);
+					if(m_action == ACTION_EDIT_TRIG) {
+						if(vel == CSequenceLayer::VELOCITY_HIGH) {
+							CRenderBuf::set_raster(12, mask);
+						}
+						else {
+							CRenderBuf::set_hilite(12, mask);
+						}
+						if(vel == CSequenceLayer::VELOCITY_MEDIUM) {
+							CRenderBuf::set_raster(13, mask);
+						}
+						else {
+							CRenderBuf::set_hilite(13, mask);
+						}
+						if(vel == CSequenceLayer::VELOCITY_LOW) {
+							CRenderBuf::set_raster(14, mask);
+						}
+						else {
+							CRenderBuf::set_hilite(14, mask);
+						}
 					}
 					else {
-						CRenderBuf::set_hilite(14, mask);
+						if(vel >= CSequenceLayer::VELOCITY_LOW) {
+							CRenderBuf::set_raster(14, mask);
+						}
+						else {
+							CRenderBuf::set_hilite(14, mask);
+						}
 					}
 				}
+				break;
+			default:
+				break;
 			}
 			mask>>=1;
 		}
