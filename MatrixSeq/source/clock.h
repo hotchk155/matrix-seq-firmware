@@ -117,6 +117,11 @@ public:
 		}
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
+	int is_valid_param(PARAM_ID param) {
+		return 1;
+	}
+
 	void set_bpm(float bpm) {
 		m_bpm = bpm;
 		m_ticks_per_ms = ((double)bpm * RATE_4) / (60.0 * 1000.0);

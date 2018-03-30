@@ -102,6 +102,18 @@ int get_param(PARAM_ID param) {
 	}
 	return 0;
 }
+int is_valid_param(PARAM_ID param) {
+	if(param < P_SQL_MAX) {
+		return g_sequencer.is_valid_param(param);
+	}
+	else if(param < P_CVGATE_MAX) {
+		return g_cv_gate.is_valid_param(g_current_layer,param);
+	}
+	else if(param < P_CLOCK_MAX) {
+		return g_clock.is_valid_param(param);
+	}
+	return 0;
+}
 
 
 /*

@@ -60,6 +60,7 @@ public:
 	// This structure holds the layer information that gets saved with the patch
 	typedef struct {
 		V_SQL_SEQ_MODE 	m_mode;				// the mode for this layer (note, mod etc)
+		V_SQL_FORCE_SCALE	m_force_scale;	// force to scale
 		STEP_TYPE		m_step[MAX_STEPS];	// data value and gate for each step
 		V_SQL_STEP_RATE m_step_rate;		// step rate setting
 		byte 			m_loop_from;		// loop start point
@@ -112,6 +113,7 @@ public:
 			m_cfg.m_step[i] = DEFAULT_NOTE;
 		}
 		m_cfg.m_mode 		= V_SQL_SEQ_MODE_CHROMATIC;
+		m_cfg.m_force_scale = V_SQL_FORCE_SCALE_OFF;
 		m_cfg.m_step_rate	= V_SQL_STEP_RATE_16;
 		m_cfg.m_note_dur	= V_SQL_STEP_DUR_FULL;
 		m_cfg.m_loop_from	= 0;
@@ -162,6 +164,7 @@ public:
 	void set(PARAM_ID param, int value) {
 		switch(param) {
 		case P_SQL_SEQ_MODE: set_mode((V_SQL_SEQ_MODE)value); break;
+		case P_SQL_FORCE_SCALE: m_cfg.m_force_scale = (V_SQL_FORCE_SCALE)value; break;
 		case P_SQL_STEP_RATE: m_cfg.m_step_rate = (V_SQL_STEP_RATE)value; break;
 		case P_SQL_STEP_DUR: m_cfg.m_note_dur = (V_SQL_STEP_DUR)value; break;
 		case P_SQL_MIDI_CHAN: m_cfg.m_midi_channel = (V_SQL_MIDI_CHAN)value; break;
@@ -177,6 +180,7 @@ public:
 	int get(PARAM_ID param) {
 		switch(param) {
 		case P_SQL_SEQ_MODE: return m_cfg.m_mode;
+		case P_SQL_FORCE_SCALE: return m_cfg.m_force_scale;
 		case P_SQL_STEP_RATE: return m_cfg.m_step_rate;
 		case P_SQL_STEP_DUR: return m_cfg.m_note_dur;
 		case P_SQL_MIDI_CHAN: return m_cfg.m_midi_channel;
@@ -185,6 +189,14 @@ public:
 		case P_SQL_MIDI_VEL_MED: return m_cfg.m_midi_vel_med;
 		case P_SQL_MIDI_VEL_LO: return m_cfg.m_midi_vel_lo;
 		default:return 0;
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	int is_valid_param(PARAM_ID param) {
+		switch(param) {
+		case P_SQL_FORCE_SCALE: return !(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
+		default: return 1;
 		}
 	}
 
@@ -201,10 +213,6 @@ public:
 	void set_mode(V_SQL_SEQ_MODE value) {
 		switch (value) {
 		case V_SQL_SEQ_MODE_CHROMATIC:
-		case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
-			if(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC || m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC_FORCED) {
-				break;
-			}
 			if(m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
 				// changing from short scale to chromatic mode...
 				for(int i=0; i<MAX_STEPS; ++i) {
@@ -222,7 +230,7 @@ public:
 			break;
 
 		case V_SQL_SEQ_MODE_SCALE:
-			if(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC || m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC_FORCED) {
+			if(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC) {
 				// changing from chromatic to short scale mode...
 				for(int i=0; i<MAX_STEPS; ++i) {
 					byte value = m_cfg.m_step[i] & 0xFF;
@@ -245,7 +253,6 @@ public:
 			break;
 
 		case V_SQL_SEQ_MODE_MOD:
-		case V_SQL_SEQ_MODE_MOD_FINE:
 			reset_values(0);
 			break;
 		default:
@@ -389,9 +396,7 @@ public:
 			break;
 		case V_SQL_SEQ_MODE_SCALE:
 			max_note = g_scale.max_index();
-		case V_SQL_SEQ_MODE_MOD_FINE:
 		case V_SQL_SEQ_MODE_CHROMATIC:
-		case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
 		default:
 			if(v < 0) {
 				v = 0;
@@ -406,12 +411,12 @@ public:
 	}
 	///////////////////////////////////////////////////////////////////////////////
 	inline byte is_mod_mode() {
-		return(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD || m_cfg.m_mode == V_SQL_SEQ_MODE_MOD_FINE);
+		return(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	inline byte is_note_mode() {
-		return(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC || m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC_FORCED|| m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE);
+		return(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC || m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE);
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -467,7 +472,6 @@ public:
 		int n;
 		switch (m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_CHROMATIC:
-		case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
 			n = m_state.m_scroll_ofs + 15; // note at top row of screen
 			n = 12*(n/12); // C at bottom of that octave
 			*baseline = 12 - n + m_state.m_scroll_ofs; // now take scroll offset into account
@@ -484,7 +488,6 @@ public:
 			*spacing = 0;
 			return 1;
 		case V_SQL_SEQ_MODE_MOD:
-		case V_SQL_SEQ_MODE_MOD_FINE:
 		case V_SQL_SEQ_MODE_MAX:
 			break;
 		}
@@ -546,11 +549,11 @@ public:
 
 			// force to scale if needed
 			byte note = STEP_VALUE(step);
-			if(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC_FORCED || m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
-				note = g_scale.force_to_scale(note);
-			}
-			else if(m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
+			if(m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
 				note = g_scale.index_to_note(note);
+			}
+			else if(m_cfg.m_force_scale == V_SQL_FORCE_SCALE_ON) {
+				note = g_scale.force_to_scale(note);
 			}
 
 			if(note) {

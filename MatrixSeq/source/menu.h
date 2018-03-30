@@ -32,21 +32,24 @@ public:
 		ACTION_VALUE_SELECTED,
 		ACTION_VALUE_CHANGED
 	};
-	const OPTION m_opts[14] = {
-			{"TYP", P_SQL_SEQ_MODE, CMenu::ENUMERATED, "CHR|FSC|KEY|MOD|MODF|TRAN"},
-			{"RTE", P_SQL_STEP_RATE, CMenu::ENUMERATED, "1|2D|2|4D|2T|4|8D|4T|8|16D|8T|16|16T|32"},
+	const OPTION m_opts[17] = {
+			{"TYP", P_SQL_SEQ_MODE, CMenu::ENUMERATED, "CHRO|SCAL|MOD|TRAN"},
+			{"FOR", P_SQL_FORCE_SCALE, CMenu::ENUMERATED, "OFF|ON"},
+			{"RAT", P_SQL_STEP_RATE, CMenu::ENUMERATED, "1|2D|2|4D|2T|4|8D|4T|8|16D|8T|16|16T|32"},
 			{"DUR", P_SQL_STEP_DUR, CMenu::ENUMERATED, "STEP|FULL|NONE|32|16T|16|8T|16D|8|4T|8D|4|2T|4D|2|2D|1"},
+			{"SCL", P_SQL_SCALE_TYPE, CMenu::ENUMERATED, "IONI|DORI|PHRY|LYDI|MIXO|AEOL|LOCR"},
+			{"BAS", P_SQL_SCALE_ROOT, CMenu::ENUMERATED, "C|C#|D|D#|E|F|F#|G|G#|A|A#|B"},
+			{0},
 			{"CHN", P_SQL_MIDI_CHAN, CMenu::ENUMERATED, "NONE|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16"},
 			{"CC", P_SQL_MIDI_CC, CMenu::NUMBER_7BIT},
 			{"CV", P_CVGATE_VRANGE, CMenu::VOLT_RANGE},
 			{"TUN", P_CVGATE_VSCALE, CMenu::ENUMERATED, "1V|1.2V|HZV"},
-			{"SCL", P_SQL_SCALE_TYPE, CMenu::ENUMERATED, "IONI|DORI|PHRY|LYDI|MIXO|AEOL|LOCR"},
-			{"ROOT", P_SQL_SCALE_ROOT, CMenu::ENUMERATED, "C|C#|D|D#|E|F|F#|G|G#|A|A#|B"},
+			{"VHI", P_SQL_MIDI_VEL_HI, CMenu::NUMBER_7BIT},
+			{"VMD", P_SQL_MIDI_VEL_MED, CMenu::NUMBER_7BIT},
+			{"VLO", P_SQL_MIDI_VEL_LO, CMenu::NUMBER_7BIT},
+			{0},
 			{"BPM", P_CLOCK_BPM, CMenu::BPM},
-			{"CLK", P_CLOCK_SRC, CMenu::ENUMERATED, "INT|MIDI"},
-			{"VELH", P_SQL_MIDI_VEL_HI, CMenu::NUMBER_7BIT},
-			{"VELM", P_SQL_MIDI_VEL_MED, CMenu::NUMBER_7BIT},
-			{"VELL", P_SQL_MIDI_VEL_LO, CMenu::NUMBER_7BIT}
+			{"CLK", P_CLOCK_SRC, CMenu::ENUMERATED, "INT|MIDI"}
 	};
 
 
@@ -166,11 +169,20 @@ public:
 				}
 			}
 			else {
-				i = m_item + (int)param;
-				if(i>=0 && i<NUM_MENU_OPTS) {
+				do {
+					if((int)param < 0) {
+						i = m_item - 1;
+					}
+					else {
+						i = m_item + 1;
+					}
+					if(i<0 || i>=NUM_MENU_OPTS) {
+						break;
+					}
 					m_item = i;
 					m_repaint = 1;
 				}
+				while(!m_opts[m_item].prompt || !is_valid_param(m_opts[m_item].param));
 			}
 			break;
 		case EV_KEY_PRESS:
@@ -195,47 +207,42 @@ public:
 		m_repaint = 1;
 	}
 
-	/////////////////////////////////////////////////////////////////////////////////////////////////
-	void repaint() {
-		if(m_repaint) {
-			CRenderBuf::clear();
-			int row = -2;
-			for(int opt = m_item - 1; opt <= m_item + 1; ++opt) {
-
-				uint32_t buf[5] = {0};
-				int state = 0;
-				if(opt >= 0 && opt < NUM_MENU_OPTS) {
-					const CMenu::OPTION &this_opt = m_opts[opt];
-
-					int value;
-					if(opt == m_item) {
-						if(m_action == ACTION_VALUE_CHANGED) {
-							state = 2;
-							value = m_value;
-						}
-						else {
-							state = 1;
-						}
+	int draw_menu_option(int opt, int row) {
+		uint32_t buf[5] = {0};
+		int state = 0;
+		int visible = 0;
+		if(opt >= 0 && opt < NUM_MENU_OPTS) {
+			const CMenu::OPTION &this_opt = m_opts[opt];
+			if(this_opt.prompt) {
+				int value;
+				if(opt == m_item) {
+					if(m_action == ACTION_VALUE_CHANGED) {
+						state = 2;
+						value = m_value;
 					}
-					if(state != 2) {
-						value = get_param(this_opt.param);
-					}
-
-					const char *sz = this_opt.prompt;
-					int col = 0;
-					while(*sz) {
-						CRenderBuf::print_char(*sz, col, 0, buf, 5);
-						++sz;
-						col += 4;
-					}
-					sz = get_value_string(this_opt, value);
-					col = 16;
-					while(*sz && *sz != '|') {
-						CRenderBuf::print_char(*sz, col, 0, buf, 5);
-						++sz;
-						col += 4;
+					else {
+						state = 1;
 					}
 				}
+				if(state != 2) {
+					value = get_param(this_opt.param);
+				}
+
+				const char *sz = this_opt.prompt;
+				int col = 0;
+				while(*sz) {
+					CRenderBuf::print_char(*sz, col, 0, buf, 5);
+					++sz;
+					col += 4;
+				}
+				sz = get_value_string(this_opt, value);
+				col = 16;
+				while(*sz && *sz != '|') {
+					CRenderBuf::print_char(*sz, col, 0, buf, 5);
+					++sz;
+					col += 4;
+				}
+
 				for(int i=0; i<5; ++i) {
 					if(row>=0 && row<16) {
 						switch(state) {
@@ -252,10 +259,47 @@ public:
 							CRenderBuf::raster(row) = buf[i];
 							break;
 						}
+						visible = 1;
 					}
 					++row;
 				}
-				++row;
+			}
+			else {
+				if(row>=0 && row<16) {
+					CRenderBuf::hilite(row) = 0xFFFFFFFF;
+					visible = 1;
+				}
+			}
+		}
+		return visible;
+	}
+
+
+	/////////////////////////////////////////////////////////////////////////////////////////////////
+	void repaint() {
+		if(m_repaint) {
+			CRenderBuf::clear();
+
+			int visible = 1;
+			int opt = m_item - 1;
+			int row = 5;
+			while(opt >= 0 && visible) {
+				if(!m_opts[opt].prompt || is_valid_param(m_opts[opt].param)) {
+					row -= (m_opts[opt].prompt)? 6:2;
+					visible = draw_menu_option(opt,row);
+				}
+				--opt;
+			}
+
+			visible = 1;
+			opt = m_item;
+			row = 5;
+			while(opt < NUM_MENU_OPTS && visible) {
+				if(!m_opts[opt].prompt || is_valid_param(m_opts[opt].param)) {
+					visible = draw_menu_option(opt,row);
+					row += (m_opts[opt].prompt)? 6:2;
+				}
+				++opt;
 			}
 			m_repaint = 0;
 		}

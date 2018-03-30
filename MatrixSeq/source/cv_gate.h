@@ -72,6 +72,9 @@ public:
 			default: return 0;
 		}
 	}
+	int is_valid_param(int which, PARAM_ID param) {
+		return 1;
+	}
 
 	void gate_on(byte which) {
 		switch(which) {

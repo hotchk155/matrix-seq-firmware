@@ -18,6 +18,7 @@ typedef enum {
 	P_SQL_MIDI_CC,
 	P_SQL_SCALE_TYPE,
 	P_SQL_SCALE_ROOT,
+	P_SQL_FORCE_SCALE,
 	P_SQL_MIDI_VEL_HI,
 	P_SQL_MIDI_VEL_MED,
 	P_SQL_MIDI_VEL_LO,
@@ -35,10 +36,8 @@ typedef enum {
 
 typedef enum:byte {
 	V_SQL_SEQ_MODE_CHROMATIC = 0,		// One grid row is one semitone (11 rows per octave)
-	V_SQL_SEQ_MODE_CHROMATIC_FORCED,	// One grid row is one semitone but on playback notes are forced to scale
 	V_SQL_SEQ_MODE_SCALE,				// One grid row is one scale note (7 rows per octave)
 	V_SQL_SEQ_MODE_MOD,					// full modulation range compressed to 13 rows
-	V_SQL_SEQ_MODE_MOD_FINE,			// One grid row is one CC increment (127 rows for all)
 	V_SQL_SEQ_MODE_TRANSPOSE,
 	V_SQL_SEQ_MODE_MAX
 } V_SQL_SEQ_MODE;
@@ -69,6 +68,12 @@ typedef enum:byte {
 	V_SQL_SCALE_ROOT_ASHARP,
 	V_SQL_SCALE_ROOT_B
 } V_SQL_SCALE_ROOT;
+
+typedef enum:byte {
+	V_SQL_FORCE_SCALE_OFF,
+	V_SQL_FORCE_SCALE_ON,
+	V_SQL_FORCE_SCALE_MAX
+} V_SQL_FORCE_SCALE;
 
 typedef enum:byte {
 	V_SQL_VEL_MOD_OFF,
@@ -192,6 +197,7 @@ typedef enum:byte {
 
 extern void set_param(PARAM_ID param, int value);
 extern int get_param(PARAM_ID param);
+extern int is_valid_param(PARAM_ID param);
 
 
 

@@ -99,6 +99,24 @@ public:
 		}
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
+	int is_valid_param(PARAM_ID param) {
+		switch(param) {
+		case P_SQL_SCALE_TYPE:
+		case P_SQL_SCALE_ROOT:
+			switch(m_layers[m_layer].m_cfg.m_mode) {
+			case V_SQL_SEQ_MODE_CHROMATIC:
+			case V_SQL_SEQ_MODE_TRANSPOSE:
+				return (m_layers[m_layer].m_cfg.m_force_scale == V_SQL_FORCE_SCALE_ON);
+			case V_SQL_SEQ_MODE_SCALE:
+				return 1;
+			case V_SQL_SEQ_MODE_MOD:
+				return 0;
+			}
+		}
+		return m_layers[m_layer].is_valid_param(param);
+	}
+
 	void start() {
 		m_is_running = 1;
 		for(int i=0; i<NUM_LAYERS; ++i) {
@@ -155,14 +173,12 @@ public:
 			}
 			// fall thru
 		case V_SQL_SEQ_MODE_CHROMATIC:
-		case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
 			g_popup.note_name(value);
 			break;
 		case V_SQL_SEQ_MODE_TRANSPOSE:
 			g_popup.show_offset(((int)value)-64);
 			break;
 		case V_SQL_SEQ_MODE_MOD:
-		case V_SQL_SEQ_MODE_MOD_FINE:
 		case V_SQL_SEQ_MODE_MAX:
 			break;
 		}
@@ -413,7 +429,6 @@ public:
 			byte show_step = 1;
 			switch(layer->m_cfg.m_mode) {
 			case V_SQL_SEQ_MODE_CHROMATIC:
-			case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
 			case V_SQL_SEQ_MODE_SCALE:
 				show_step = !!(step & CSequenceLayer::IS_ACTIVE);	// note nodes hide the note unless a trigger present
 				// fall thru
@@ -454,8 +469,6 @@ public:
 
 				}
 				break;
-			case V_SQL_SEQ_MODE_MOD_FINE:
-				//TODO
 			case V_SQL_SEQ_MODE_MAX:
 				break;
 			}
@@ -464,7 +477,6 @@ public:
 			int vel;
 			switch(layer->m_cfg.m_mode) {
 			case V_SQL_SEQ_MODE_CHROMATIC:
-			case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
 			case V_SQL_SEQ_MODE_SCALE:
 			case V_SQL_SEQ_MODE_MOD:
 				if(step & CSequenceLayer::IS_ACTIVE) {
@@ -523,7 +535,6 @@ public:
 				if(layer.m_state.m_stepped && layer.m_cfg.m_enabled) {
 					switch(layer.m_cfg.m_mode) {
 						case V_SQL_SEQ_MODE_CHROMATIC:
-						case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
 						case V_SQL_SEQ_MODE_SCALE:
 							layer.play_note_step(0,0);
 							g_cv_gate.note_gate(i, layer.m_state.m_last_note, layer.m_state.m_gate);
