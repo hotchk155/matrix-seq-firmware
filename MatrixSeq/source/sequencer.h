@@ -147,14 +147,26 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	void step_info(CSequenceLayer::STEP_TYPE step, CSequenceLayer *layer) {
-		if(layer->is_note_mode()) {
-			byte note = STEP_VALUE(step);
+		byte value = STEP_VALUE(step);
+		switch(layer->m_cfg.m_mode) {
+		case V_SQL_SEQ_MODE_SCALE:
 			if(layer->m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
-				note = g_scale.index_to_note(note);
+				value = g_scale.index_to_note(value);
 			}
-			g_popup.note_name(note);
-			g_popup.avoid(m_cursor);
+			// fall thru
+		case V_SQL_SEQ_MODE_CHROMATIC:
+		case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
+			g_popup.note_name(value);
+			break;
+		case V_SQL_SEQ_MODE_TRANSPOSE:
+			g_popup.show_offset(((int)value)-64);
+			break;
+		case V_SQL_SEQ_MODE_MOD:
+		case V_SQL_SEQ_MODE_MOD_FINE:
+		case V_SQL_SEQ_MODE_MAX:
+			break;
 		}
+		g_popup.avoid(m_cursor);
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -351,14 +363,19 @@ public:
 
 		int max_row = (m_action == ACTION_EDIT_TRIG)? 11 : 12;
 
-		int graticule_row;
-		int graticule_spacing;
+		int graticule_row = 0;
+		int graticule_spacing = 0;
 		if(layer->get_graticule(&graticule_row, &graticule_spacing)) {
 			while(graticule_row < 16) {
 				if(graticule_row>= 0 && graticule_row<=max_row) {
 					CRenderBuf::hilite(graticule_row) = 0x11111111U;
 				}
-				graticule_row += graticule_spacing;
+				if(graticule_spacing > 0) {
+					graticule_row += graticule_spacing;
+				}
+				else {
+					break;
+				}
 			}
 		}
 
@@ -393,11 +410,15 @@ public:
 			CSequenceLayer::STEP_TYPE step = layer->get_step(i);
 
 			// Display the sequencer steps
+			byte show_step = 1;
 			switch(layer->m_cfg.m_mode) {
 			case V_SQL_SEQ_MODE_CHROMATIC:
 			case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
 			case V_SQL_SEQ_MODE_SCALE:
-				if(step & CSequenceLayer::IS_ACTIVE) {
+				show_step = !!(step & CSequenceLayer::IS_ACTIVE);	// note nodes hide the note unless a trigger present
+				// fall thru
+			case V_SQL_SEQ_MODE_TRANSPOSE:
+				if(show_step) {
 					n = STEP_VALUE(step);
 					n = 12 - n + layer->m_state.m_scroll_ofs;
 					if(n >= 0 && n <= max_row) {
@@ -433,7 +454,9 @@ public:
 
 				}
 				break;
-			default:
+			case V_SQL_SEQ_MODE_MOD_FINE:
+				//TODO
+			case V_SQL_SEQ_MODE_MAX:
 				break;
 			}
 
@@ -502,9 +525,24 @@ public:
 						case V_SQL_SEQ_MODE_CHROMATIC:
 						case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
 						case V_SQL_SEQ_MODE_SCALE:
-							layer.play_note_step(m_cfg.scale_type);
+							layer.play_note_step(0,0);
 							g_cv_gate.note_gate(i, layer.m_state.m_last_note, layer.m_state.m_gate);
+
+
+							for(int j=i+1; j<NUM_LAYERS; ++j) {
+								CSequenceLayer& other_layer = m_layers[j];
+								if(other_layer.is_note_mode()) {
+									break;
+								}
+								else if(other_layer.m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
+									other_layer.play_note_step(layer.m_state.m_step_value, layer.m_state.m_last_note);
+									//g_cv_gate.note_gate(i, layer.m_state.m_last_note, layer.m_state.m_gate);
+								}
+							}
+
 							break;
+
+
 						default:
 							break;
 					}

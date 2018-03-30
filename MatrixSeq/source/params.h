@@ -39,6 +39,7 @@ typedef enum:byte {
 	V_SQL_SEQ_MODE_SCALE,				// One grid row is one scale note (7 rows per octave)
 	V_SQL_SEQ_MODE_MOD,					// full modulation range compressed to 13 rows
 	V_SQL_SEQ_MODE_MOD_FINE,			// One grid row is one CC increment (127 rows for all)
+	V_SQL_SEQ_MODE_TRANSPOSE,
 	V_SQL_SEQ_MODE_MAX
 } V_SQL_SEQ_MODE;
 

@@ -25,6 +25,7 @@ public:
 		IS_VEL1 = (uint16_t)0x400, 	// velocity type bit 1
 		MAX_PLAYING_NOTES = 8,
 		REFERENCE_NOTE = 48,
+		DEFAULT_NOTE = 36,
 		MAX_MOD_VALUE = 12
 	};
 
@@ -108,7 +109,7 @@ public:
 	///////////////////////////////////////////////////////////////////////////////
 	void init_config() {
 		for(int i=0; i<MAX_STEPS; ++i) {
-			m_cfg.m_step[i] = 0;
+			m_cfg.m_step[i] = DEFAULT_NOTE;
 		}
 		m_cfg.m_mode 		= V_SQL_SEQ_MODE_CHROMATIC;
 		m_cfg.m_step_rate	= V_SQL_STEP_RATE_16;
@@ -189,32 +190,23 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	// preserve trigs but clear all data
-	void clear_values() {
+	void reset_values(byte value) {
 		for(int i=0; i<MAX_STEPS; ++i) {
 			m_cfg.m_step[i] &= 0xFF00;
+			m_cfg.m_step[i] |= value;
 		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void set_mode(V_SQL_SEQ_MODE value) {
-		switch (m_cfg.m_mode) {
+		switch (value) {
 		case V_SQL_SEQ_MODE_CHROMATIC:
 		case V_SQL_SEQ_MODE_CHROMATIC_FORCED:
-			if(value == V_SQL_SEQ_MODE_SCALE) {
-				for(int i=0; i<MAX_STEPS; ++i) {
-					byte value = m_cfg.m_step[i] & 0xFF;
-					value = g_scale.note_to_index(value);
-					m_cfg.m_step[i] &= 0xFF00;
-					m_cfg.m_step[i] |= value;
-				}
-				m_state.m_scroll_ofs = g_scale.note_to_index(m_state.m_scroll_ofs);
+			if(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC || m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC_FORCED) {
+				break;
 			}
-			else {
-				clear_values();
-			}
-			break;
-		case V_SQL_SEQ_MODE_SCALE:
-			if(value == V_SQL_SEQ_MODE_CHROMATIC || value == V_SQL_SEQ_MODE_CHROMATIC_FORCED) {
+			if(m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
+				// changing from short scale to chromatic mode...
 				for(int i=0; i<MAX_STEPS; ++i) {
 					byte value = m_cfg.m_step[i] & 0xFF;
 					value = g_scale.index_to_note(value);
@@ -224,13 +216,38 @@ public:
 				m_state.m_scroll_ofs = g_scale.index_to_note(m_state.m_scroll_ofs);
 			}
 			else {
-				clear_values();
+				reset_values(DEFAULT_NOTE);
+				m_state.m_scroll_ofs = DEFAULT_NOTE - 5;
 			}
 			break;
-		case V_SQL_SEQ_MODE_MOD:
-			clear_values();
+
+		case V_SQL_SEQ_MODE_SCALE:
+			if(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC || m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC_FORCED) {
+				// changing from chromatic to short scale mode...
+				for(int i=0; i<MAX_STEPS; ++i) {
+					byte value = m_cfg.m_step[i] & 0xFF;
+					value = g_scale.note_to_index(value);
+					m_cfg.m_step[i] &= 0xFF00;
+					m_cfg.m_step[i] |= value;
+				}
+				m_state.m_scroll_ofs = g_scale.note_to_index(m_state.m_scroll_ofs);
+			}
+			else {
+				int default_index = g_scale.note_to_index(DEFAULT_NOTE);
+				reset_values(default_index);
+				m_state.m_scroll_ofs = default_index - 5;
+			}
 			break;
+
+		case V_SQL_SEQ_MODE_TRANSPOSE:
+			reset_values(64);
+			m_state.m_scroll_ofs = 60;
+			break;
+
+		case V_SQL_SEQ_MODE_MOD:
 		case V_SQL_SEQ_MODE_MOD_FINE:
+			reset_values(0);
+			break;
 		default:
 			break;
 		}
@@ -309,85 +326,6 @@ public:
 		}
 	}
 
-	/*
-	///////////////////////////////////////////////////////////////////////////////
-	void start_midi_note(byte chan, byte note, byte velocity, byte duration, byte legato) {
-
-		// scan list of playing note slots to find candidate slots
-		int free = -1;
-		int same = -1;
-		int last = -1;
-		int steal = -1;
-		byte steal_count = 255;
-		for(int i=0; i<MAX_PLAYING_NOTES;++i) {
-			if(!m_state.m_playing[i].note) {
-				// we have a free slot
-				free = i;
-			}
-			else if(m_state.m_playing[i].note == note) {
-				// the same note is already playing. we will use this slot so
-				// there is no need to carry on looking
-				same = i;
-				break;
-			}
-			else if(m_state.m_playing[i].note == m_state.m_last_note) {
-				// this slot is playing the last note output from this channel
-				// (and it is still playing!)
-				last = i;
-			}
-			else if(m_state.m_playing[i].count < steal_count) {
-				// this is the note that has the least time remaining to play
-				// so we might steal it's slot if we have to...
-				steal_count = m_state.m_playing[i].count;
-				steal = i;
-			}
-		}
-
-
-		// decide which of the possible slots we're going to use
-		byte legato_note = 0;
-		int slot = -1;
-		if(same>=0) {
-			// slot for same note will always be reused
-			slot = same;
-			if(legato) {
-				// for legato playing we just extend this note, do not retrigger it!
-				m_state.m_playing[same].count = duration;
-				m_state.m_last_note = note;
-				return;
-			}
-		}
-		else if(last>=0 && legato) {
-			// the last played note is still sounding, in legato mode we will
-			// replace that note, but only stop it after the new note starts
-			slot = last;
-			velocity = m_state.m_last_velocity;
-			legato_note = m_state.m_playing[last].note;
-		}
-		else if(free>=0) {
-			// else a free slot will be used if available
-			slot = free;
-		}
-		else if(steal>=0) {
-			// final option we'll steal a slot from another note, so we need to stop that note playing
-			g_midi.send_note(chan, m_state.m_playing[steal].note, 0);
-			slot = steal;
-		}
-
-		if(slot>=0) {
-			// play the the new note
-			m_state.m_playing[slot].note = note;
-			m_state.m_playing[slot].count = duration;
-			m_state.m_last_note = note;
-			m_state.m_last_velocity = velocity;
-			g_midi.send_note(chan, note, velocity);
-		}
-		if(legato_note) {
-			// if there is a "legato" note to stop only after the new note
-			// has been started then stop it now
-			g_midi.send_note(chan, legato_note, 0);
-		}
-	}*/
 
 	///////////////////////////////////////////////////////////////////////////////
 	void send_midi_note(byte note, byte velocity) {
@@ -439,6 +377,14 @@ public:
 			}
 			else if(v > MAX_MOD_VALUE) {
 				v = MAX_MOD_VALUE;
+			}
+			break;
+		case V_SQL_SEQ_MODE_TRANSPOSE:
+			if(v < 0) {
+				v = 0;
+			}
+			else if(v > 127) {
+				v = 127;
 			}
 			break;
 		case V_SQL_SEQ_MODE_SCALE:
@@ -533,22 +479,40 @@ public:
 			*baseline = 12 - n + m_state.m_scroll_ofs; // now take scroll offset into account
 			*spacing = 7;
 			return 1;
+		case V_SQL_SEQ_MODE_TRANSPOSE:
+			*baseline = 64;
+			*spacing = 0;
+			return 1;
 		case V_SQL_SEQ_MODE_MOD:
 		case V_SQL_SEQ_MODE_MOD_FINE:
-		default:
-			return 0;
+		case V_SQL_SEQ_MODE_MAX:
+			break;
 		}
+		return 0;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	// Play a step for a note mode
-	void play_note_step(V_SQL_SCALE_TYPE scale) {
+	void play_note_step(STEP_TYPE step_for_transpose, byte note_for_transpose) {
+
+		STEP_TYPE step = 0;
+		if(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
+			int transposed = (int)STEP_VALUE(m_state.m_step_value) + note_for_transpose - 64;
+			if(transposed >= 0 && transposed < 128) {
+				transposed = g_scale.force_to_scale(transposed);
+				step = (step_for_transpose & 0xFF00) | transposed;
+			}
+		}
+		else {
+			step = m_state.m_step_value;
+		}
+
 
 		// Get step type: active / legato / velocity level
 		byte legato = 0;
 		byte velocity = 0;
 		byte active = 1;
-		switch(get_velocity(m_state.m_step_value)) {
+		switch(get_velocity(step)) {
 		case VELOCITY_LOW: velocity = m_cfg.m_midi_vel_lo; break;
 		case VELOCITY_MEDIUM: velocity = m_cfg.m_midi_vel_med; break;
 		case VELOCITY_HIGH: velocity = m_cfg.m_midi_vel_hi; break;
@@ -580,96 +544,98 @@ public:
 		// is there anything going on at this step
 		if(active) {
 
-			// get note to play and force to scale if needed
-			byte note = STEP_VALUE(m_state.m_step_value);
-			if(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC_FORCED) {
+			// force to scale if needed
+			byte note = STEP_VALUE(step);
+			if(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC_FORCED || m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
 				note = g_scale.force_to_scale(note);
 			}
 			else if(m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
 				note = g_scale.index_to_note(note);
 			}
 
-			// decide duration. a duration 0 is open ended
-			byte duration = 0;
-			if(m_cfg.m_note_dur >= V_SQL_STEP_DUR_32) {
-				duration = c_step_duration[m_cfg.m_note_dur - V_SQL_STEP_DUR_32];
-			}
+			if(note) {
+				// decide duration. a duration 0 is open ended
+				byte duration = 0;
+				if(m_cfg.m_note_dur >= V_SQL_STEP_DUR_32) {
+					duration = c_step_duration[m_cfg.m_note_dur - V_SQL_STEP_DUR_32];
+				}
 
-			// scan list of playing note slots to find a usable slot where
-			// we can track this note
-			int free = -1;
-			int same = -1;
-			int last = -1;
-			int steal = -1;
-			int steal_count = -1;
-			for(int i=0; i<MAX_PLAYING_NOTES;++i) {
-				if(!m_state.m_playing[i].note) {
-					// we have a free slot
-					free = i;
+				// scan list of playing note slots to find a usable slot where
+				// we can track this note
+				int free = -1;
+				int same = -1;
+				int last = -1;
+				int steal = -1;
+				int steal_count = -1;
+				for(int i=0; i<MAX_PLAYING_NOTES;++i) {
+					if(!m_state.m_playing[i].note) {
+						// we have a free slot
+						free = i;
+					}
+					else if(m_state.m_playing[i].note == note) {
+						// the same note is already playing. we will use this slot so
+						// there is no need to carry on looking
+						same = i;
+						break;
+					}
+					else if(m_state.m_playing[i].note == m_state.m_last_note) {
+						// this slot is playing the last note output from this channel
+						// (and it is still playing!)
+						last = i;
+					}
+					else if(m_state.m_playing[i].count < steal_count || steal_count == -1) {
+						// this is the note that has the least time remaining to play
+						// so we might steal it's slot if we have to...
+						steal_count = m_state.m_playing[i].count;
+						steal = i;
+					}
 				}
-				else if(m_state.m_playing[i].note == note) {
-					// the same note is already playing. we will use this slot so
-					// there is no need to carry on looking
-					same = i;
-					break;
-				}
-				else if(m_state.m_playing[i].note == m_state.m_last_note) {
-					// this slot is playing the last note output from this channel
-					// (and it is still playing!)
-					last = i;
-				}
-				else if(m_state.m_playing[i].count < steal_count || steal_count == -1) {
-					// this is the note that has the least time remaining to play
-					// so we might steal it's slot if we have to...
-					steal_count = m_state.m_playing[i].count;
-					steal = i;
-				}
-			}
 
-			// For legato steps there is no velocity information... we use the
-			// velocity for the last played note
-			if(velocity) {
-				m_state.m_last_velocity = velocity;
-			}
+				// For legato steps there is no velocity information... we use the
+				// velocity for the last played note
+				if(velocity) {
+					m_state.m_last_velocity = velocity;
+				}
 
-			// decide which of the possible slots we're going to use
-			int slot = -1;
-			if(same>=0) {
-				// slot for same note will always be reused
-				if(!legato) {
-					// retrigger the note
-					send_midi_note(note,0);
+				// decide which of the possible slots we're going to use
+				int slot = -1;
+				if(same>=0) {
+					// slot for same note will always be reused
+					if(!legato) {
+						// retrigger the note
+						send_midi_note(note,0);
+						send_midi_note(note,m_state.m_last_velocity);
+						m_state.m_gate = CCVGate::GATE_RETRIG;
+					}
+					slot = same;
+				}
+				else if(last>=0 && legato) {
+					// the last played note is still sounding, in legato mode we will
+					// replace that note, but only stop it after the new note starts
 					send_midi_note(note,m_state.m_last_velocity);
-					m_state.m_gate = CCVGate::GATE_RETRIG;
+					send_midi_note(m_state.m_playing[last].note,0);
+					m_state.m_gate = CCVGate::GATE_OPEN;
+					slot = last;
 				}
-				slot = same;
-			}
-			else if(last>=0 && legato) {
-				// the last played note is still sounding, in legato mode we will
-				// replace that note, but only stop it after the new note starts
-				send_midi_note(note,m_state.m_last_velocity);
-				send_midi_note(m_state.m_playing[last].note,0);
-				m_state.m_gate = CCVGate::GATE_OPEN;
-				slot = last;
-			}
-			else if(free>=0) {
-				// else a free slot will be used if available
-				send_midi_note(note,m_state.m_last_velocity);
-				m_state.m_gate = legato? CCVGate::GATE_OPEN : CCVGate::GATE_RETRIG;
-				slot = free;
-			}
-			else if(steal>=0) {
-				// final option we'll steal a slot from another note, so we need to stop that note playing
-				send_midi_note(m_state.m_playing[steal].note,0);
-				send_midi_note(note,m_state.m_last_velocity);
-				m_state.m_gate = legato? CCVGate::GATE_OPEN : CCVGate::GATE_RETRIG;
-				slot = steal;
-			}
+				else if(free>=0) {
+					// else a free slot will be used if available
+					send_midi_note(note,m_state.m_last_velocity);
+					m_state.m_gate = legato? CCVGate::GATE_OPEN : CCVGate::GATE_RETRIG;
+					slot = free;
+				}
+				else if(steal>=0) {
+					// final option we'll steal a slot from another note, so we need to stop that note playing
+					send_midi_note(m_state.m_playing[steal].note,0);
+					send_midi_note(note,m_state.m_last_velocity);
+					m_state.m_gate = legato? CCVGate::GATE_OPEN : CCVGate::GATE_RETRIG;
+					slot = steal;
+				}
 
-			if(slot >= 0) {
-				m_state.m_last_note = note;
-				m_state.m_playing[slot].note = note;
-				m_state.m_playing[slot].count = duration;
+				if(slot >= 0) {
+					m_state.m_last_note = note;
+					m_state.m_playing[slot].note = note;
+					m_state.m_playing[slot].count = duration;
+				}
 			}
 		}
 	}
@@ -685,6 +651,87 @@ public:
 		m_cfg.m_step[9] = 50|IS_VEL1|IS_ACTIVE;
 		m_cfg.m_step[12] = 52|IS_VEL1|IS_ACTIVE;
 	}
+
+	/*
+	///////////////////////////////////////////////////////////////////////////////
+	void start_midi_note(byte chan, byte note, byte velocity, byte duration, byte legato) {
+
+		// scan list of playing note slots to find candidate slots
+		int free = -1;
+		int same = -1;
+		int last = -1;
+		int steal = -1;
+		byte steal_count = 255;
+		for(int i=0; i<MAX_PLAYING_NOTES;++i) {
+			if(!m_state.m_playing[i].note) {
+				// we have a free slot
+				free = i;
+			}
+			else if(m_state.m_playing[i].note == note) {
+				// the same note is already playing. we will use this slot so
+				// there is no need to carry on looking
+				same = i;
+				break;
+			}
+			else if(m_state.m_playing[i].note == m_state.m_last_note) {
+				// this slot is playing the last note output from this channel
+				// (and it is still playing!)
+				last = i;
+			}
+			else if(m_state.m_playing[i].count < steal_count) {
+				// this is the note that has the least time remaining to play
+				// so we might steal it's slot if we have to...
+				steal_count = m_state.m_playing[i].count;
+				steal = i;
+			}
+		}
+
+
+		// decide which of the possible slots we're going to use
+		byte legato_note = 0;
+		int slot = -1;
+		if(same>=0) {
+			// slot for same note will always be reused
+			slot = same;
+			if(legato) {
+				// for legato playing we just extend this note, do not retrigger it!
+				m_state.m_playing[same].count = duration;
+				m_state.m_last_note = note;
+				return;
+			}
+		}
+		else if(last>=0 && legato) {
+			// the last played note is still sounding, in legato mode we will
+			// replace that note, but only stop it after the new note starts
+			slot = last;
+			velocity = m_state.m_last_velocity;
+			legato_note = m_state.m_playing[last].note;
+		}
+		else if(free>=0) {
+			// else a free slot will be used if available
+			slot = free;
+		}
+		else if(steal>=0) {
+			// final option we'll steal a slot from another note, so we need to stop that note playing
+			g_midi.send_note(chan, m_state.m_playing[steal].note, 0);
+			slot = steal;
+		}
+
+		if(slot>=0) {
+			// play the the new note
+			m_state.m_playing[slot].note = note;
+			m_state.m_playing[slot].count = duration;
+			m_state.m_last_note = note;
+			m_state.m_last_velocity = velocity;
+			g_midi.send_note(chan, note, velocity);
+		}
+		if(legato_note) {
+			// if there is a "legato" note to stop only after the new note
+			// has been started then stop it now
+			g_midi.send_note(chan, legato_note, 0);
+		}
+	}*/
+
 };
 
 
