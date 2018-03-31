@@ -3,6 +3,16 @@
 
 #include "defs.h"
 extern const uint32_t char4x5[];
+#define CHAR4X5_ALPHA		0
+#define CHAR4X5_HASH		26
+#define CHAR4X5_NUMERIC		32
+#define CHAR4X5_MINUS		42
+#define CHAR4X5_DOT			43
+#define CHAR4X5_GT			44
+#define CHAR4X5_CROSS		45
+#define CHAR4X5_PLUS		46
+#define CHAR4X5_BLOCK		47
+
 #ifdef MAIN_INCLUDE
 const uint32_t char4x5[30] = {
 		// A thru H
