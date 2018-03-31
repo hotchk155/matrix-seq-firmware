@@ -68,9 +68,6 @@ public:
 		char			m_transpose;		// manual transpose amount for the layer
 		V_SQL_TRANSPOSE_MOD	m_transpose_mod;	// automatic transpose source for the layer
 		V_SQL_STEP_DUR	m_note_dur;
-		byte 			m_midi_vel_hi;
-		byte 			m_midi_vel_med;;
-		byte 			m_midi_vel_lo;
 //		V_SQL_VEL_MOD	m_midi_vel_mod;		// MIDI velocity modulation
 		byte 			m_enabled;
 		V_SQL_MIDI_CHAN m_midi_channel;		// MIDI channel
@@ -112,7 +109,7 @@ public:
 		for(int i=0; i<MAX_STEPS; ++i) {
 			m_cfg.m_step[i] = DEFAULT_NOTE;
 		}
-		m_cfg.m_mode 		= V_SQL_SEQ_MODE_CHROMATIC;
+		m_cfg.m_mode 		= V_SQL_SEQ_MODE_SCALE;
 		m_cfg.m_force_scale = V_SQL_FORCE_SCALE_OFF;
 		m_cfg.m_step_rate	= V_SQL_STEP_RATE_16;
 		m_cfg.m_note_dur	= V_SQL_STEP_DUR_FULL;
@@ -120,9 +117,6 @@ public:
 		m_cfg.m_loop_to		= 15;
 		m_cfg.m_transpose	= 0;
 		m_cfg.m_transpose_mod = V_SQL_TRANSPOSE_MOD_OFF;
-		m_cfg.m_midi_vel_hi		= 127;
-		m_cfg.m_midi_vel_med	= 100;
-		m_cfg.m_midi_vel_lo		= 50;
 		m_cfg.m_midi_channel 	= V_SQL_MIDI_CHAN_1;
 		m_cfg.m_midi_cc = 1;
 		m_cfg.m_enabled = 1;
@@ -169,9 +163,6 @@ public:
 		case P_SQL_STEP_DUR: m_cfg.m_note_dur = (V_SQL_STEP_DUR)value; break;
 		case P_SQL_MIDI_CHAN: m_cfg.m_midi_channel = (V_SQL_MIDI_CHAN)value; break;
 		case P_SQL_MIDI_CC: m_cfg.m_midi_cc = value; break;
-		case P_SQL_MIDI_VEL_HI: m_cfg.m_midi_vel_hi = value; break;
-		case P_SQL_MIDI_VEL_MED: m_cfg.m_midi_vel_med = value; break;
-		case P_SQL_MIDI_VEL_LO: m_cfg.m_midi_vel_lo = value; break;
 		default: break;
 		}
 	}
@@ -185,9 +176,6 @@ public:
 		case P_SQL_STEP_DUR: return m_cfg.m_note_dur;
 		case P_SQL_MIDI_CHAN: return m_cfg.m_midi_channel;
 		case P_SQL_MIDI_CC: return m_cfg.m_midi_cc;
-		case P_SQL_MIDI_VEL_HI: return m_cfg.m_midi_vel_hi;
-		case P_SQL_MIDI_VEL_MED: return m_cfg.m_midi_vel_med;
-		case P_SQL_MIDI_VEL_LO: return m_cfg.m_midi_vel_lo;
 		default:return 0;
 		}
 	}
@@ -196,6 +184,7 @@ public:
 	int is_valid_param(PARAM_ID param) {
 		switch(param) {
 		case P_SQL_FORCE_SCALE: return !(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
+		case P_SQL_MIDI_CC: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
 		default: return 1;
 		}
 	}
@@ -488,6 +477,7 @@ public:
 			*spacing = 0;
 			return 1;
 		case V_SQL_SEQ_MODE_MOD:
+		case V_SQL_SEQ_MODE_VELOCITY:
 		case V_SQL_SEQ_MODE_MAX:
 			break;
 		}
@@ -496,8 +486,7 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	// Play a step for a note mode
-	void play_note_step(STEP_TYPE step_for_transpose, byte note_for_transpose) {
-
+	void play_note_step(STEP_TYPE step_for_transpose, byte note_for_transpose, byte midi_vel_hi, byte midi_vel_med, byte midi_vel_lo) {
 		STEP_TYPE step = 0;
 		if(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
 			int transposed = (int)STEP_VALUE(m_state.m_step_value) + note_for_transpose - 64;
@@ -516,9 +505,9 @@ public:
 		byte velocity = 0;
 		byte active = 1;
 		switch(get_velocity(step)) {
-		case VELOCITY_LOW: velocity = m_cfg.m_midi_vel_lo; break;
-		case VELOCITY_MEDIUM: velocity = m_cfg.m_midi_vel_med; break;
-		case VELOCITY_HIGH: velocity = m_cfg.m_midi_vel_hi; break;
+		case VELOCITY_LOW: velocity = midi_vel_lo; break;
+		case VELOCITY_MEDIUM: velocity = midi_vel_med; break;
+		case VELOCITY_HIGH: velocity = midi_vel_hi; break;
 		case VELOCITY_LEGATO: legato = 1; break; // legato only set for active step
 		case VELOCITY_OFF: active = 0; break;
 		}

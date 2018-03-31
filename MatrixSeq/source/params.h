@@ -35,10 +35,11 @@ typedef enum {
 
 
 typedef enum:byte {
-	V_SQL_SEQ_MODE_CHROMATIC = 0,		// One grid row is one semitone (11 rows per octave)
-	V_SQL_SEQ_MODE_SCALE,				// One grid row is one scale note (7 rows per octave)
-	V_SQL_SEQ_MODE_MOD,					// full modulation range compressed to 13 rows
+	V_SQL_SEQ_MODE_SCALE = 0,
+	V_SQL_SEQ_MODE_CHROMATIC,
+	V_SQL_SEQ_MODE_MOD,
 	V_SQL_SEQ_MODE_TRANSPOSE,
+	V_SQL_SEQ_MODE_VELOCITY,
 	V_SQL_SEQ_MODE_MAX
 } V_SQL_SEQ_MODE;
 

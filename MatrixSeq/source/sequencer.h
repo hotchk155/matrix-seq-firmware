@@ -41,6 +41,9 @@ public:
 	typedef struct {
 		V_SQL_SCALE_TYPE scale_type;
 		V_SQL_SCALE_ROOT scale_root;
+		byte 			m_midi_vel_hi;
+		byte 			m_midi_vel_med;
+		byte 			m_midi_vel_lo;
 	} CONFIG;
 	CONFIG m_cfg;
 
@@ -66,6 +69,9 @@ public:
 	void init_config() {
 		m_cfg.scale_type = V_SQL_SCALE_TYPE_IONIAN;
 		m_cfg.scale_root = V_SQL_SCALE_ROOT_C;
+		m_cfg.m_midi_vel_hi = 127;
+		m_cfg.m_midi_vel_med = 100;
+		m_cfg.m_midi_vel_lo = 50;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -86,6 +92,9 @@ public:
 		switch(param) {
 		case P_SQL_SCALE_TYPE: m_cfg.scale_type = (V_SQL_SCALE_TYPE)value; break;
 		case P_SQL_SCALE_ROOT: m_cfg.scale_root = (V_SQL_SCALE_ROOT)value; break;
+		case P_SQL_MIDI_VEL_HI: m_cfg.m_midi_vel_hi = value; break;
+		case P_SQL_MIDI_VEL_MED: m_cfg.m_midi_vel_med = value; break;
+		case P_SQL_MIDI_VEL_LO: m_cfg.m_midi_vel_lo = value; break;
 		default: m_layers[m_layer].set(param,value);
 		}
 	}
@@ -95,6 +104,9 @@ public:
 		switch(param) {
 		case P_SQL_SCALE_TYPE: return m_cfg.scale_type;
 		case P_SQL_SCALE_ROOT: return m_cfg.scale_root;
+		case P_SQL_MIDI_VEL_HI: return m_cfg.m_midi_vel_hi;
+		case P_SQL_MIDI_VEL_MED: return m_cfg.m_midi_vel_med;
+		case P_SQL_MIDI_VEL_LO: return m_cfg.m_midi_vel_lo;
 		default: return m_layers[m_layer].get(param);
 		}
 	}
@@ -111,8 +123,31 @@ public:
 			case V_SQL_SEQ_MODE_SCALE:
 				return 1;
 			case V_SQL_SEQ_MODE_MOD:
+			case V_SQL_SEQ_MODE_VELOCITY:
+			case V_SQL_SEQ_MODE_MAX:
 				return 0;
+			default:
+				break;
 			}
+			break;
+		case P_SQL_MIDI_VEL_HI:
+		case P_SQL_MIDI_VEL_MED:
+		case P_SQL_MIDI_VEL_LO:
+			switch(m_layers[m_layer].m_cfg.m_mode) {
+			case V_SQL_SEQ_MODE_CHROMATIC:
+			case V_SQL_SEQ_MODE_TRANSPOSE:
+			case V_SQL_SEQ_MODE_SCALE:
+				return 1;
+			case V_SQL_SEQ_MODE_MOD:
+			case V_SQL_SEQ_MODE_VELOCITY:
+			case V_SQL_SEQ_MODE_MAX:
+				return 0;
+			default:
+				break;
+			}
+			break;
+		default:
+			break;
 		}
 		return m_layers[m_layer].is_valid_param(param);
 	}
@@ -179,6 +214,7 @@ public:
 			g_popup.show_offset(((int)value)-64);
 			break;
 		case V_SQL_SEQ_MODE_MOD:
+		case V_SQL_SEQ_MODE_VELOCITY:
 		case V_SQL_SEQ_MODE_MAX:
 			break;
 		}
@@ -406,6 +442,11 @@ public:
 		CRenderBuf::raster(15) |= mask;
 		CRenderBuf::hilite(15) |= mask;
 
+		// if this is velocity mode then we simply show some text
+		if(layer->m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY) {
+			CRenderBuf::print_text("VEL",5,2);
+		}
+
 		mask = CRenderBuf::bit(0);
 		int c = 0;
 		int n;
@@ -469,6 +510,7 @@ public:
 
 				}
 				break;
+			case V_SQL_SEQ_MODE_VELOCITY:
 			case V_SQL_SEQ_MODE_MAX:
 				break;
 			}
@@ -536,7 +578,13 @@ public:
 					switch(layer.m_cfg.m_mode) {
 						case V_SQL_SEQ_MODE_CHROMATIC:
 						case V_SQL_SEQ_MODE_SCALE:
-							layer.play_note_step(0,0);
+							layer.play_note_step(
+									0,
+									0,
+									m_cfg.m_midi_vel_hi,
+									m_cfg.m_midi_vel_med,
+									m_cfg.m_midi_vel_lo
+							);
 							g_cv_gate.note_gate(i, layer.m_state.m_last_note, layer.m_state.m_gate);
 
 
@@ -546,7 +594,19 @@ public:
 									break;
 								}
 								else if(other_layer.m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
-									other_layer.play_note_step(layer.m_state.m_step_value, layer.m_state.m_last_note);
+									other_layer.play_note_step(
+											layer.m_state.m_step_value,
+											layer.m_state.m_last_note,
+											m_cfg.m_midi_vel_hi,
+											m_cfg.m_midi_vel_med,
+											m_cfg.m_midi_vel_lo
+									);
+									// TODO
+									//g_cv_gate.note_gate(i, layer.m_state.m_last_note, layer.m_state.m_gate);
+								}
+								else if(other_layer.m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY) {
+									// TODO
+									//other_layer.play_note_step(layer.m_state.m_step_value, layer.m_state.m_last_note);
 									//g_cv_gate.note_gate(i, layer.m_state.m_last_note, layer.m_state.m_gate);
 								}
 							}

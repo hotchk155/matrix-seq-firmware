@@ -192,119 +192,14 @@ public:
 			++row;
 		}
 	}
-
-	/*
-	//
-	// 0111011101110
-	static void print_note_name(byte note, int flags) {
-
-
-		char first;
-		char second = 0;
-		switch(note%12) {
-		case 0: first = 'C'; break;
-		case 1: first = 'C'; second = '#'; break;
-		case 2: first = 'D'; break;
-		case 3: first = 'D'; second = '#'; break;
-		case 4: first = 'E'; break;
-		case 5: first = 'F'; break;
-		case 6: first = 'F'; second = '#'; break;
-		case 7: first = 'G'; break;
-		case 8: first = 'G'; second = '#'; break;
-		case 9: first = 'A'; break;
-		case 10: first = 'A'; second = '#'; break;
-		case 11: first = 'B'; break;
-		}
-
-		int octave = note/12 - 1;
-		int width = 7;
-		if(second) {
-			width += 4;
-		}
-		if(octave < 0) {
-			width += 4;
-		}
-
-
-		int col;
-		uint32_t mask;
-		if(flags & POPUP_LEFT) {
-			col = 0;
-			mask = make_mask(0,width);
-		}
-		else {
-			col = 32-width;
-			mask = make_mask(32-width,32);
-		}
-
-		for(int i=1; i<6; ++i) {
-			g_render_buf[i] &= ~mask;
-			g_render_buf[i+16] |= mask;
-		}
-
-		print_char(first, col, 1, CHAR_RASTER);
-		col += 4;
-		if(second) {
-			print_char(second, col, 1, CHAR_RASTER);
-			col += 4;
-		}
-		if(octave<0) {
-			print_char('-', col, 1, CHAR_RASTER);
-			col += 4;
-			octave = -octave;
-		}
-		print_char('0' + octave, col, 1, CHAR_RASTER);
-	}
-
-	static void print_number2(int value, int flags) {
-		int col;
-		uint32_t mask;
-		if(flags & POPUP_LEFT) {
-			col = 0;
-			mask = make_mask(0,7);
-		}
-		else {
-			col = 25;
-			mask = make_mask(25,32);
-		}
-
-		for(int i=1; i<6; ++i) {
-			g_render_buf[i] &= ~mask;
-			g_render_buf[i+16] |= mask;
-		}
-
-		value %= 100;
-		print_char('0' + (value/10), col, 1, CHAR_RASTER);
-		col += 4;
-		print_char('0' + (value%10), col, 1, CHAR_RASTER);
-	}
-
-
-	static void print_text(char *sz, int flags) {
-		int col;
-		uint32_t mask;
-		char *q;
-		for(q=sz; *q; ++q);
-		if(flags & POPUP_LEFT) {
-			col = 0;
-			mask = make_mask(0,4*(q-sz));
-		}
-		else {
-			col = 33-4*(q-sz);
-			mask = make_mask(25,32);
-		}
-
-		for(int i=1; i<6; ++i) {
-			g_render_buf[i] &= ~mask;
-			g_render_buf[i+16] |= mask;
-		}
-
+	static void print_text(const char *sz, int col, int row) {
 		while(*sz) {
-			print_char(*sz, col, 1, CHAR_RASTER);
-			col += 4;
+			print_char(*sz, col, row, g_render_buf, DISPLAY_BUF_SIZE);
 			++sz;
+			col+=4;
 		}
-	}*/
+	}
+
 
 };
 

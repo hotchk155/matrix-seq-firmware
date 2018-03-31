@@ -119,7 +119,10 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	int is_valid_param(PARAM_ID param) {
-		return 1;
+		switch(param) {
+		case P_CLOCK_BPM: return !!(m_cfg.m_source == V_CLOCK_SRC_INTERNAL);
+		default: return 1;
+		}
 	}
 
 	void set_bpm(float bpm) {
