@@ -69,12 +69,7 @@ public:
 		}
 	}
 
-	void note_gate(int which, int note, int gate) {
-		int dac = (500 * (int)note)/12;
-		if(m_dac[which] != dac) {
-			m_dac[which] = dac;
-			m_cv_pending = 1;
-		}
+	void gate(byte which, byte gate) {
 		if(m_gate[which] != gate) {
 			switch(gate) {
 				case GATE_CLOSED:
@@ -91,6 +86,13 @@ public:
 					m_gate_pending = 1;
 					break;
 			}
+		}
+	}
+	void note_cv(int which, int note) {
+		int dac = (500 * (int)note)/12;
+		if(m_dac[which] != dac) {
+			m_dac[which] = dac;
+			m_cv_pending = 1;
 		}
 	}
 

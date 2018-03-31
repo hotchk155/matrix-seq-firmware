@@ -27,7 +27,6 @@ typedef unsigned char byte;
 #define PORTC_BASE 16
 #define PORTD_BASE 24
 
-extern const uint32_t char4x5[];
 
 #define MK_GPIOA_BIT(port, bit) (((uint32_t)1) << ((port) + (bit)))
 #define SET_GPIOA(mask) ((GPIO_Type *)GPIOA_BASE)->PSOR = (mask)

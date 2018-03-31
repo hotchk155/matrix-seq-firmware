@@ -94,7 +94,7 @@ public:
 		uint32_t m_next_tick;
 		byte m_last_tick_lsb;
 		PLAYING_NOTE m_playing[MAX_PLAYING_NOTES];
-		byte m_gate;
+		//byte m_gate;
 //		byte m_reference;
 	} STATE;
 
@@ -131,7 +131,7 @@ public:
 		m_state.m_scroll_ofs = 48;
 		m_state.m_last_tick_lsb = 0;
 		m_state.m_last_note = 0;
-		m_state.m_gate = CCVGate::GATE_CLOSED;
+		//m_state.m_gate = CCVGate::GATE_CLOSED;
 		//m_state.m_reference = 0;
 		memset(m_state.m_playing,0,sizeof(m_state.m_playing));
 		reset();
@@ -316,7 +316,7 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	void manage(uint32_t ticks) {
+	void manage(byte index, uint32_t ticks) {
 		// has a tick expired?
 		if(m_state.m_last_tick_lsb != (byte)ticks) {
 			m_state.m_last_tick_lsb = (byte)ticks;
@@ -325,7 +325,7 @@ public:
 					if(!--m_state.m_playing[i].count) {
 						if(m_state.m_playing[i].note == m_state.m_last_note) {
 							// close the gate
-							m_state.m_gate = CCVGate::GATE_CLOSED;
+							g_cv_gate.gate(index, CCVGate::GATE_CLOSED);
 						}
 						send_midi_note(m_state.m_playing[i].note, 0);
 						m_state.m_playing[i].note = 0;
@@ -499,7 +499,7 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	// Play a step for a note mode
-	void play_note_step(STEP_TYPE step_for_transpose, byte note_for_transpose, byte midi_vel_hi, byte midi_vel_med, byte midi_vel_lo) {
+	void play_note_step(byte which, STEP_TYPE step_for_transpose, byte note_for_transpose, byte midi_vel_hi, byte midi_vel_med, byte midi_vel_lo) {
 		STEP_TYPE step = 0;
 		if(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
 			int transposed = (int)STEP_VALUE(m_state.m_step_value) + note_for_transpose - 64;
@@ -514,6 +514,7 @@ public:
 
 
 		// Get step type: active / legato / velocity level
+		byte gate_state = CCVGate::GATE_CLOSED;
 		byte legato = 0;
 		byte velocity = 0;
 		byte active = 1;
@@ -537,7 +538,7 @@ public:
 			for(int i=0; i<MAX_PLAYING_NOTES;++i) {
 				if(m_state.m_playing[i].note && !m_state.m_playing[i].count) {
 					if(m_state.m_playing[i].note == m_state.m_last_note) {
-						m_state.m_gate = CCVGate::GATE_CLOSED;
+						gate_state = CCVGate::GATE_CLOSED;
 					}
 					send_midi_note(m_state.m_playing[i].note,0);
 					m_state.m_playing[i].note = 0;
@@ -610,7 +611,7 @@ public:
 						// retrigger the note
 						send_midi_note(note,0);
 						send_midi_note(note,m_state.m_last_velocity);
-						m_state.m_gate = CCVGate::GATE_RETRIG;
+						gate_state = CCVGate::GATE_RETRIG;
 					}
 					slot = same;
 				}
@@ -619,20 +620,20 @@ public:
 					// replace that note, but only stop it after the new note starts
 					send_midi_note(note,m_state.m_last_velocity);
 					send_midi_note(m_state.m_playing[last].note,0);
-					m_state.m_gate = CCVGate::GATE_OPEN;
+					gate_state = CCVGate::GATE_OPEN;
 					slot = last;
 				}
 				else if(free>=0) {
 					// else a free slot will be used if available
 					send_midi_note(note,m_state.m_last_velocity);
-					m_state.m_gate = legato? CCVGate::GATE_OPEN : CCVGate::GATE_RETRIG;
+					gate_state = legato? CCVGate::GATE_OPEN : CCVGate::GATE_RETRIG;
 					slot = free;
 				}
 				else if(steal>=0) {
 					// final option we'll steal a slot from another note, so we need to stop that note playing
 					send_midi_note(m_state.m_playing[steal].note,0);
 					send_midi_note(note,m_state.m_last_velocity);
-					m_state.m_gate = legato? CCVGate::GATE_OPEN : CCVGate::GATE_RETRIG;
+					gate_state = legato? CCVGate::GATE_OPEN : CCVGate::GATE_RETRIG;
 					slot = steal;
 				}
 
@@ -640,11 +641,31 @@ public:
 					m_state.m_last_note = note;
 					m_state.m_playing[slot].note = note;
 					m_state.m_playing[slot].count = duration;
+					g_cv_gate.note_cv(which, note);
+					g_cv_gate.gate(which, gate_state);
 				}
 			}
 		}
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
+	// Play the gate for a step
+	void play_gate_step(byte which) {
+		STEP_TYPE step = m_state.m_step_value;
+		switch(get_velocity(step)) {
+		case VELOCITY_LOW:
+		case VELOCITY_MEDIUM:
+		case VELOCITY_HIGH:
+			g_cv_gate.gate(which, CCVGate::GATE_RETRIG);
+			break;
+		case VELOCITY_LEGATO:
+			g_cv_gate.gate(which, CCVGate::GATE_OPEN);
+			break;
+		case VELOCITY_OFF:
+			g_cv_gate.gate(which, CCVGate::GATE_CLOSED);
+			break;
+		}
+	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void test() {

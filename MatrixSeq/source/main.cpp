@@ -44,6 +44,7 @@
 
 
 #include "defs.h"
+#include "chars.h"
 #include "params.h"
 #include "clock.h"
 #include "i2c_bus.h"

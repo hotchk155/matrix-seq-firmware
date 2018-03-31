@@ -576,16 +576,23 @@ public:
 				CSequenceLayer& layer = m_layers[i];
 				if(layer.m_state.m_stepped && layer.m_cfg.m_enabled) {
 					switch(layer.m_cfg.m_mode) {
+						case V_SQL_SEQ_MODE_MOD:
+						case V_SQL_SEQ_MODE_TRANSPOSE:
+						case V_SQL_SEQ_MODE_VELOCITY:
+							layer.play_gate_step(i);
+							break;
+
 						case V_SQL_SEQ_MODE_CHROMATIC:
 						case V_SQL_SEQ_MODE_SCALE:
 							layer.play_note_step(
+									i,
 									0,
 									0,
 									m_cfg.m_midi_vel_hi,
 									m_cfg.m_midi_vel_med,
 									m_cfg.m_midi_vel_lo
 							);
-							g_cv_gate.note_gate(i, layer.m_state.m_last_note, layer.m_state.m_gate);
+							//g_cv_gate.note_gate(i, layer.m_state.m_last_note, layer.m_state.m_gate);
 
 
 							for(int j=i+1; j<NUM_LAYERS; ++j) {
@@ -595,6 +602,7 @@ public:
 								}
 								else if(other_layer.m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
 									other_layer.play_note_step(
+											j,
 											layer.m_state.m_step_value,
 											layer.m_state.m_last_note,
 											m_cfg.m_midi_vel_hi,
@@ -618,7 +626,7 @@ public:
 							break;
 					}
 				}
-				layer.manage(ticks);
+				layer.manage(i, ticks);
 			}
 	/*
 			for(int i=0; i<NUM_LAYERS; ++i) {
