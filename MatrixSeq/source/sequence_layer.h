@@ -72,6 +72,8 @@ public:
 		byte 			m_enabled;
 		V_SQL_MIDI_CHAN m_midi_channel;		// MIDI channel
 		byte 			m_midi_cc;			// MIDI CC
+		V_SQL_CVSCALE	m_cv_scale;
+		byte 			m_cv_range;
 	} CONFIG;
 
 
@@ -117,9 +119,11 @@ public:
 		m_cfg.m_loop_to		= 15;
 		m_cfg.m_transpose	= 0;
 		m_cfg.m_transpose_mod = V_SQL_TRANSPOSE_MOD_OFF;
-		m_cfg.m_midi_channel 	= V_SQL_MIDI_CHAN_1;
+		m_cfg.m_midi_channel 	= V_SQL_MIDI_CHAN_NONE;
 		m_cfg.m_midi_cc = 1;
 		m_cfg.m_enabled = 1;
+		m_cfg.m_cv_scale = V_SQL_CVSCALE_1VOCT;
+		m_cfg.m_cv_range = 5;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -163,6 +167,8 @@ public:
 		case P_SQL_STEP_DUR: m_cfg.m_note_dur = (V_SQL_STEP_DUR)value; break;
 		case P_SQL_MIDI_CHAN: m_cfg.m_midi_channel = (V_SQL_MIDI_CHAN)value; break;
 		case P_SQL_MIDI_CC: m_cfg.m_midi_cc = value; break;
+		case P_SQL_CVSCALE: m_cfg.m_cv_scale = (V_SQL_CVSCALE)value; break;
+		case P_SQL_CVRANGE: m_cfg.m_cv_range = value; break;
 		default: break;
 		}
 	}
@@ -176,15 +182,22 @@ public:
 		case P_SQL_STEP_DUR: return m_cfg.m_note_dur;
 		case P_SQL_MIDI_CHAN: return m_cfg.m_midi_channel;
 		case P_SQL_MIDI_CC: return m_cfg.m_midi_cc;
+		case P_SQL_CVSCALE: return m_cfg.m_cv_scale;
+		case P_SQL_CVRANGE: return m_cfg.m_cv_range;
 		default:return 0;
 		}
 	}
 
+
+
 	///////////////////////////////////////////////////////////////////////////////
 	int is_valid_param(PARAM_ID param) {
 		switch(param) {
-		case P_SQL_FORCE_SCALE: return !(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
-		case P_SQL_MIDI_CC: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
+		case P_SQL_MIDI_CHAN: return !(m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY);
+		case P_SQL_FORCE_SCALE: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC||m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE);
+		case P_SQL_MIDI_CC:	return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
+		case P_SQL_CVRANGE: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD || m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY);
+		case P_SQL_CVSCALE: return !(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD || m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY);
 		default: return 1;
 		}
 	}

@@ -83,9 +83,6 @@ void set_param(PARAM_ID param, int value) {
 	if(param < P_SQL_MAX) {
 		g_sequencer.set(param,value);
 	}
-	else if(param < P_CVGATE_MAX) {
-		g_cv_gate.set(g_current_layer,param,value);
-	}
 	else if(param < P_CLOCK_MAX) {
 		g_clock.set(param,value);
 	}
@@ -93,9 +90,6 @@ void set_param(PARAM_ID param, int value) {
 int get_param(PARAM_ID param) {
 	if(param < P_SQL_MAX) {
 		return g_sequencer.get(param);
-	}
-	else if(param < P_CVGATE_MAX) {
-		return g_cv_gate.get(g_current_layer,param);
 	}
 	else if(param < P_CLOCK_MAX) {
 		return g_clock.get(param);
@@ -105,9 +99,6 @@ int get_param(PARAM_ID param) {
 int is_valid_param(PARAM_ID param) {
 	if(param < P_SQL_MAX) {
 		return g_sequencer.is_valid_param(param);
-	}
-	else if(param < P_CVGATE_MAX) {
-		return g_cv_gate.is_valid_param(g_current_layer,param);
 	}
 	else if(param < P_CLOCK_MAX) {
 		return g_clock.is_valid_param(param);

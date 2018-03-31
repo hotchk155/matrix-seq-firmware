@@ -9,7 +9,7 @@
 #define MENU_H_
 
 
-#define NUM_MENU_OPTS (int)(sizeof(CMenu::m_opts)/sizeof(CMenu::OPTION))
+//#define NUM_MENU_OPTS (int)(sizeof(CMenu::m_opts)/sizeof(CMenu::OPTION))
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 class CMenu {
@@ -30,23 +30,26 @@ public:
 
 		ACTION_NONE = 0,
 		ACTION_VALUE_SELECTED,
-		ACTION_VALUE_CHANGED
+		ACTION_VALUE_CHANGED,
+
+		NUM_MENU_OPTS = 18
 	};
-	const OPTION m_opts[17] = {
+	const OPTION m_opts[NUM_MENU_OPTS] = {
 			{"TYP", P_SQL_SEQ_MODE, CMenu::ENUMERATED, "SCAL|CHRO|MOD|TRAN|VELO"},
 			{"FOR", P_SQL_FORCE_SCALE, CMenu::ENUMERATED, "OFF|ON"},
-			{"RAT", P_SQL_STEP_RATE, CMenu::ENUMERATED, "1|2D|2|4D|2T|4|8D|4T|8|16D|8T|16|16T|32"},
-			{"DUR", P_SQL_STEP_DUR, CMenu::ENUMERATED, "STEP|FULL|NONE|32|16T|16|8T|16D|8|4T|8D|4|2T|4D|2|2D|1"},
 			{"SCL", P_SQL_SCALE_TYPE, CMenu::ENUMERATED, "IONI|DORI|PHRY|LYDI|MIXO|AEOL|LOCR"},
-			{"BAS", P_SQL_SCALE_ROOT, CMenu::ENUMERATED, "C|C#|D|D#|E|F|F#|G|G#|A|A#|B"},
+			{"ROO", P_SQL_SCALE_ROOT, CMenu::ENUMERATED, "C|C#|D|D#|E|F|F#|G|G#|A|A#|B"},
 			{0},
-			{"CHN", P_SQL_MIDI_CHAN, CMenu::ENUMERATED, "NONE|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16"},
-			{"CC", P_SQL_MIDI_CC, CMenu::NUMBER_7BIT},
-			{"CV", P_CVGATE_VRANGE, CMenu::VOLT_RANGE},
-			{"TUN", P_CVGATE_VSCALE, CMenu::ENUMERATED, "1V|1.2V|HZV"},
+			{"RAT", P_SQL_STEP_RATE, CMenu::ENUMERATED, "1|2D|2|4D|2T|4|8D|4T|8|16D|8T|16|16T|32"},
+			{"GAT", P_SQL_STEP_DUR, CMenu::ENUMERATED, "STEP|FULL|NONE|32|16T|16|8T|16D|8|4T|8D|4|2T|4D|2|2D|1"},
+			{0},
+			{"MCH", P_SQL_MIDI_CHAN, CMenu::ENUMERATED, "NONE|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16"},
+			{"MCC", P_SQL_MIDI_CC, CMenu::NUMBER_7BIT},
 			{"VHI", P_SQL_MIDI_VEL_HI, CMenu::NUMBER_7BIT},
 			{"VMD", P_SQL_MIDI_VEL_MED, CMenu::NUMBER_7BIT},
 			{"VLO", P_SQL_MIDI_VEL_LO, CMenu::NUMBER_7BIT},
+			{"CVV", P_SQL_CVRANGE, CMenu::VOLT_RANGE},
+			{"CVO", P_SQL_CVSCALE, CMenu::ENUMERATED, "1V|1.2V|HZV"},
 			{0},
 			{"CLK", P_CLOCK_SRC, CMenu::ENUMERATED, "INT|MIDI"},
 			{"BPM", P_CLOCK_BPM, CMenu::BPM}
@@ -169,20 +172,23 @@ public:
 				}
 			}
 			else {
-				do {
+				i = m_item;
+				for(;;) {
 					if((int)param < 0) {
-						i = m_item - 1;
+						--i;
 					}
 					else {
-						i = m_item + 1;
+						++i;
 					}
 					if(i<0 || i>=NUM_MENU_OPTS) {
 						break;
 					}
-					m_item = i;
-					m_repaint = 1;
+					if(m_opts[i].prompt && is_valid_param(m_opts[i].param)) {
+						m_item = i;
+						m_repaint = 1;
+						break;
+					}
 				}
-				while(!m_opts[m_item].prompt || !is_valid_param(m_opts[m_item].param));
 			}
 			break;
 		case EV_KEY_PRESS:

@@ -44,36 +44,12 @@ public:
 
 	typedef uint16_t DAC_TYPE;
 
-	typedef struct {
-		byte cv_range[4];
-		byte cv_scale[4];
-	} CONFIG;
-	CONFIG m_cfg;
-
 
 	CCVGate() {
 		memset((byte*)m_dac,0,sizeof m_dac);
 		memset((byte*)m_gate,0,sizeof m_gate);
 		m_cv_pending = 0;
 		m_gate_pending = 0;
-	}
-
-	void set(int which, PARAM_ID param, int value) {
-		switch(param) {
-			case P_CVGATE_VSCALE: m_cfg.cv_scale[which] = value; break;
-			case P_CVGATE_VRANGE: m_cfg.cv_range[which] = value; break;
-			default: break;
-		}
-	}
-	int get(int which, PARAM_ID param) {
-		switch(param) {
-			case P_CVGATE_VSCALE: return m_cfg.cv_scale[which];
-			case P_CVGATE_VRANGE: return m_cfg.cv_range[which];
-			default: return 0;
-		}
-	}
-	int is_valid_param(int which, PARAM_ID param) {
-		return 1;
 	}
 
 	void gate_on(byte which) {
