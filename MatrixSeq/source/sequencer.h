@@ -7,7 +7,7 @@
 #ifndef SEQUENCER_H_
 #define SEQUENCER_H_
 
-#include "matrix_seq.h"
+
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -563,59 +563,68 @@ public:
 	/////////////////////////////////////////////////////////////////////////////////////////////
 	void tick(uint32_t ticks, byte parts_tick) {
 
+		// ensure the sequencer is running
 		if(m_is_running) {
-			// run the clock on each sequencer layer
+
+			// tick each layer
 			for(int i=0; i<NUM_LAYERS; ++i) {
 				m_layers[i].tick(ticks, parts_tick);
 			}
 
 
-			// Step is "played" only after the state from all layers
-			// is known, since other layers might provide modulation
+			// process each layer
 			for(int i=0; i<NUM_LAYERS; ++i) {
 				CSequenceLayer& layer = m_layers[i];
 				if(layer.m_state.m_stepped && layer.m_cfg.m_enabled) {
 					switch(layer.m_cfg.m_mode) {
+
+						//////////////////////////////////////////////////
 						case V_SQL_SEQ_MODE_MOD:
-						case V_SQL_SEQ_MODE_TRANSPOSE:
-						case V_SQL_SEQ_MODE_VELOCITY:
-							layer.play_gate_step(i);
+							layer.action_step_mod(i);
+							layer.action_step_gate(i);
 							break;
 
+						//////////////////////////////////////////////////
+						case V_SQL_SEQ_MODE_TRANSPOSE:
+						case V_SQL_SEQ_MODE_VELOCITY:
+							layer.action_step_gate(i);
+							break;
+
+						//////////////////////////////////////////////////
 						case V_SQL_SEQ_MODE_CHROMATIC:
 						case V_SQL_SEQ_MODE_SCALE:
-							layer.play_note_step(
+							layer.action_step_note(
 									i,
-									0,
 									0,
 									m_cfg.m_midi_vel_hi,
 									m_cfg.m_midi_vel_med,
-									m_cfg.m_midi_vel_lo
+									m_cfg.m_midi_vel_lo,
+									1
 							);
-							//g_cv_gate.note_gate(i, layer.m_state.m_last_note, layer.m_state.m_gate);
 
-
+							// note layers pass note information to subsequent transpose/velocity layers
 							for(int j=i+1; j<NUM_LAYERS; ++j) {
 								CSequenceLayer& other_layer = m_layers[j];
-								if(other_layer.is_note_mode()) {
+								if(other_layer.m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE ||
+									other_layer.m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC) {
+									// another note layer found - stops current note layer providing any
+									// info to further layers
 									break;
 								}
 								else if(other_layer.m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
-									other_layer.play_note_step(
+									// transpose layer, action as a note layer passing in the
+									// note from the active layer to be transposed
+									other_layer.action_step_note(
 											j,
 											layer.m_state.m_step_value,
-											layer.m_state.m_last_note,
 											m_cfg.m_midi_vel_hi,
 											m_cfg.m_midi_vel_med,
-											m_cfg.m_midi_vel_lo
+											m_cfg.m_midi_vel_lo,
+											0
 									);
-									// TODO
-									//g_cv_gate.note_gate(i, layer.m_state.m_last_note, layer.m_state.m_gate);
 								}
 								else if(other_layer.m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY) {
-									// TODO
-									//other_layer.play_note_step(layer.m_state.m_step_value, layer.m_state.m_last_note);
-									//g_cv_gate.note_gate(i, layer.m_state.m_last_note, layer.m_state.m_gate);
+									g_cv_gate.mod_cv(j, layer.m_state.m_last_velocity, other_layer.m_cfg.m_cv_range);
 								}
 							}
 

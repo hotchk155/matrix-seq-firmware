@@ -15,24 +15,47 @@
 #define BIT_GATE4		MK_GPIOA_BIT(PORTA_BASE, 6)
 
 
+	/////////////////////////////////////////////////////////////////////////////////
 class CCVGate {
-
+public:
+	typedef enum:byte  {
+		GATE_CLOSED,
+		GATE_OPEN,
+		GATE_RETRIG,
+	} GATE_STATE;
 	enum {
 		MAX_CV = 4,
 		MAX_GATE = 4
 	};
+
+private:
 	uint16_t m_dac[MAX_CV];
-	byte m_gate[MAX_GATE];
+	GATE_STATE m_gate[MAX_GATE];
 	byte m_cv_pending;
 	byte m_gate_pending;
 
+	/////////////////////////////////////////////////////////////////////////////////
+	void gate_on(byte which) {
+		switch(which) {
+		case 0: SET_GPIOA(BIT_GATE1); break;
+		case 1: SET_GPIOA(BIT_GATE2); break;
+		case 2: SET_GPIOA(BIT_GATE3); break;
+		case 3: SET_GPIOA(BIT_GATE4); break;
+		}
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
+	void gate_off(byte which) {
+		switch(which) {
+		case 0: CLR_GPIOA(BIT_GATE1); break;
+		case 1: CLR_GPIOA(BIT_GATE2); break;
+		case 2: CLR_GPIOA(BIT_GATE3); break;
+		case 3: CLR_GPIOA(BIT_GATE4); break;
+		}
+	}
 
 public:
-	enum {
-		GATE_CLOSED,
-		GATE_OPEN,
-		GATE_RETRIG,
-	};
+
 	// pitch is defined a 256 * midi note number + fractional part
 	typedef uint16_t PITCH_TYPE;
 
@@ -52,24 +75,8 @@ public:
 		m_gate_pending = 0;
 	}
 
-	void gate_on(byte which) {
-		switch(which) {
-		case 0: SET_GPIOA(BIT_GATE1); break;
-		case 1: SET_GPIOA(BIT_GATE2); break;
-		case 2: SET_GPIOA(BIT_GATE3); break;
-		case 3: SET_GPIOA(BIT_GATE4); break;
-		}
-	}
-	void gate_off(byte which) {
-		switch(which) {
-		case 0: CLR_GPIOA(BIT_GATE1); break;
-		case 1: CLR_GPIOA(BIT_GATE2); break;
-		case 2: CLR_GPIOA(BIT_GATE3); break;
-		case 3: CLR_GPIOA(BIT_GATE4); break;
-		}
-	}
 
-	void gate(byte which, byte gate) {
+	void gate(byte which, GATE_STATE gate) {
 		if(m_gate[which] != gate) {
 			switch(gate) {
 				case GATE_CLOSED:
@@ -88,12 +95,23 @@ public:
 			}
 		}
 	}
-	void note_cv(int which, int note) {
+/*
+	V_SQL_CVSCALE_1VOCT = 0,
+	V_SQL_CVSCALE_1_2VOCT,
+	V_SQL_CVSCALE_HZVOLT,
+	V_SQL_CVSCALE_MAX
+} V_SQL_CVSCALE;
+	*/
+	void pitch_cv(int which, int note, V_SQL_CVSCALE scaling) {
 		int dac = (500 * (int)note)/12;
 		if(m_dac[which] != dac) {
 			m_dac[which] = dac;
 			m_cv_pending = 1;
 		}
+	}
+
+	void mod_cv(int which, byte value, byte volt_range) {
+
 	}
 
 	void run() {

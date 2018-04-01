@@ -6,8 +6,6 @@
 #ifndef SEQUENCE_LAYER_H_
 #define SEQUENCE_LAYER_H_
 
-#include "matrix_seq.h"
-
 #define STEP_VALUE(s) ((byte)(s))
 
 class CSequencer;
@@ -499,10 +497,10 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	// Play a step for a note mode
-	void play_note_step(byte which, STEP_TYPE step_for_transpose, byte note_for_transpose, byte midi_vel_hi, byte midi_vel_med, byte midi_vel_lo) {
+	void action_step_note(byte which, STEP_TYPE step_for_transpose, byte midi_vel_hi, byte midi_vel_med, byte midi_vel_lo, byte action_gate) {
 		STEP_TYPE step = 0;
 		if(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
-			int transposed = (int)STEP_VALUE(m_state.m_step_value) + note_for_transpose - 64;
+			int transposed = (int)STEP_VALUE(step_for_transpose) + (int)STEP_VALUE(m_state.m_step_value) - 64;
 			if(transposed >= 0 && transposed < 128) {
 				transposed = g_scale.force_to_scale(transposed);
 				step = (step_for_transpose & 0xFF00) | transposed;
@@ -514,7 +512,7 @@ public:
 
 
 		// Get step type: active / legato / velocity level
-		byte gate_state = CCVGate::GATE_CLOSED;
+		CCVGate::GATE_STATE gate_state = CCVGate::GATE_CLOSED;
 		byte legato = 0;
 		byte velocity = 0;
 		byte active = 1;
@@ -641,16 +639,24 @@ public:
 					m_state.m_last_note = note;
 					m_state.m_playing[slot].note = note;
 					m_state.m_playing[slot].count = duration;
-					g_cv_gate.note_cv(which, note);
-					g_cv_gate.gate(which, gate_state);
+					g_cv_gate.pitch_cv(which, note, m_cfg.m_cv_scale);
+					if(action_gate) {
+						g_cv_gate.gate(which, gate_state);
+					}
 				}
 			}
 		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
+	void action_step_mod(byte which) {
+		byte value = STEP_VALUE(m_state.m_step_value);
+		g_cv_gate.mod_cv(which, value, m_cfg.m_cv_range);
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
 	// Play the gate for a step
-	void play_gate_step(byte which) {
+	void action_step_gate(byte which) {
 		STEP_TYPE step = m_state.m_step_value;
 		switch(get_velocity(step)) {
 		case VELOCITY_LOW:
@@ -662,7 +668,7 @@ public:
 			g_cv_gate.gate(which, CCVGate::GATE_OPEN);
 			break;
 		case VELOCITY_OFF:
-			g_cv_gate.gate(which, CCVGate::GATE_CLOSED);
+			// gate closes based on step duration
 			break;
 		}
 	}
