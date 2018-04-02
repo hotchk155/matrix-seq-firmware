@@ -212,7 +212,7 @@ void fire_event(int event, uint32_t param) {
 			}
 			else {
 				g_view = VIEW_MENU;
-				g_menu.activate();
+				g_menu.activate(CMenu::MAIN_MENU);
 			}
 		}
 		if(g_menu_press && (param == KEY2_LAYER1 || param == KEY2_LAYER2 || param == KEY2_LAYER3 || param == KEY2_LAYER4)) {

@@ -27,14 +27,27 @@ public:
 		VOLT_RANGE,
 		BPM,
 		DURATION,
+		PATTERN,
 
 		ACTION_NONE = 0,
 		ACTION_VALUE_SELECTED,
 		ACTION_VALUE_CHANGED,
 
-		NUM_MENU_OPTS = 18
+		NUM_MAIN_MENU_OPTS = 18,
+		NUM_LOAD_MENU_OPTS = 1,
+		NUM_SAVE_MENU_OPTS = 1,
+
+		MAIN_MENU,
+		LOAD_MENU,
+		SAVE_MENU
 	};
-	const OPTION m_opts[NUM_MENU_OPTS] = {
+	const OPTION m_load_opts[NUM_LOAD_MENU_OPTS] = {
+			{"LOAD", P_SQL_LOAD_PATTERN, CMenu::PATTERN}
+	};
+	const OPTION m_save_opts[NUM_SAVE_MENU_OPTS] = {
+			{"SAVE", P_SQL_SAVE_PATTERN, CMenu::PATTERN}
+	};
+	const OPTION m_main_opts[NUM_MAIN_MENU_OPTS] = {
 			{"TYP", P_SQL_SEQ_MODE, CMenu::ENUMERATED, "SCAL|CHRO|MOD|TRAN|VELO"},
 			{"FOR", P_SQL_FORCE_SCALE, CMenu::ENUMERATED, "OFF|ON"},
 			{"SCL", P_SQL_SCALE_TYPE, CMenu::ENUMERATED, "IONI|DORI|PHRY|LYDI|MIXO|AEOL|LOCR"},
@@ -56,6 +69,9 @@ public:
 	};
 
 
+	byte m_num_opts;
+	const OPTION *m_opts;
+
 	byte m_item;
 	byte m_value;
 	byte m_repaint;
@@ -63,11 +79,29 @@ public:
 
 	/////////////////////////////////////////////////////////////////////////////////////////////////
 	CMenu() {
-		m_item = 0;
-		m_repaint = 1;
-		m_action = ACTION_NONE;
+		activate(MAIN_MENU);
 	}
 
+	void activate(byte type) {
+		switch(type) {
+		case LOAD_MENU:
+			m_opts = m_load_opts;
+			m_num_opts = NUM_LOAD_MENU_OPTS;
+			break;
+		case SAVE_MENU:
+			m_opts = m_save_opts;
+			m_num_opts = NUM_SAVE_MENU_OPTS;
+			break;
+		case MAIN_MENU:
+		default:
+			m_opts = m_main_opts;
+			m_num_opts = NUM_MAIN_MENU_OPTS;
+			break;
+		}
+		m_action = ACTION_NONE;
+		m_item = 0;
+		m_repaint = 1;
+	}
 	/////////////////////////////////////////////////////////////////////////////////////////////////
 	void format_number(int value, char *buf, int digits) {
 		if(digits > 2) {
@@ -109,6 +143,11 @@ public:
 		case VOLT_RANGE:
 			format_number(value, buf, 1);
 			buf[1] = 'V';
+			buf[2] = 0;
+			return buf;
+		case PATTERN:
+			buf[0] = 'A' + value/8;
+			buf[1] = '0' + value%8;
 			buf[2] = 0;
 			return buf;
 		default:
@@ -153,12 +192,6 @@ public:
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////////////////////
-	void activate() {
-		m_action = ACTION_NONE;
-		m_repaint = 1;
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////////////////////
 	void event(int evt, uint32_t param) {
 		int i;
 		switch(evt) {
@@ -180,7 +213,7 @@ public:
 					else {
 						++i;
 					}
-					if(i<0 || i>=NUM_MENU_OPTS) {
+					if(i<0 || i>=m_num_opts) {
 						break;
 					}
 					if(m_opts[i].prompt && is_valid_param(m_opts[i].param)) {
@@ -217,7 +250,7 @@ public:
 		uint32_t buf[5] = {0};
 		int state = 0;
 		int visible = 0;
-		if(opt >= 0 && opt < NUM_MENU_OPTS) {
+		if(opt >= 0 && opt < m_num_opts) {
 			const CMenu::OPTION &this_opt = m_opts[opt];
 			if(this_opt.prompt) {
 				int value;
@@ -300,7 +333,7 @@ public:
 			visible = 1;
 			opt = m_item;
 			row = 5;
-			while(opt < NUM_MENU_OPTS && visible) {
+			while(opt < m_num_opts && visible) {
 				if(!m_opts[opt].prompt || is_valid_param(m_opts[opt].param)) {
 					visible = draw_menu_option(opt,row);
 					row += (m_opts[opt].prompt)? 6:2;

@@ -49,6 +49,7 @@ extern volatile byte g_disp_update;
 // map specific key functions
 #define KEY_EDIT	KEY_B1
 #define KEY_MENU	KEY_B8
+
 #define KEY_STARTSTOP	KEY_B7
 #define KEY2_LAYER1	KEY_B1
 #define KEY2_LAYER2	KEY_B2
