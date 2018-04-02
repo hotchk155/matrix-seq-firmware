@@ -502,7 +502,6 @@ public:
 		if(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
 			int transposed = (int)STEP_VALUE(step_for_transpose) + (int)STEP_VALUE(m_state.m_step_value) - 64;
 			if(transposed >= 0 && transposed < 128) {
-				transposed = g_scale.force_to_scale(transposed);
 				step = (step_for_transpose & 0xFF00) | transposed;
 			}
 		}
