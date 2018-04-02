@@ -145,14 +145,14 @@ public:
 				const char *sz = this_opt.prompt;
 				int col = 0;
 				while(*sz) {
-					CRenderBuf::print_char(*sz, col, 0, buf, NULL, 5);
+					g_ui.print_char(*sz, col, 0, buf, NULL, 5);
 					++sz;
 					col += 4;
 				}
 				sz = param_value_string(this_opt.type, value, this_opt.values);
 				col = 16;
 				while(*sz && *sz != '|') {
-					CRenderBuf::print_char(*sz, col, 0, buf, NULL, 5);
+					g_ui.print_char(*sz, col, 0, buf, NULL, 5);
 					++sz;
 					col += 4;
 				}
@@ -161,16 +161,16 @@ public:
 					if(row>=0 && row<16) {
 						switch(state) {
 						case 0:
-							CRenderBuf::hilite(row) = buf[i];
-							CRenderBuf::raster(row) = 0;
+							g_ui.hilite(row) = buf[i];
+							g_ui.raster(row) = 0;
 							break;
 						case 1:
-							CRenderBuf::hilite(row) = buf[i] & 0xFFFF0000U;
-							CRenderBuf::raster(row) = buf[i];
+							g_ui.hilite(row) = buf[i] & 0xFFFF0000U;
+							g_ui.raster(row) = buf[i];
 							break;
 						case 2:
-							CRenderBuf::hilite(row) = buf[i];
-							CRenderBuf::raster(row) = buf[i];
+							g_ui.hilite(row) = buf[i];
+							g_ui.raster(row) = buf[i];
 							break;
 						}
 						visible = 1;
@@ -180,7 +180,7 @@ public:
 			}
 			else {
 				if(row>=0 && row<16) {
-					CRenderBuf::hilite(row) = 0xFFFFFFFF;
+					g_ui.hilite(row) = 0xFFFFFFFF;
 					visible = 1;
 				}
 			}
@@ -192,7 +192,7 @@ public:
 	/////////////////////////////////////////////////////////////////////////////////////////////////
 	void repaint() {
 		if(m_repaint) {
-			CRenderBuf::clear();
+			g_ui.clear();
 
 			int visible = 1;
 			int opt = m_item - 1;

@@ -39,12 +39,16 @@
 #include "pin_mux.h"
 #include "clock_config.h"
 #include "MKE02Z4.h"
+#include "fsl_clock.h"
+#include "fsl_spi.h"
+#include "fsl_pit.h"
 /* TODO: insert other include files here. */
 #define MAIN_INCLUDE
 
 
 #include "defs.h"
 #include "chars.h"
+#include "ui.h"
 #include "params.h"
 #include "clock.h"
 #include "i2c_bus.h"
@@ -54,7 +58,6 @@
 #include "scale.h"
 #include "sequence_layer.h"
 #include "digital_out.h"
-#include "display_panel.h"
 #include "popup.h"
 #include "sequencer.h"
 #include "menu.h"
@@ -281,7 +284,7 @@ void fire_event(int event, uint32_t param) {
 		if(g_menu_press && (param == KEY2_LAYER1 || param == KEY2_LAYER2 || param == KEY2_LAYER3 ||  param == KEY2_LAYER4)) {
 			layer_button_event(event,param);
 		}
-		else if(param == KEY_STARTSTOP) {
+		else if(param == KEY_RUN) {
 			if(g_menu_press) {
 				g_sequencer.enable_layer(g_current_layer,!g_sequencer.is_layer_enabled(g_current_layer));
 				g_popup.layer(g_current_layer, g_sequencer.is_layer_enabled(g_current_layer));
@@ -385,12 +388,6 @@ int main(void) {
     BOARD_InitBootClocks();
     BOARD_InitBootPeripherals();
 
-
-    //printf("Hello World\n");
-    /* Force the counter to be placed into memory. */
-
-
-
     g_clock.init();
     g_clock.wait_ms(500);
     PowerControl.set(1);
@@ -404,15 +401,8 @@ int main(void) {
 
     /* Enter an infinite loop, just incrementing a counter.
      * */
-    panelInit();
+    g_ui.init();
     g_sequencer.m_layers[0].test();
-
-    /*for(;;) {
-    LED1.set(0);
-    CDelay::wait_ms(500);
-    LED1.set(1);
-    CDelay::wait_ms(500);
-    }*/
 
     while(1) {
 
@@ -428,18 +418,9 @@ int main(void) {
     			PowerControl.set(0);
     		}
 
-/*       		if(j<500) {
-       			LED3.set(1);
-       		}
-       		else {
-       			LED3.set(0);
-       		}
-       		if(++j>=1000) {
-       			j = 0;
-       		}*/
-        	panelRun();
+        	g_ui.run();
 
-    		CRenderBuf::lock();
+    		g_ui.lock_for_update();
     		switch(g_view) {
     		case VIEW_SEQUENCER:
     			g_sequencer.repaint();
@@ -452,32 +433,65 @@ int main(void) {
     			break;
     		}
 			g_popup.repaint();
-    		CRenderBuf::unlock();
+			g_ui.unlock_for_update();
 
 
     	}
-    	//g_cv_gate.write(3, j);
-        //g_cv.write(1, j);
-        //g_cv.write(2, j);
-        //g_cv.write(3, j);
-        //if(++j>4095) j = 0;
-
-   		//sequence.run();
-    	/*
-    	if(g_clock.is_pending(CSeqClock::CHANNEL_SEQ1)) {
-    		g_seq[0].step();
-    	}
-    	if(g_clock.is_pending(CSeqClock::CHANNEL_SEQ2)) {
-    		g_seq[1].step();
-    	}
-    	if(g_clock.is_pending(CSeqClock::CHANNEL_SEQ3)) {
-    		g_seq[2].step();
-    	}
-    	if(g_clock.is_pending(CSeqClock::CHANNEL_SEQ4)) {
-    		g_seq[3].step();
-    	}
-*/
-
     }
     return 0 ;
 }
+
+
+
+/*
+ *
+ *
+ *
+
+
+
+EDIT
+	EDIT_CLICK
+	EDIT_PASTE_HELD
+		EDIT_PASTE_CLICK
+		EDIT_PASTE_ENCODER
+	EDIT_CLEAR_HELD
+		EDIT_CLEAR_CLICK
+		EDIT_CLEAR_ENCODER
+	EDIT_GATE_HELD
+		EDIT_GATE_CLICK
+	EDIT_LOOP_HELD
+		EDIT_LOOP_CLICK
+	EDIT_STORE_HELD
+		EDIT_STORE_CLICK
+	EDIT_RUN_HELD
+		EDIT_RUN_CLICK
+
+
+	EDIT_PRESS
+	EDIT_CLICK
+
+PASTE
+
+CLEAR
+
+GATE
+
+LOOP
+
+STORE
+
+START/STOP
+
+MENU
+	SELECT_LAYER1
+	SELECT_LAYER2
+	SELECT_LAYER3
+	SELECT_LAYER4
+	MUTE_LAYER
+
+
+
+
+
+*/

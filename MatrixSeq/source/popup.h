@@ -8,7 +8,7 @@
 #ifndef POPUP_H_
 #define POPUP_H_
 
-#include "display_panel.h"
+
 class CPopup {
 
 public:
@@ -57,9 +57,9 @@ public:
 			default:
 				col = 0;
 			}
-			m_mask = CRenderBuf::make_mask(col, col + 4 * m_len - 1);
+			m_mask = g_ui.make_mask(col, col + 4 * m_len - 1);
 			for(int i=0; i<m_len; ++i) {
-				CRenderBuf::print_char(m_text[i], col, 0, m_raster, NULL, 5);
+				g_ui.print_char(m_text[i], col, 0, m_raster, NULL, 5);
 				col += 4;
 			}
 		}
@@ -191,9 +191,9 @@ public:
 
 		int row = m_row;
 		for(int i=0; i<5; ++i) {
-			CRenderBuf::raster(row) &= ~m_mask;
-			CRenderBuf::raster(row) |= m_raster[i];
-			CRenderBuf::hilite(row) |= m_mask;
+			g_ui.raster(row) &= ~m_mask;
+			g_ui.raster(row) |= m_raster[i];
+			g_ui.hilite(row) |= m_mask;
 			++row;
 		}
 	}

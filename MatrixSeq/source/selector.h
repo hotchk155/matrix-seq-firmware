@@ -62,9 +62,9 @@ public:
 	/////////////////////////////////////////////////////////////////////////////////////////////////
 	void repaint() {
 		if(m_repaint) {
-			CRenderBuf::clear();
-			CRenderBuf::print_text(m_prompt, 0, 3, CRenderBuf::RASTER);
-			CRenderBuf::print_text(param_value_string(m_type, m_value, m_values_text), 0, 9, CRenderBuf::RASTER|CRenderBuf::HILITE);
+			g_ui.clear();
+			g_ui.print_text(m_prompt, 0, 3, CUI::RASTER);
+			g_ui.print_text(param_value_string(m_type, m_value, m_values_text), 0, 9, CUI::RASTER|CUI::HILITE);
 			m_repaint = 0;
 		}
 	}

@@ -246,6 +246,7 @@ public:
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////////////////
+	// EVENT HANDLER FOR THE SEQUENCER WINDOW
 	void event(int evt, uint32_t param) {
 		CSequenceLayer *layer = &m_layers[m_layer];
 		CSequenceLayer::STEP_TYPE step;
@@ -411,7 +412,7 @@ public:
 		uint32_t mask;
 		CSequenceLayer *layer = &m_layers[m_layer];
 
-		CRenderBuf::clear();
+		g_ui.clear();
 
 		int max_row = (m_action == ACTION_EDIT_TRIG)? 11 : 12;
 
@@ -420,7 +421,7 @@ public:
 		if(layer->get_graticule(&graticule_row, &graticule_spacing)) {
 			while(graticule_row < 16) {
 				if(graticule_row>= 0 && graticule_row<=max_row) {
-					CRenderBuf::hilite(graticule_row) = 0x11111111U;
+					g_ui.hilite(graticule_row) = 0x11111111U;
 				}
 				if(graticule_spacing > 0) {
 					graticule_row += graticule_spacing;
@@ -432,22 +433,22 @@ public:
 		}
 
 		// displaying the cursor
-		mask = CRenderBuf::bit(m_cursor);
+		mask = g_ui.bit(m_cursor);
 		for(i=0; i<=max_row; ++i) {
-			CRenderBuf::raster(i) &= ~mask;
-			CRenderBuf::hilite(i) |= mask;
+			g_ui.raster(i) &= ~mask;
+			g_ui.hilite(i) |= mask;
 		}
 
-		mask = CRenderBuf::bit(layer->m_state.m_play_pos);
-		CRenderBuf::raster(15) |= mask;
-		CRenderBuf::hilite(15) |= mask;
+		mask = g_ui.bit(layer->m_state.m_play_pos);
+		g_ui.raster(15) |= mask;
+		g_ui.hilite(15) |= mask;
 
 		// if this is velocity mode then we simply show some text
 		if(layer->m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY) {
-			CRenderBuf::print_text("VEL",5,2,CRenderBuf::RASTER);
+			g_ui.print_text("VEL",5,2,g_ui.RASTER);
 		}
 
-		mask = CRenderBuf::bit(0);
+		mask = g_ui.bit(0);
 		int c = 0;
 		int n;
 
@@ -456,10 +457,10 @@ public:
 			// show the "ruler" at the bottom of screen
 			if(i >= layer->m_cfg.m_loop_from && i <= layer->m_cfg.m_loop_to) {
 				if(!(c & 0x03)) { // steps 0, 4, 8 etc
-					CRenderBuf::raster(15) |= mask;
+					g_ui.raster(15) |= mask;
 				}
 				else {
-					CRenderBuf::hilite(15) |= mask;
+					g_ui.hilite(15) |= mask;
 				}
 				++c;
 			}
@@ -478,12 +479,12 @@ public:
 					n = STEP_VALUE(step);
 					n = 12 - n + layer->m_state.m_scroll_ofs;
 					if(n >= 0 && n <= max_row) {
-						CRenderBuf::raster(n) |= mask;
+						g_ui.raster(n) |= mask;
 						if(i == layer->m_state.m_play_pos && m_is_running) {
-							CRenderBuf::set_hilite(n, mask);
+							g_ui.hilite(n) |= mask;
 						}
 						else {
-							CRenderBuf::clear_hilite(n, mask);
+							g_ui.hilite(n) &= ~mask;
 						}
 					}
 				}
@@ -501,12 +502,12 @@ public:
 //					CRenderBuf::hilite(j) |= mask;
 //				}
 				if(i == layer->m_state.m_play_pos && m_is_running) {
-					CRenderBuf::raster(n) |= mask;
-					CRenderBuf::hilite(n) |= mask;
+					g_ui.raster(n) |= mask;
+					g_ui.hilite(n) |= mask;
 				}
 				else {
-					CRenderBuf::raster(n) |= mask;
-					CRenderBuf::hilite(n) &= ~mask;
+					g_ui.raster(n) |= mask;
+					g_ui.hilite(n) &= ~mask;
 
 				}
 				break;
@@ -525,30 +526,30 @@ public:
 					vel = CSequenceLayer::get_velocity(step);
 					if(m_action == ACTION_EDIT_TRIG) {
 						if(vel == CSequenceLayer::VELOCITY_HIGH) {
-							CRenderBuf::set_raster(12, mask);
+							g_ui.raster(12) |= mask;
 						}
 						else {
-							CRenderBuf::set_hilite(12, mask);
+							g_ui.hilite(12) |= mask;
 						}
 						if(vel == CSequenceLayer::VELOCITY_MEDIUM) {
-							CRenderBuf::set_raster(13, mask);
+							g_ui.raster(13) |= mask;
 						}
 						else {
-							CRenderBuf::set_hilite(13, mask);
+							g_ui.hilite(13) |= mask;
 						}
 						if(vel == CSequenceLayer::VELOCITY_LOW) {
-							CRenderBuf::set_raster(14, mask);
+							g_ui.raster(14) |= mask;
 						}
 						else {
-							CRenderBuf::set_hilite(14, mask);
+							g_ui.hilite(14) |= mask;
 						}
 					}
 					else {
 						if(vel >= CSequenceLayer::VELOCITY_LOW) {
-							CRenderBuf::set_raster(14, mask);
+							g_ui.raster(14) |= mask;
 						}
 						else {
-							CRenderBuf::set_hilite(14, mask);
+							g_ui.hilite(14) |= mask;
 						}
 					}
 				}
