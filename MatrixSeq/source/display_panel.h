@@ -48,6 +48,9 @@ extern volatile byte g_disp_update;
 
 // map specific key functions
 #define KEY_EDIT	KEY_B1
+
+#define KEY_STORE	KEY_B6
+
 #define KEY_MENU	KEY_B8
 
 #define KEY_STARTSTOP	KEY_B7
@@ -63,8 +66,8 @@ extern volatile byte g_disp_update;
 class CRenderBuf {
 public:
 	enum {
-		CHAR_RASTER = 1,
-		CHAR_HILITE = 2,
+		RASTER = 1,
+		HILITE = 2,
 
 		POPUP_LEFT = 1
 
@@ -121,7 +124,7 @@ public:
 		}
 		return result;
 	}
-	static void print_char(int ch, int col, int row, uint32_t *buf, int size) {
+	static void print_char(int ch, int col, int row, uint32_t *raster, uint32_t *hilite, int size) {
 
 		switch(ch) {
 		case '#': ch = CHAR4X5_HASH; break;
@@ -179,13 +182,20 @@ public:
 				d>>=shift2;
 			}
 
-			buf[row] |= d;
+			if(raster) {
+				raster[row] |= d;
+			}
+			if(hilite) {
+				hilite[row] |= d;
+			}
 			++row;
 		}
 	}
-	static void print_text(const char *sz, int col, int row) {
+	static void print_text(const char *sz, int col, int row, byte layer) {
+		uint32_t *raster = (layer & RASTER)? g_render_buf : 0;
+		uint32_t *hilite = (layer & HILITE)? &g_render_buf[16] : 0;
 		while(*sz) {
-			print_char(*sz, col, row, g_render_buf, DISPLAY_BUF_SIZE);
+			print_char(*sz, col, row, raster, hilite, 16);
 			++sz;
 			col+=4;
 		}

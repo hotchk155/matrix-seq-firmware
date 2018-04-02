@@ -8,7 +8,7 @@
 #ifndef PARAMS_H_
 #define PARAMS_H_
 
-typedef enum {
+typedef enum:byte {
 	P_NONE = 0,
 
 	P_SQL_SEQ_MODE,
@@ -32,6 +32,17 @@ typedef enum {
 	P_CLOCK_SRC,
 	P_CLOCK_MAX
 } PARAM_ID;
+
+typedef enum:byte {
+	PT_NONE = 0,
+	PT_ENUMERATED,
+	PT_MIDI_CHANNEL,
+	PT_NUMBER_7BIT,
+	PT_VOLT_RANGE,
+	PT_BPM,
+	PT_DURATION,
+	PT_PATTERN
+} PARAM_TYPE;
 
 
 typedef enum:byte {
@@ -199,8 +210,9 @@ typedef enum:byte {
 extern void set_param(PARAM_ID param, int value);
 extern int get_param(PARAM_ID param);
 extern int is_valid_param(PARAM_ID param);
-
-
+extern const char *param_value_string(PARAM_TYPE type, int value, const char *values_text);
+extern int param_max_value(PARAM_TYPE type, const char *values_text);
+extern int param_min_value(PARAM_TYPE type);
 
 
 #endif /* PARAMS_H_ */

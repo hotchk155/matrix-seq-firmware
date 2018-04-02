@@ -59,7 +59,7 @@ public:
 			}
 			m_mask = CRenderBuf::make_mask(col, col + 4 * m_len - 1);
 			for(int i=0; i<m_len; ++i) {
-				CRenderBuf::print_char(m_text[i], col, 0, m_raster, 5);
+				CRenderBuf::print_char(m_text[i], col, 0, m_raster, NULL, 5);
 				col += 4;
 			}
 		}

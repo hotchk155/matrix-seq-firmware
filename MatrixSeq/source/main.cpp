@@ -58,6 +58,7 @@
 #include "popup.h"
 #include "sequencer.h"
 #include "menu.h"
+#include "selector.h"
 
 
 
@@ -73,12 +74,12 @@
 
  enum {
 	 VIEW_SEQUENCER,
-	 VIEW_MENU
+	 VIEW_MENU,
+	 VIEW_SELECTOR
  };
 
 byte g_view = VIEW_SEQUENCER;
 byte g_current_layer = 0;
-//byte g_is_running = 0;
 
 void set_param(PARAM_ID param, int value) {
 	if(param < P_SQL_MAX) {
@@ -106,6 +107,101 @@ int is_valid_param(PARAM_ID param) {
 	}
 	return 0;
 }
+/////////////////////////////////////////////////////////////////////////////////////////////////
+void format_number(int value, char *buf, int digits) {
+	if(digits > 2) {
+		*buf++ = '0' + value/100;
+	}
+	value %= 100;
+	if(digits > 1) {
+		*buf++ = '0' + value/10;
+	}
+	value %= 10;
+	*buf++ = '0' + value;
+	*buf = 0;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+const char *param_value_string(PARAM_TYPE type, int value, const char *values_text) {
+	static char buf[9];
+	int pos;
+	switch(type) {
+	case PT_ENUMERATED:
+		while(values_text && *values_text && value) {
+			if(*values_text == '|') {
+				--value;
+			}
+			++values_text;
+		}
+		pos = 0;
+		while(*values_text && *values_text != '|') {
+			buf[pos++] = *values_text++;
+		}
+		buf[pos] = 0;
+		break;
+	case PT_MIDI_CHANNEL:
+		format_number(value + 1, buf, 2);
+		break;
+	case PT_DURATION:
+		format_number(value, buf, 2);
+		break;
+	case PT_NUMBER_7BIT:
+	case PT_BPM:
+		format_number(value, buf, 3);
+		break;
+	case PT_VOLT_RANGE:
+		format_number(value, buf, 1);
+		buf[1] = 'V';
+		buf[2] = 0;
+		break;
+	case PT_PATTERN:
+		buf[0] = 'A' + value/8;
+		buf[1] = '1' + value%8;
+		buf[2] = 0;
+		break;
+	default:
+		buf[0] = 0;
+		break;
+	}
+	return buf;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+int param_max_value(PARAM_TYPE type, const char *values_text) {
+	int count;
+	switch(type) {
+	case PT_ENUMERATED:
+		count = 0;
+		while(values_text && *values_text) {
+			if(*values_text == '|') {
+				++count;
+			}
+			++values_text;
+		}
+		return count;
+	case PT_MIDI_CHANNEL:
+		return 15;
+	case PT_NUMBER_7BIT:
+		return 127;
+	case PT_VOLT_RANGE:
+		return 8;
+	case PT_BPM:
+		return 300;
+	case PT_PATTERN:
+		return 39;
+	default:
+		return 0;
+	}
+}
+/////////////////////////////////////////////////////////////////////////////////////////////////
+int param_min_value(PARAM_TYPE type) {
+	switch(type) {
+	case PT_BPM:
+		return 30;
+	default:
+		return 0;
+	}
+}
 
 
 /*
@@ -122,6 +218,9 @@ void dispatch_event(int event, uint32_t param) {
 		break;
 	case VIEW_MENU:
 		g_menu.event(event, param);
+		break;
+	case VIEW_SELECTOR:
+		g_selector.event(event, param);
 		break;
 	}
 }
@@ -194,6 +293,10 @@ void fire_event(int event, uint32_t param) {
 				fire_event(g_sequencer.is_running()? EV_SEQ_STOP : EV_SEQ_START, 0);
 			}
 		}
+		else if(param == KEY_STORE) {
+			g_view = VIEW_SELECTOR;
+			g_selector.activate("LOAD FR", P_SQL_LOAD_PATTERN, PT_PATTERN, NULL);
+		}
 		else {
 			// pass event to active view
 			dispatch_event(event, param);
@@ -212,7 +315,7 @@ void fire_event(int event, uint32_t param) {
 			}
 			else {
 				g_view = VIEW_MENU;
-				g_menu.activate(CMenu::MAIN_MENU);
+				g_menu.activate();
 			}
 		}
 		if(g_menu_press && (param == KEY2_LAYER1 || param == KEY2_LAYER2 || param == KEY2_LAYER3 || param == KEY2_LAYER4)) {
@@ -269,6 +372,7 @@ void force_full_repaint() {
 	g_popup.force_repaint();
 	g_sequencer.force_repaint();
 	g_menu.force_repaint();
+	g_selector.force_repaint();
 }
 
 
@@ -342,6 +446,9 @@ int main(void) {
     			break;
     		case VIEW_MENU:
     			g_menu.repaint();
+    			break;
+    		case VIEW_SELECTOR:
+    			g_selector.repaint();
     			break;
     		}
 			g_popup.repaint();

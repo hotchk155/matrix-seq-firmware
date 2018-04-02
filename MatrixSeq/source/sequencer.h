@@ -444,7 +444,7 @@ public:
 
 		// if this is velocity mode then we simply show some text
 		if(layer->m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY) {
-			CRenderBuf::print_text("VEL",5,2);
+			CRenderBuf::print_text("VEL",5,2,CRenderBuf::RASTER);
 		}
 
 		mask = CRenderBuf::bit(0);
