@@ -32,6 +32,9 @@
  * @file    MKE02Z64xxx4_Project.cpp
  * @brief   Application entry point.
  */
+
+#define MAIN_INCLUDE
+
 #include <digital_out.h>
 #include <stdio.h>
 #include "board.h"
@@ -42,8 +45,6 @@
 #include "fsl_clock.h"
 #include "fsl_spi.h"
 #include "fsl_pit.h"
-/* TODO: insert other include files here. */
-#define MAIN_INCLUDE
 
 
 #include "defs.h"
@@ -81,7 +82,8 @@
 	 VIEW_SELECTOR
  };
 
-byte g_view = VIEW_SEQUENCER;
+//byte g_view = VIEW_SEQUENCER;
+byte g_view = VIEW_SELECTOR;
 byte g_current_layer = 0;
 
 void set_param(PARAM_ID param, int value) {
@@ -273,8 +275,16 @@ void layer_button_event(int event, uint32_t param) {
 	}
 }
 void fire_event(int event, uint32_t param) {
+	g_selector.event(event, param);
+	return;
 
 	switch(event) {
+	case EV_KEY_HOLD:
+		if(param == KEY_MENU) {
+			g_view = VIEW_SELECTOR;
+			g_selector.activate("LOAD FR", P_SQL_LOAD_PATTERN, PT_PATTERN, NULL);
+		}
+		break;
 	//////////////////////////////////////////////////////////////
 	case EV_KEY_PRESS:
 		// when menu key initially pressed, remember but do not take action yet

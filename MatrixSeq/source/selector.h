@@ -40,18 +40,23 @@ public:
 		m_repaint = 1;
 	}
 
+	int m_evt;
+	uint32_t m_evparam;
 	/////////////////////////////////////////////////////////////////////////////////////////////////
 	void event(int evt, uint32_t param) {
-		int i;
+		m_evt = evt;
+		m_evparam = param;
+
+/*		int i;
 		switch(evt) {
 		case EV_ENCODER:
 			i = m_value + (int)param;
 			if(i >= param_min_value(m_type) && i <= param_max_value(m_type, m_values_text)) {
 				m_value = i;
 				m_repaint = 1;
-			}
 			break;
-		}
+			}
+		}*/
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////////////////////
@@ -61,12 +66,33 @@ public:
 
 	/////////////////////////////////////////////////////////////////////////////////////////////////
 	void repaint() {
+		g_ui.clear();
+		switch(m_evt) {
+/*		case EV_ENCODER:
+			i = m_value + (int)param;
+			if(i >= param_min_value(m_type) && i <= param_max_value(m_type, m_values_text)) {
+				m_value = i;
+				m_repaint = 1;
+			break;
+			}*/
+
+
+		case EV_KEY_PRESS: g_ui.print_text("PR", 0, 3, CUI::RASTER); break;
+		case EV_KEY_RELEASE: g_ui.print_text("RE", 0, 3, CUI::RASTER); break;
+		case EV_KEY_CLICK: g_ui.print_text("CK", 0, 3, CUI::RASTER); break;
+		case EV_KEY_HOLD: g_ui.print_text("HL", 0, 3, CUI::RASTER); break;
+
+		}
+
+		g_ui.raster(15) = m_evparam;
+
+		/*
 		if(m_repaint) {
 			g_ui.clear();
 			g_ui.print_text(m_prompt, 0, 3, CUI::RASTER);
 			g_ui.print_text(param_value_string(m_type, m_value, m_values_text), 0, 9, CUI::RASTER|CUI::HILITE);
 			m_repaint = 0;
-		}
+		}*/
 	}
 };
 

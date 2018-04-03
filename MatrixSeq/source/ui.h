@@ -88,6 +88,8 @@ extern volatile byte g_disp_update;
 #define KEY2_LAYER3	KEY_B3
 #define KEY2_LAYER4	KEY_B4
 
+#define LONG_PRESS_TIME 800
+
 class CUI {
 
 	typedef enum:byte {
@@ -123,6 +125,10 @@ class CUI {
 
 	int m_cathode = 0;
 	UPDATE_PHASE m_phase = PHASE_NORMAL;
+
+	uint32_t m_shift = 0U;
+	uint32_t m_key = 0U;
+	int m_button_hold_timeout = 0;
 
 public:
 	enum {
@@ -320,11 +326,55 @@ public:
 		PIT_StartTimer(PIT, kPIT_Chnl_1);
 	}
 
+
+	// combined keypress
+	void key_down(uint32_t key) {
+		m_button_hold_timeout = 0;
+		if(key & (KEY_EDIT|KEY_MENU)) { // a shift key pressed
+			if(!m_key) {	// only valid if pressed when no other keys held
+				if(m_shift) {
+					m_key = key;
+				}
+				else {
+					m_shift = key;
+				}
+				fire_event(EV_KEY_PRESS, m_shift|m_key);
+				m_button_hold_timeout = LONG_PRESS_TIME;
+			}
+		}
+		else {
+			if(m_key == 0) { // only valid if it is first non-shift key pressed
+				m_key = key;
+				fire_event(EV_KEY_PRESS, m_shift|m_key);
+				m_button_hold_timeout = LONG_PRESS_TIME;
+			}
+		}
+	}
+	void key_up(uint32_t key) {
+		if(key == m_shift) { // has the current shift key been released?
+			fire_event(EV_KEY_RELEASE, key);
+			if(m_key == 0 && m_button_hold_timeout) { // only counts as "click" if last key released
+				fire_event(EV_KEY_CLICK, key);
+			}
+			m_key = 0;
+			m_shift = 0;
+		}
+		else if(key == m_key) {
+			fire_event(EV_KEY_RELEASE, m_shift|m_key);
+			if(m_button_hold_timeout) {
+				fire_event(EV_KEY_CLICK, m_shift|m_key);
+			}
+			m_key = 0;
+		}
+		m_button_hold_timeout = 0;
+	}
+
 	//////////////////////////////////////////////////////////////////////////////////
 	void run()
 	{
 		int pos = m_enc_pos;
 		if(pos != m_prev_enc_pos) {
+			m_button_hold_timeout = 0;
 			fire_event(EV_ENCODER, (uint32_t)(pos - m_prev_enc_pos));
 			m_prev_enc_pos = pos;
 		}
@@ -340,16 +390,23 @@ public:
 				uint32_t pressed = keys & ~m_prev_key_state;
 				while(bit) {
 					if(pressed & bit) {
-						fire_event(EV_KEY_PRESS, bit);
+						key_down(bit);
 						m_debounce = DEBOUNCE_MS_PRESS;
 					}
 					if(released & bit) {
-						fire_event(EV_KEY_RELEASE, bit);
+						key_up(bit);
 						m_debounce = DEBOUNCE_MS_RELEASE;
 					}
 					bit>>=1;
 				}
 				m_prev_key_state = keys;
+			}
+			else if(m_button_hold_timeout) {
+				if(!--m_button_hold_timeout) {
+					if(m_shift || m_key) {
+						fire_event(EV_KEY_HOLD, m_shift|m_key);
+					}
+				}
 			}
 		}
 	}
