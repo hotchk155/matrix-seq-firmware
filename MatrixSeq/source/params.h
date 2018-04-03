@@ -8,211 +8,136 @@
 #ifndef PARAMS_H_
 #define PARAMS_H_
 
-typedef enum:byte {
-	P_NONE = 0,
+class CParams {
+	/////////////////////////////////////////////////////////////////////////////////////////////////
+	static void format_number(int value, char *buf, int digits) {
+		if(digits > 2) {
+			*buf++ = '0' + value/100;
+		}
+		value %= 100;
+		if(digits > 1) {
+			*buf++ = '0' + value/10;
+		}
+		value %= 10;
+		*buf++ = '0' + value;
+		*buf = 0;
+	}
 
-	P_SQL_SEQ_MODE,
-	P_SQL_STEP_RATE,
-	P_SQL_STEP_DUR,
-	P_SQL_MIDI_CHAN,
-	P_SQL_MIDI_CC,
-	P_SQL_SCALE_TYPE,
-	P_SQL_SCALE_ROOT,
-	P_SQL_FORCE_SCALE,
-	P_SQL_MIDI_VEL_HI,
-	P_SQL_MIDI_VEL_MED,
-	P_SQL_MIDI_VEL_LO,
-	P_SQL_CVSCALE,
-	P_SQL_CVRANGE,
-	P_SQL_LOAD_PATTERN,
-	P_SQL_SAVE_PATTERN,
-	P_SQL_MAX,
+public:
+	/////////////////////////////////////////////////////////////////////////////////////////////////
+	static void set(PARAM_ID param, int value) {
+		if(param < P_SQL_MAX) {
+			g_sequencer.set(param,value);
+		}
+		else if(param < P_CLOCK_MAX) {
+			g_clock.set(param,value);
+		}
+	}
+	/////////////////////////////////////////////////////////////////////////////////////////////////
+	static int get(PARAM_ID param) {
+		if(param < P_SQL_MAX) {
+			return g_sequencer.get(param);
+		}
+		else if(param < P_CLOCK_MAX) {
+			return g_clock.get(param);
+		}
+		return 0;
+	}
+	/////////////////////////////////////////////////////////////////////////////////////////////////
+	static int is_valid_for_menu(PARAM_ID param) {
+		if(param < P_SQL_MAX) {
+			return g_sequencer.is_valid_param(param);
+		}
+		else if(param < P_CLOCK_MAX) {
+			return g_clock.is_valid_param(param);
+		}
+		return 0;
+	}
 
-	P_CLOCK_BPM,
-	P_CLOCK_SRC,
-	P_CLOCK_MAX
-} PARAM_ID;
+	/////////////////////////////////////////////////////////////////////////////////////////////////
+	static const char *value_string(PARAM_TYPE type, int value, const char *values_text) {
+		static char buf[9];
+		int pos;
+		switch(type) {
+		case PT_ENUMERATED:
+			while(values_text && *values_text && value) {
+				if(*values_text == '|') {
+					--value;
+				}
+				++values_text;
+			}
+			pos = 0;
+			while(*values_text && *values_text != '|') {
+				buf[pos++] = *values_text++;
+			}
+			buf[pos] = 0;
+			break;
+		case PT_MIDI_CHANNEL:
+			format_number(value + 1, buf, 2);
+			break;
+		case PT_DURATION:
+			format_number(value, buf, 2);
+			break;
+		case PT_NUMBER_7BIT:
+		case PT_BPM:
+			format_number(value, buf, 3);
+			break;
+		case PT_VOLT_RANGE:
+			format_number(value, buf, 1);
+			buf[1] = 'V';
+			buf[2] = 0;
+			break;
+		case PT_PATTERN:
+			buf[0] = 'A' + value/8;
+			buf[1] = '1' + value%8;
+			buf[2] = 0;
+			break;
+		default:
+			buf[0] = 0;
+			break;
+		}
+		return buf;
+	}
 
-typedef enum:byte {
-	PT_NONE = 0,
-	PT_ENUMERATED,
-	PT_MIDI_CHANNEL,
-	PT_NUMBER_7BIT,
-	PT_VOLT_RANGE,
-	PT_BPM,
-	PT_DURATION,
-	PT_PATTERN
-} PARAM_TYPE;
+	/////////////////////////////////////////////////////////////////////////////////////////////////
+	static int max_value(PARAM_TYPE type, const char *values_text) {
+		int count;
+		switch(type) {
+		case PT_ENUMERATED:
+			count = 0;
+			while(values_text && *values_text) {
+				if(*values_text == '|') {
+					++count;
+				}
+				++values_text;
+			}
+			return count;
+		case PT_MIDI_CHANNEL:
+			return 15;
+		case PT_NUMBER_7BIT:
+			return 127;
+		case PT_VOLT_RANGE:
+			return 8;
+		case PT_BPM:
+			return 300;
+		case PT_PATTERN:
+			return 39;
+		default:
+			return 0;
+		}
+	}
+	/////////////////////////////////////////////////////////////////////////////////////////////////
+	static int min_value(PARAM_TYPE type) {
+		switch(type) {
+		case PT_BPM:
+			return 30;
+		default:
+			return 0;
+		}
+	}
 
+};
 
-typedef enum:byte {
-	V_SQL_SEQ_MODE_SCALE = 0,
-	V_SQL_SEQ_MODE_CHROMATIC,
-	V_SQL_SEQ_MODE_MOD,
-	V_SQL_SEQ_MODE_TRANSPOSE,
-	V_SQL_SEQ_MODE_VELOCITY,
-	V_SQL_SEQ_MODE_MAX
-} V_SQL_SEQ_MODE;
-
-
-typedef enum:byte {
-	V_SQL_SCALE_TYPE_IONIAN,
-	V_SQL_SCALE_TYPE_DORIAN,
-	V_SQL_SCALE_TYPE_PHRYGIAN,
-	V_SQL_SCALE_TYPE_LYDIAN,
-	V_SQL_SCALE_TYPE_MIXOLYDIAN,
-	V_SQL_SCALE_TYPE_AEOLIAN,
-	V_SQL_SCALE_TYPE_LOCRIAN,
-	V_SQL_SCALE_TYPE_MAX
-} V_SQL_SCALE_TYPE;
-
-typedef enum:byte {
-	V_SQL_SCALE_ROOT_C = 0,
-	V_SQL_SCALE_ROOT_CSHARP,
-	V_SQL_SCALE_ROOT_D,
-	V_SQL_SCALE_ROOT_DSHARP,
-	V_SQL_SCALE_ROOT_E,
-	V_SQL_SCALE_ROOT_F,
-	V_SQL_SCALE_ROOT_FSHARP,
-	V_SQL_SCALE_ROOT_G,
-	V_SQL_SCALE_ROOT_GSHARP,
-	V_SQL_SCALE_ROOT_A,
-	V_SQL_SCALE_ROOT_ASHARP,
-	V_SQL_SCALE_ROOT_B
-} V_SQL_SCALE_ROOT;
-
-typedef enum:byte {
-	V_SQL_FORCE_SCALE_OFF,
-	V_SQL_FORCE_SCALE_ON,
-	V_SQL_FORCE_SCALE_MAX
-} V_SQL_FORCE_SCALE;
-
-typedef enum:byte {
-	V_SQL_VEL_MOD_OFF,
-	V_SQL_VEL_MOD_LAYER1,
-	V_SQL_VEL_MOD_LAYER2,
-	V_SQL_VEL_MOD_LAYER3,
-	V_SQL_VEL_MOD_LAYER4,
-	V_SQL_VEL_MOD_MAX,
-} V_SQL_VEL_MOD;
-
-typedef enum:byte {
-	V_SQL_TRANSPOSE_MOD_OFF,
-	V_SQL_TRANSPOSE_MOD_LAYER1,
-	V_SQL_TRANSPOSE_MOD_LAYER2,
-	V_SQL_TRANSPOSE_MOD_LAYER3,
-	V_SQL_TRANSPOSE_MOD_LAYER4,
-	V_SQL_TRANSPOSE_MOD_MAX,
-} V_SQL_TRANSPOSE_MOD;
-
-typedef enum:byte {
-	V_SQL_MIDI_CHAN_NONE,
-	V_SQL_MIDI_CHAN_1,
-	V_SQL_MIDI_CHAN_2,
-	V_SQL_MIDI_CHAN_3,
-	V_SQL_MIDI_CHAN_4,
-	V_SQL_MIDI_CHAN_5,
-	V_SQL_MIDI_CHAN_6,
-	V_SQL_MIDI_CHAN_7,
-	V_SQL_MIDI_CHAN_8,
-	V_SQL_MIDI_CHAN_9,
-	V_SQL_MIDI_CHAN_10,
-	V_SQL_MIDI_CHAN_11,
-	V_SQL_MIDI_CHAN_12,
-	V_SQL_MIDI_CHAN_13,
-	V_SQL_MIDI_CHAN_14,
-	V_SQL_MIDI_CHAN_15,
-	V_SQL_MIDI_CHAN_16
-} V_SQL_MIDI_CHAN;
-
-
-typedef enum:byte {
-	V_SQL_STEP_RATE_1 = 0,
-	V_SQL_STEP_RATE_2D,
-	V_SQL_STEP_RATE_2,
-	V_SQL_STEP_RATE_4D,
-	V_SQL_STEP_RATE_2T,
-	V_SQL_STEP_RATE_4,
-	V_SQL_STEP_RATE_8D,
-	V_SQL_STEP_RATE_4T,
-	V_SQL_STEP_RATE_8,
-	V_SQL_STEP_RATE_16D,
-	V_SQL_STEP_RATE_8T,
-	V_SQL_STEP_RATE_16,
-	V_SQL_STEP_RATE_16T,
-	V_SQL_STEP_RATE_32,
-	V_SQL_STEP_RATE_MAX
-} V_SQL_STEP_RATE;
-
-typedef enum:byte {
-	V_SQL_STEP_DUR_STEP,	// Play for exactly one sequencer step unless extended by legato step(s)
-	V_SQL_STEP_DUR_FULL,	// Play up until the next active sequencer step
-	V_SQL_STEP_DUR_NONE,
-	V_SQL_STEP_DUR_32,
-	V_SQL_STEP_DUR_16T,
-	V_SQL_STEP_DUR_16,
-	V_SQL_STEP_DUR_8T,
-	V_SQL_STEP_DUR_16D,
-	V_SQL_STEP_DUR_8,
-	V_SQL_STEP_DUR_4T,
-	V_SQL_STEP_DUR_8D,
-	V_SQL_STEP_DUR_4,
-	V_SQL_STEP_DUR_2T,
-	V_SQL_STEP_DUR_4D,
-	V_SQL_STEP_DUR_2,
-	V_SQL_STEP_DUR_2D,
-	V_SQL_STEP_DUR_1,
-	V_SQL_STEP_DUR_MAX
-} V_SQL_STEP_DUR;
-
-
-typedef enum:byte {
-	V_SQL_CVSCALE_1VOCT = 0,
-	V_SQL_CVSCALE_1_2VOCT,
-	V_SQL_CVSCALE_HZVOLT,
-	V_SQL_CVSCALE_MAX
-} V_SQL_CVSCALE;
-
-typedef enum:byte {
-	V_SQL_STEP_TRIG_CLOCK = 0,
-	V_SQL_STEP_TRIG_LAYER1,
-	V_SQL_STEP_TRIG_LAYER2,
-	V_SQL_STEP_TRIG_LAYER3,
-	V_SQL_STEP_TRIG_LAYER4,
-	V_SQL_STEP_TRIG_MAX
-} V_SQL_STEP_TRIG;
-
-typedef enum:byte {
-	V_SQL_RESET_TRIG_NONE = 0,
-	V_SQL_RESET_TRIG_LAYER1,
-	V_SQL_RESET_TRIG_LAYER2,
-	V_SQL_RESET_TRIG_LAYER3,
-	V_SQL_RESET_TRIG_LAYER4,
-	V_SQL_RESET_TRIG_MAX
-} V_SQL_RESET_TRIG;
-
-typedef enum:byte {
-	V_SQL_TRANSP_SRC_NONE = 0,
-	V_SQL_TRANSP_SRC_LAYER1,
-	V_SQL_TRANSP_SRC_LAYER2,
-	V_SQL_TRANSP_SRC_LAYER3,
-	V_SQL_TRANSP_SRC_LAYER4,
-	V_SQL_TRANSP_SRC_MAX
-} V_SQL_TRANSP_SRC;
-
-typedef enum:byte {
-	V_CLOCK_SRC_INTERNAL,
-	V_CLOCK_SRC_MIDI
-} V_CLOCK_SRC;
-
-
-
-extern void set_param(PARAM_ID param, int value);
-extern int get_param(PARAM_ID param);
-extern int is_valid_param(PARAM_ID param);
-extern const char *param_value_string(PARAM_TYPE type, int value, const char *values_text);
-extern int param_max_value(PARAM_TYPE type, const char *values_text);
-extern int param_min_value(PARAM_TYPE type);
 
 
 #endif /* PARAMS_H_ */

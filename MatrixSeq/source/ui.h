@@ -83,10 +83,11 @@ extern volatile byte g_disp_update;
 #define KEY_RUN		KEY_B7
 #define KEY_MENU	KEY_B8
 
-#define KEY2_LAYER1	KEY_B1
-#define KEY2_LAYER2	KEY_B2
-#define KEY2_LAYER3	KEY_B3
-#define KEY2_LAYER4	KEY_B4
+#define KEY2_LAYER1		KEY_B1
+#define KEY2_LAYER2		KEY_B2
+#define KEY2_LAYER3		KEY_B3
+#define KEY2_LAYER4		KEY_B4
+#define KEY2_LAYER_MUTE	KEY_B7
 
 #define LONG_PRESS_TIME 800
 

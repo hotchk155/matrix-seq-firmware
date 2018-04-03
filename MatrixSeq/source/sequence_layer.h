@@ -374,8 +374,8 @@ public:
 		}
 	}
 
-	void inc_step(STEP_TYPE *value, int delta) {
-		int v = (byte)(*value) + delta;
+	void inc_step_value(STEP_TYPE *value, byte up) {
+		int v = (byte)(*value) + (up? 1 : -1);
 		int max_note = 127;
 		switch(m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_MOD:

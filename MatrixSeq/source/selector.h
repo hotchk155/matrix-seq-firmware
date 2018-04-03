@@ -36,7 +36,7 @@ public:
 		m_param = param;
 		m_type = type;
 		m_values_text = values_text;
-		m_value = get_param(param);
+		m_value = CParams::get(param);
 		m_repaint = 1;
 	}
 

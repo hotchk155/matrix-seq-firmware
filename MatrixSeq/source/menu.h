@@ -73,7 +73,7 @@ public:
 		case EV_ENCODER:
 			if(m_action == ACTION_VALUE_SELECTED || m_action == ACTION_VALUE_CHANGED) {
 				i = m_value + (int)param;
-				if(i >= param_min_value(m_opts[m_item].type) && i <= param_max_value(m_opts[m_item].type, m_opts[m_item].values)) {
+				if(i >= CParams::min_value(m_opts[m_item].type) && i <= CParams::max_value(m_opts[m_item].type, m_opts[m_item].values)) {
 					m_value = i;
 					m_action = ACTION_VALUE_CHANGED;
 					m_repaint = 1;
@@ -91,7 +91,7 @@ public:
 					if(i<0 || i>=NUM_MENU_OPTS) {
 						break;
 					}
-					if(m_opts[i].prompt && is_valid_param(m_opts[i].param)) {
+					if(m_opts[i].prompt && CParams::is_valid_for_menu(m_opts[i].param)) {
 						m_item = i;
 						m_repaint = 1;
 						break;
@@ -101,13 +101,13 @@ public:
 			break;
 		case EV_KEY_PRESS:
 			if(param == KEY_EDIT) {
-				m_value = get_param(m_opts[m_item].param);
+				m_value = CParams::get(m_opts[m_item].param);
 				m_action = ACTION_VALUE_SELECTED;
 			}
 			break;
 		case EV_KEY_RELEASE:
 			if(m_action == ACTION_VALUE_CHANGED) {
-				set_param(m_opts[m_item].param, m_value);
+				CParams::set(m_opts[m_item].param, m_value);
 				m_repaint = 1;
 			}
 			m_action = ACTION_NONE;
@@ -139,7 +139,7 @@ public:
 					}
 				}
 				if(state != 2) {
-					value = get_param(this_opt.param);
+					value = CParams::get(this_opt.param);
 				}
 
 				const char *sz = this_opt.prompt;
@@ -149,7 +149,7 @@ public:
 					++sz;
 					col += 4;
 				}
-				sz = param_value_string(this_opt.type, value, this_opt.values);
+				sz = CParams::value_string(this_opt.type, value, this_opt.values);
 				col = 16;
 				while(*sz && *sz != '|') {
 					g_ui.print_char(*sz, col, 0, buf, NULL, 5);
@@ -198,7 +198,7 @@ public:
 			int opt = m_item - 1;
 			int row = 5;
 			while(opt >= 0 && visible) {
-				if(!m_opts[opt].prompt || is_valid_param(m_opts[opt].param)) {
+				if(!m_opts[opt].prompt || CParams::is_valid_for_menu(m_opts[opt].param)) {
 					row -= (m_opts[opt].prompt)? 6:2;
 					visible = draw_menu_option(opt,row);
 				}
@@ -209,7 +209,7 @@ public:
 			opt = m_item;
 			row = 5;
 			while(opt < NUM_MENU_OPTS && visible) {
-				if(!m_opts[opt].prompt || is_valid_param(m_opts[opt].param)) {
+				if(!m_opts[opt].prompt || CParams::is_valid_for_menu(m_opts[opt].param)) {
 					visible = draw_menu_option(opt,row);
 					row += (m_opts[opt].prompt)? 6:2;
 				}

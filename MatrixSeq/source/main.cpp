@@ -50,7 +50,6 @@
 #include "defs.h"
 #include "chars.h"
 #include "ui.h"
-#include "params.h"
 #include "clock.h"
 #include "i2c_bus.h"
 #include "storage.h"
@@ -61,6 +60,7 @@
 #include "digital_out.h"
 #include "popup.h"
 #include "sequencer.h"
+#include "params.h"
 #include "menu.h"
 #include "selector.h"
 
@@ -82,131 +82,9 @@
 	 VIEW_SELECTOR
  };
 
-//byte g_view = VIEW_SEQUENCER;
-byte g_view = VIEW_SELECTOR;
+byte g_view = VIEW_SEQUENCER;
 byte g_current_layer = 0;
 
-void set_param(PARAM_ID param, int value) {
-	if(param < P_SQL_MAX) {
-		g_sequencer.set(param,value);
-	}
-	else if(param < P_CLOCK_MAX) {
-		g_clock.set(param,value);
-	}
-}
-int get_param(PARAM_ID param) {
-	if(param < P_SQL_MAX) {
-		return g_sequencer.get(param);
-	}
-	else if(param < P_CLOCK_MAX) {
-		return g_clock.get(param);
-	}
-	return 0;
-}
-int is_valid_param(PARAM_ID param) {
-	if(param < P_SQL_MAX) {
-		return g_sequencer.is_valid_param(param);
-	}
-	else if(param < P_CLOCK_MAX) {
-		return g_clock.is_valid_param(param);
-	}
-	return 0;
-}
-/////////////////////////////////////////////////////////////////////////////////////////////////
-void format_number(int value, char *buf, int digits) {
-	if(digits > 2) {
-		*buf++ = '0' + value/100;
-	}
-	value %= 100;
-	if(digits > 1) {
-		*buf++ = '0' + value/10;
-	}
-	value %= 10;
-	*buf++ = '0' + value;
-	*buf = 0;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////////
-const char *param_value_string(PARAM_TYPE type, int value, const char *values_text) {
-	static char buf[9];
-	int pos;
-	switch(type) {
-	case PT_ENUMERATED:
-		while(values_text && *values_text && value) {
-			if(*values_text == '|') {
-				--value;
-			}
-			++values_text;
-		}
-		pos = 0;
-		while(*values_text && *values_text != '|') {
-			buf[pos++] = *values_text++;
-		}
-		buf[pos] = 0;
-		break;
-	case PT_MIDI_CHANNEL:
-		format_number(value + 1, buf, 2);
-		break;
-	case PT_DURATION:
-		format_number(value, buf, 2);
-		break;
-	case PT_NUMBER_7BIT:
-	case PT_BPM:
-		format_number(value, buf, 3);
-		break;
-	case PT_VOLT_RANGE:
-		format_number(value, buf, 1);
-		buf[1] = 'V';
-		buf[2] = 0;
-		break;
-	case PT_PATTERN:
-		buf[0] = 'A' + value/8;
-		buf[1] = '1' + value%8;
-		buf[2] = 0;
-		break;
-	default:
-		buf[0] = 0;
-		break;
-	}
-	return buf;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////////
-int param_max_value(PARAM_TYPE type, const char *values_text) {
-	int count;
-	switch(type) {
-	case PT_ENUMERATED:
-		count = 0;
-		while(values_text && *values_text) {
-			if(*values_text == '|') {
-				++count;
-			}
-			++values_text;
-		}
-		return count;
-	case PT_MIDI_CHANNEL:
-		return 15;
-	case PT_NUMBER_7BIT:
-		return 127;
-	case PT_VOLT_RANGE:
-		return 8;
-	case PT_BPM:
-		return 300;
-	case PT_PATTERN:
-		return 39;
-	default:
-		return 0;
-	}
-}
-/////////////////////////////////////////////////////////////////////////////////////////////////
-int param_min_value(PARAM_TYPE type) {
-	switch(type) {
-	case PT_BPM:
-		return 30;
-	default:
-		return 0;
-	}
-}
 
 
 /*
@@ -238,9 +116,15 @@ enum {
 byte g_menu_press= 0;
 char g_selected_layer = -1;
 
-//////////////////////////////////////////////////////////////
-// one of the layer buttons has been pressed while the menu button
-// is held
+void select_layer(byte layer) {
+	g_current_layer = layer;
+	g_popup.layer(g_current_layer, g_sequencer.is_layer_enabled(g_current_layer));
+	g_sequencer.set_active_layer(g_current_layer);
+	force_full_repaint();
+}
+
+
+/*
 void layer_button_event(int event, uint32_t param) {
 	byte layer = 0;
 	switch(param) {
@@ -248,6 +132,11 @@ void layer_button_event(int event, uint32_t param) {
 	case KEY2_LAYER3: layer = 2; break;
 	case KEY2_LAYER4: layer = 3; break;
 	}
+	g_current_layer = layer;
+	g_popup.layer(g_current_layer, g_sequencer.is_layer_enabled(g_current_layer));
+	g_sequencer.set_active_layer(g_current_layer);
+	force_full_repaint();
+
 	if(event == EV_KEY_PRESS) {
 		//
 		if(g_menu_press == MENU_PRESS_LAYER_COPY) {
@@ -273,105 +162,79 @@ void layer_button_event(int event, uint32_t param) {
 			g_menu_press = MENU_PRESS_SHIFT;
 		}
 	}
-}
+	*/
+
 void fire_event(int event, uint32_t param) {
-	g_selector.event(event, param);
-	return;
 
 	switch(event) {
-	case EV_KEY_HOLD:
-		if(param == KEY_MENU) {
-			g_view = VIEW_SELECTOR;
-			g_selector.activate("LOAD FR", P_SQL_LOAD_PATTERN, PT_PATTERN, NULL);
-		}
-		break;
-	//////////////////////////////////////////////////////////////
-	case EV_KEY_PRESS:
-		// when menu key initially pressed, remember but do not take action yet
-		if(param == KEY_MENU && !g_menu_press) {
-			g_menu_press = MENU_PRESS_DOWN;
-		}
-		if(g_menu_press && (param == KEY2_LAYER1 || param == KEY2_LAYER2 || param == KEY2_LAYER3 ||  param == KEY2_LAYER4)) {
-			layer_button_event(event,param);
-		}
-		else if(param == KEY_RUN) {
-			if(g_menu_press) {
-				g_sequencer.enable_layer(g_current_layer,!g_sequencer.is_layer_enabled(g_current_layer));
-				g_popup.layer(g_current_layer, g_sequencer.is_layer_enabled(g_current_layer));
-				force_full_repaint();
-				g_menu_press = MENU_PRESS_SHIFT;
-				g_popup.align(CPopup::ALIGN_RIGHT);
-			}
-			else {
-				fire_event(g_sequencer.is_running()? EV_SEQ_STOP : EV_SEQ_START, 0);
-			}
-		}
-		else if(param == KEY_STORE) {
-			g_view = VIEW_SELECTOR;
-			g_selector.activate("LOAD FR", P_SQL_LOAD_PATTERN, PT_PATTERN, NULL);
-		}
-		else {
-			// pass event to active view
-			dispatch_event(event, param);
-		}
-		break;
-
-	//////////////////////////////////////////////////////////////
-	case EV_KEY_RELEASE:
-		// is menu button pressed and released without any action?
-		// if so we use that to toggle between menu and sequencer
-		// views
-		if(param == KEY_MENU && g_menu_press == MENU_PRESS_DOWN) {
-			if(g_view == VIEW_MENU) {
-				g_view = VIEW_SEQUENCER;
-				g_sequencer.activate();
-			}
-			else {
+	///////////////////////////////////
+	case EV_KEY_CLICK:
+		switch(param) {
+		case KEY_MENU:
+			if(g_view != VIEW_MENU) {
 				g_view = VIEW_MENU;
 				g_menu.activate();
 			}
-		}
-		if(g_menu_press && (param == KEY2_LAYER1 || param == KEY2_LAYER2 || param == KEY2_LAYER3 || param == KEY2_LAYER4)) {
-			layer_button_event(event,param);
-		}
-		else {
-			// pass event to active view
-			dispatch_event(event,param);
-		}
-		// in any case remember when menu button is released
-		if(param == KEY_MENU) {
-			g_menu_press = 0;
-			g_selected_layer = -1;
+			else {
+				g_view = VIEW_SEQUENCER;
+				g_menu.activate();
+			}
+			break;
+		case KEY_MENU|KEY2_LAYER1:
+			select_layer(0);
+			break;
+		case KEY_MENU|KEY2_LAYER2:
+			select_layer(1);
+			break;
+		case KEY_MENU|KEY2_LAYER3:
+			select_layer(2);
+			break;
+		case KEY_MENU|KEY2_LAYER4:
+			select_layer(3);
+			break;
+		case KEY_MENU|KEY2_LAYER_MUTE:
+			g_sequencer.enable_layer(g_current_layer,!g_sequencer.is_layer_enabled(g_current_layer));
+			g_popup.layer(g_current_layer, g_sequencer.is_layer_enabled(g_current_layer));
+			force_full_repaint();
+			g_popup.align(CPopup::ALIGN_RIGHT);
+			break;
+		default:
+			dispatch_event(event, param);
+			break;
 		}
 		break;
-
-	//////////////////////////////////////////////////////////////
-	case EV_ENCODER:
-		if(g_menu_press && g_view == VIEW_SEQUENCER) {
-			g_sequencer.scroll((int)param);
-		}
-		else {
-			dispatch_event(event,param);
-		}
-		if(g_menu_press) {
-			g_menu_press = MENU_PRESS_SHIFT;
+	///////////////////////////////////
+	case EV_KEY_PRESS:
+		switch(param) {
+		case KEY_RUN:
+			fire_event(g_sequencer.is_running()? EV_SEQ_STOP : EV_SEQ_START, 0);
+			break;
+		default:
+			dispatch_event(event, param);
+			break;
 		}
 		break;
+	///////////////////////////////////
 	case EV_SEQ_STOP:
 		g_sequencer.stop();
 		g_popup.text("STOP", 4);
 		g_popup.align(CPopup::ALIGN_RIGHT);
 		break;
+	///////////////////////////////////
 	case EV_SEQ_RESTART:
 		g_sequencer.reset();
 		g_sequencer.start();
 		g_popup.text("RST", 3);
 		g_popup.align(CPopup::ALIGN_RIGHT);
 		break;
+	///////////////////////////////////
 	case EV_SEQ_START:
 		g_sequencer.start();
 		g_popup.text("RUN", 3);
 		g_popup.align(CPopup::ALIGN_RIGHT);
+		break;
+	default:
+		dispatch_event(event, param);
 		break;
 	}
 }

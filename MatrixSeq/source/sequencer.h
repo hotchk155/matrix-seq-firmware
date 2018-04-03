@@ -199,11 +199,11 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	void step_info(CSequenceLayer::STEP_TYPE step, CSequenceLayer *layer) {
+	void step_info(CSequenceLayer::STEP_TYPE step, CSequenceLayer& layer) {
 		byte value = STEP_VALUE(step);
-		switch(layer->m_cfg.m_mode) {
+		switch(layer.m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_SCALE:
-			if(layer->m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
+			if(layer.m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
 				value = g_scale.index_to_note(value);
 			}
 			// fall thru
@@ -235,19 +235,177 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	void set_scroll_for(CSequenceLayer::STEP_TYPE step, CSequenceLayer *layer) {
+	void set_scroll_for(CSequenceLayer::STEP_TYPE step, CSequenceLayer& layer) {
 		int v = STEP_VALUE(step);
-		if(v<layer->m_state.m_scroll_ofs) {
-			layer->m_state.m_scroll_ofs = v;
+		if(v<layer.m_state.m_scroll_ofs) {
+			layer.m_state.m_scroll_ofs = v;
 		}
-		else if(v>layer->m_state.m_scroll_ofs+12) {
-			layer->m_state.m_scroll_ofs = v-12;
+		else if(v>layer.m_state.m_scroll_ofs+12) {
+			layer.m_state.m_scroll_ofs = v-12;
 		}
 	}
 
+	//
+	//
+	//
+	//
+	//  button down
+	//  encoder move
+	//  encoder increment
+	//
+	//
+	//
+	//
+	//
+	//
+	//
+	//
+	//
+	//
+	//
+	//	//
 	/////////////////////////////////////////////////////////////////////////////////////////////
-	// EVENT HANDLER FOR THE SEQUENCER WINDOW
+
+typedef enum:byte {
+	ACTION_BEGIN,
+	ACTION_ENC_MOVING,
+	ACTION_ENC_LEFT,
+	ACTION_ENC_RIGHT,
+	ACTION_END
+} ACTION;
+
+	uint32_t m_action_context = 0;
+	byte m_encoder_moved = 0;
+
+	void edit_action(CSequenceLayer& layer, ACTION what) {
+		switch(what) {
+		case ACTION_BEGIN:
+			break;
+		case ACTION_ENC_MOVING:
+			break;
+		case ACTION_ENC_LEFT:
+		case ACTION_ENC_RIGHT:
+			m_copy_step = layer.get_step(m_cursor);
+			layer.inc_step_value(&m_copy_step, (what == ACTION_ENC_RIGHT));
+			layer.set_step(m_cursor, m_copy_step);
+			set_scroll_for(m_copy_step, layer);
+			step_info(m_copy_step, layer);
+			break;
+		case ACTION_END:
+			break;
+		}
+	}
+	void paste_action(CSequenceLayer& layer, ACTION what) {
+		switch(what) {
+		case ACTION_BEGIN:
+		case ACTION_ENC_MOVING:
+		case ACTION_ENC_LEFT:
+		case ACTION_ENC_RIGHT:
+		case ACTION_END:
+			break;
+		}
+	}
+	void clear_action(CSequenceLayer& layer, ACTION what) {
+		switch(what) {
+		case ACTION_BEGIN:
+		case ACTION_ENC_MOVING:
+		case ACTION_ENC_LEFT:
+		case ACTION_ENC_RIGHT:
+		case ACTION_END:
+			break;
+		}
+	}
+	void gate_action(CSequenceLayer& layer, ACTION what) {
+		switch(what) {
+		case ACTION_BEGIN:
+		case ACTION_ENC_MOVING:
+		case ACTION_ENC_LEFT:
+		case ACTION_ENC_RIGHT:
+		case ACTION_END:
+			break;
+		}
+	}
+	void loop_action(CSequenceLayer& layer, ACTION what) {
+		switch(what) {
+		case ACTION_BEGIN:
+		case ACTION_ENC_MOVING:
+		case ACTION_ENC_LEFT:
+		case ACTION_ENC_RIGHT:
+		case ACTION_END:
+			break;
+		}
+	}
+
+
+	void action(ACTION what) {
+		CSequenceLayer& layer(m_layers[m_layer]);
+		switch(m_action_context) {
+		case KEY_EDIT: edit_action(layer,what); break;
+		case KEY_PASTE: paste_action(layer,what); break;
+		case KEY_CLEAR: clear_action(layer,what); break;
+		case KEY_GATE: gate_action(layer,what); break;
+		case KEY_LOOP: loop_action(layer,what); break;
+		}
+	}
+
 	void event(int evt, uint32_t param) {
+		switch(evt) {
+		case EV_KEY_PRESS:
+			if(!m_action_context) {
+				switch(param) {
+				case KEY_EDIT:
+				case KEY_PASTE:
+				case KEY_CLEAR:
+				case KEY_GATE:
+				case KEY_LOOP:
+					m_action_context = param;
+					m_encoder_moved = 0;
+					action(ACTION_BEGIN);
+					break;
+				}
+			}
+			break;
+		case EV_KEY_RELEASE:
+			if(param == m_action_context) {
+				action(ACTION_END);
+				m_action_context = 0;
+			}
+			break;
+		case EV_ENCODER:
+			if(m_action_context) {
+				if(!m_encoder_moved) {
+					action(ACTION_ENC_MOVING);
+					m_encoder_moved = 0;
+				}
+				if((int)param<0) {
+					action(ACTION_ENC_LEFT);
+				}
+				else {
+					action(ACTION_ENC_RIGHT);
+				}
+			}
+			else {
+				if((int)param < 0) {
+					if(m_cursor > 0) {
+						--m_cursor;
+					}
+				}
+				else {
+					if(++m_cursor >=  MAX_CURSOR) {
+						m_cursor = MAX_CURSOR;
+					}
+				}
+				g_popup.avoid(m_cursor);
+			}
+			break;
+		}
+	}
+
+
+
+
+	/*
+	void xevent(int evt, uint32_t param) {
 		CSequenceLayer *layer = &m_layers[m_layer];
 		CSequenceLayer::STEP_TYPE step;
 		switch(evt) {
@@ -404,7 +562,7 @@ public:
 			}
 			break;
                                                                                          		}
-	}
+	}*/
 
 	/////////////////////////////////////////////////////////////////////////////////////////////
 	void repaint() {
