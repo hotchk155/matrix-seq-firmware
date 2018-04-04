@@ -220,18 +220,14 @@ int main(void) {
     while(1) {
 
     	if(g_clock.m_ms_tick) {
-    		g_popup.run();
     		g_clock.m_ms_tick = 0;
+
+    		g_popup.run();
         	g_cv_gate.run();
         	g_midi.run();
-
        		g_sequencer.tick(g_clock.get_ticks(), g_clock.get_part_ticks());
-
-    		if(!OffSwitch.get()) {
-    			PowerControl.set(0);
-    		}
-
         	g_ui.run();
+
 
     		g_ui.lock_for_update();
     		switch(g_view) {
@@ -248,6 +244,9 @@ int main(void) {
 			g_popup.repaint();
 			g_ui.unlock_for_update();
 
+    		if(!OffSwitch.get()) {
+    			PowerControl.set(0);
+    		}
 
     	}
     }
