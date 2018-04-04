@@ -76,24 +76,15 @@
 
 
 
- enum {
+typedef enum:byte {
 	 VIEW_SEQUENCER,
 	 VIEW_MENU,
 	 VIEW_SELECTOR
- };
+ } VIEW_TYPE;
 
-byte g_view = VIEW_SEQUENCER;
-byte g_current_layer = 0;
-
+VIEW_TYPE g_view = VIEW_SEQUENCER;
 
 
-/*
-enum {
-	ACTION_NONE,
-	ACTION_MENU_PRESS,
-	ACTION_MENU_DRAG
-};
-int g_action = ACTION_NONE;*/
 void dispatch_event(int event, uint32_t param) {
 	switch(g_view) {
 	case VIEW_SEQUENCER:
@@ -108,62 +99,11 @@ void dispatch_event(int event, uint32_t param) {
 	}
 }
 
-/*
-enum {
-	MENU_PRESS_DOWN = 1, // menu key has been pressed but no action specified yet
-	MENU_PRESS_SHIFT = 2,
-	MENU_PRESS_LAYER_COPY = 3 // a shifted layer button has been pressed
-};
-byte g_menu_press= 0;*/
-//char g_selected_layer = -1;
-
 void select_layer(byte layer) {
-	g_current_layer = layer;
-	g_popup.layer(g_current_layer, g_sequencer.is_layer_enabled(g_current_layer));
-	g_sequencer.set_active_layer(g_current_layer);
+	g_popup.layer(layer, g_sequencer.is_layer_enabled(layer));
+	g_sequencer.set_active_layer(layer);
 	force_full_repaint();
 }
-
-
-/*
-void layer_button_event(int event, uint32_t param) {
-	byte layer = 0;
-	switch(param) {
-	case KEY2_LAYER2: layer = 1; break;
-	case KEY2_LAYER3: layer = 2; break;
-	case KEY2_LAYER4: layer = 3; break;
-	}
-	g_current_layer = layer;
-	g_popup.layer(g_current_layer, g_sequencer.is_layer_enabled(g_current_layer));
-	g_sequencer.set_active_layer(g_current_layer);
-	force_full_repaint();
-
-	if(event == EV_KEY_PRESS) {
-		//
-		if(g_menu_press == MENU_PRESS_LAYER_COPY) {
-			char text[4] = {(char)('1'+g_current_layer), '-', '>', (char)('1'+layer)};
-			g_sequencer.copy_layer(g_current_layer, layer);
-			g_popup.text(text,4);
-			g_popup.align(CPopup::ALIGN_RIGHT);
-		}
-		else {
-			// the current layer button is not currently
-			// held so we are selecting a new layer
-			g_current_layer = layer;
-			g_popup.layer(g_current_layer, g_sequencer.is_layer_enabled(g_current_layer));
-			g_sequencer.set_active_layer(g_current_layer);
-			force_full_repaint();
-			g_menu_press = MENU_PRESS_LAYER_COPY;
-		}
-	}
-	else {
-		if(layer == g_current_layer) {
-			// the button for the current layer has been
-			// released, so copying is no longer active
-			g_menu_press = MENU_PRESS_SHIFT;
-		}
-	}
-	*/
 
 void fire_event(int event, uint32_t param) {
 
@@ -194,8 +134,8 @@ void fire_event(int event, uint32_t param) {
 			select_layer(3);
 			break;
 		case KEY_MENU|KEY2_LAYER_MUTE:
-			g_sequencer.enable_layer(g_current_layer,!g_sequencer.is_layer_enabled(g_current_layer));
-			g_popup.layer(g_current_layer, g_sequencer.is_layer_enabled(g_current_layer));
+			g_sequencer.enable_layer(g_sequencer.m_layer,!g_sequencer.is_layer_enabled(g_sequencer.m_layer));
+			g_popup.layer(g_sequencer.m_layer, g_sequencer.is_layer_enabled(g_sequencer.m_layer));
 			force_full_repaint();
 			g_popup.align(CPopup::ALIGN_RIGHT);
 			break;
@@ -242,7 +182,6 @@ void fire_event(int event, uint32_t param) {
 
 void fire_note(byte midi_note, byte midi_vel) {
 	g_midi.send_note(0, midi_note, midi_vel);
-	//LED1.set(!!midi_vel);
 }
 
 void force_full_repaint() {
@@ -314,58 +253,3 @@ int main(void) {
     }
     return 0 ;
 }
-
-
-
-/*
- *
- *
- *
-
-
-
-EDIT
-	EDIT_CLICK
-	EDIT_PASTE_HELD
-		EDIT_PASTE_CLICK
-		EDIT_PASTE_ENCODER
-	EDIT_CLEAR_HELD
-		EDIT_CLEAR_CLICK
-		EDIT_CLEAR_ENCODER
-	EDIT_GATE_HELD
-		EDIT_GATE_CLICK
-	EDIT_LOOP_HELD
-		EDIT_LOOP_CLICK
-	EDIT_STORE_HELD
-		EDIT_STORE_CLICK
-	EDIT_RUN_HELD
-		EDIT_RUN_CLICK
-
-
-	EDIT_PRESS
-	EDIT_CLICK
-
-PASTE
-
-CLEAR
-
-GATE
-
-LOOP
-
-STORE
-
-START/STOP
-
-MENU
-	SELECT_LAYER1
-	SELECT_LAYER2
-	SELECT_LAYER3
-	SELECT_LAYER4
-	MUTE_LAYER
-
-
-
-
-
-*/
