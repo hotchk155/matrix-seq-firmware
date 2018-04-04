@@ -353,18 +353,18 @@ public:
 	}
 	void key_up(uint32_t key) {
 		if(key == m_shift) { // has the current shift key been released?
-			fire_event(EV_KEY_RELEASE, key);
 			if(m_key == 0 && m_button_hold_timeout) { // only counts as "click" if last key released
 				fire_event(EV_KEY_CLICK, key);
 			}
+			fire_event(EV_KEY_RELEASE, key);
 			m_key = 0;
 			m_shift = 0;
 		}
 		else if(key == m_key) {
-			fire_event(EV_KEY_RELEASE, m_shift|m_key);
 			if(m_button_hold_timeout) {
 				fire_event(EV_KEY_CLICK, m_shift|m_key);
 			}
+			fire_event(EV_KEY_RELEASE, m_shift|m_key);
 			m_key = 0;
 		}
 		m_button_hold_timeout = 0;

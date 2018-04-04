@@ -61,7 +61,6 @@ public:
 	byte m_flags;
 	byte m_scale[11];
 	byte m_scale_size;
-	CSequenceLayer::STEP_TYPE m_copy_step;
 
 
 
@@ -81,7 +80,7 @@ public:
 		m_flags = 0;
 		m_action = ACTION_NONE;
 		//m_popup = 0;
-		m_copy_step = 0;
+		//m_copy_step = 0;
 		m_value = 0;
 		m_scale_size = 0;
 		m_is_running = 0;
@@ -268,49 +267,127 @@ public:
 
 typedef enum:byte {
 	ACTION_BEGIN,
-	ACTION_ENC_MOVING,
 	ACTION_ENC_LEFT,
 	ACTION_ENC_RIGHT,
+	ACTION_HOLD,
+	ACTION_CLICK,
 	ACTION_END
 } ACTION;
 
 	uint32_t m_action_context = 0;
 	byte m_encoder_moved = 0;
 
-	void edit_action(CSequenceLayer& layer, ACTION what) {
+
+	///////////////////////////////////////////////////////////////////////////////
+	// change step value based on encode event
+	void value_action(CSequenceLayer& layer, CSequenceLayer::STEP_TYPE *value, ACTION what) {
 		switch(what) {
-		case ACTION_BEGIN:
-			break;
-		case ACTION_ENC_MOVING:
-			break;
 		case ACTION_ENC_LEFT:
-		case ACTION_ENC_RIGHT:
-			m_copy_step = layer.get_step(m_cursor);
-			layer.inc_step_value(&m_copy_step, (what == ACTION_ENC_RIGHT));
-			layer.set_step(m_cursor, m_copy_step);
-			set_scroll_for(m_copy_step, layer);
-			step_info(m_copy_step, layer);
+			layer.inc_step_value(value, -1);
 			break;
-		case ACTION_END:
+		case ACTION_ENC_RIGHT:
+			layer.inc_step_value(value, +1);
+			break;
+		default:
 			break;
 		}
 	}
-	void paste_action(CSequenceLayer& layer, ACTION what) {
+
+	///////////////////////////////////////////////////////////////////////////////
+	// Move cursor left / right for encoder event
+	void cursor_action(ACTION what) {
 		switch(what) {
+		case ACTION_ENC_RIGHT:
+			if(m_cursor < CSequenceLayer::MAX_STEPS-1) {
+				++m_cursor;
+			}
+			break;
+		case ACTION_ENC_LEFT:
+			if(m_cursor > 0) {
+				--m_cursor;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	// STUFF WHAT THE EDIT BUTTON DOES...
+	byte edit_action(CSequenceLayer& layer, ACTION what) {
+		CSequenceLayer::STEP_TYPE step = layer.get_step(m_cursor);
+		switch(what) {
+		////////////////////////////////////////////////
 		case ACTION_BEGIN:
-		case ACTION_ENC_MOVING:
+			if(!layer.is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
+				// there is a valid note in this column so we copy it to our
+				// paste buffer, scroll it into view and show note name on screen
+				layer.m_state.m_copy_step = step;
+				set_scroll_for(layer.m_state.m_copy_step, layer);
+				step_info(layer.m_state.m_copy_step, layer);
+			}
+			break;
+		////////////////////////////////////////////////
+		case ACTION_HOLD:
+			// holding the button down shows the layer id
+			g_popup.layer(m_layer, layer.m_cfg.m_enabled);
+			break;
+		////////////////////////////////////////////////
 		case ACTION_ENC_LEFT:
 		case ACTION_ENC_RIGHT:
+			// encoder moved while the button is held
+			if(!layer.is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
+				// we are dragging a note around
+				value_action(layer, &layer.m_state.m_copy_step, what);
+				layer.set_step(m_cursor, layer.m_state.m_copy_step);
+			}
+			else {
+				// no note in copy buffer so we invent one based on scroll offset
+				// and insert it into the pattern
+				if(!(layer.m_state.m_copy_step & CSequenceLayer::IS_ACTIVE)) {
+					layer.m_state.m_copy_step = layer.m_state.m_scroll_ofs|CSequenceLayer::IS_VEL1|CSequenceLayer::IS_ACTIVE;
+				}
+				layer.set_step(m_cursor, layer.m_state.m_copy_step);
+			}
+			set_scroll_for(layer.m_state.m_copy_step, layer);
+			step_info(layer.m_state.m_copy_step, layer);
+			break;
+		default:
+			break;
+		}
+		return 0;
+	}
+
+
+	///////////////////////////////////////////////////////////////////////////////
+	// STUFF WHAT THE PASTE BUTTON DOES
+	void paste_action(CSequenceLayer& layer, ACTION what) {
+
+		switch(what) {
+		case ACTION_BEGIN:
+			set_scroll_for(layer.m_state.m_copy_step, layer);
+			step_info(layer.m_state.m_copy_step, layer);
+			break;
+		case ACTION_ENC_LEFT:
+		case ACTION_ENC_RIGHT:
+			if(!layer.is_note_mode() || (layer.m_state.m_copy_step & CSequenceLayer::IS_ACTIVE)) {
+				layer.set_step(m_cursor, layer.m_state.m_copy_step);
+			}
+			cursor_action(what);
+			break;
+		case ACTION_HOLD:
 		case ACTION_END:
+		case ACTION_CLICK:
 			break;
 		}
 	}
 	void clear_action(CSequenceLayer& layer, ACTION what) {
 		switch(what) {
 		case ACTION_BEGIN:
-		case ACTION_ENC_MOVING:
 		case ACTION_ENC_LEFT:
 		case ACTION_ENC_RIGHT:
+		case ACTION_HOLD:
+		case ACTION_CLICK:
 		case ACTION_END:
 			break;
 		}
@@ -318,9 +395,10 @@ typedef enum:byte {
 	void gate_action(CSequenceLayer& layer, ACTION what) {
 		switch(what) {
 		case ACTION_BEGIN:
-		case ACTION_ENC_MOVING:
 		case ACTION_ENC_LEFT:
 		case ACTION_ENC_RIGHT:
+		case ACTION_HOLD:
+		case ACTION_CLICK:
 		case ACTION_END:
 			break;
 		}
@@ -328,9 +406,10 @@ typedef enum:byte {
 	void loop_action(CSequenceLayer& layer, ACTION what) {
 		switch(what) {
 		case ACTION_BEGIN:
-		case ACTION_ENC_MOVING:
 		case ACTION_ENC_LEFT:
 		case ACTION_ENC_RIGHT:
+		case ACTION_HOLD:
+		case ACTION_CLICK:
 		case ACTION_END:
 			break;
 		}
@@ -365,6 +444,16 @@ typedef enum:byte {
 				}
 			}
 			break;
+		case EV_KEY_HOLD:
+			if(param == m_action_context) {
+				action(ACTION_HOLD);
+			}
+			break;
+		case EV_KEY_CLICK:
+			if(param == m_action_context) {
+				action(ACTION_CLICK);
+			}
+			break;
 		case EV_KEY_RELEASE:
 			if(param == m_action_context) {
 				action(ACTION_END);
@@ -373,16 +462,13 @@ typedef enum:byte {
 			break;
 		case EV_ENCODER:
 			if(m_action_context) {
-				if(!m_encoder_moved) {
-					action(ACTION_ENC_MOVING);
-					m_encoder_moved = 0;
-				}
 				if((int)param<0) {
 					action(ACTION_ENC_LEFT);
 				}
 				else {
 					action(ACTION_ENC_RIGHT);
 				}
+				m_encoder_moved = 1;
 			}
 			else {
 				if((int)param < 0) {
@@ -649,6 +735,11 @@ typedef enum:byte {
 				break;
 			case V_SQL_SEQ_MODE_MOD:
 				n = STEP_VALUE(step);
+				if(n>0) {
+					// baseline
+					g_ui.hilite(CSequenceLayer::MAX_MOD_VALUE) |= mask;
+				}
+
 				if(n>CSequenceLayer::MAX_MOD_VALUE) {
 					n=0;
 				}
@@ -668,11 +759,13 @@ typedef enum:byte {
 					g_ui.hilite(n) &= ~mask;
 
 				}
+
 				break;
 			case V_SQL_SEQ_MODE_VELOCITY:
 			case V_SQL_SEQ_MODE_MAX:
 				break;
 			}
+
 
 			// Display the sequencer steps
 			int vel;

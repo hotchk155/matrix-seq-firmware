@@ -92,6 +92,7 @@ public:
 		uint32_t m_next_tick;
 		byte m_last_tick_lsb;
 		PLAYING_NOTE m_playing[MAX_PLAYING_NOTES];
+		CSequenceLayer::STEP_TYPE m_copy_step;
 		//byte m_gate;
 //		byte m_reference;
 	} STATE;
@@ -129,6 +130,7 @@ public:
 		m_state.m_scroll_ofs = 48;
 		m_state.m_last_tick_lsb = 0;
 		m_state.m_last_note = 0;
+		m_state.m_copy_step = 0;
 		//m_state.m_gate = CCVGate::GATE_CLOSED;
 		//m_state.m_reference = 0;
 		memset(m_state.m_playing,0,sizeof(m_state.m_playing));
@@ -259,6 +261,7 @@ public:
 			break;
 		}
 		m_cfg.m_mode = value;
+		m_state.m_copy_step = 0;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -374,8 +377,13 @@ public:
 		}
 	}
 
-	void inc_step_value(STEP_TYPE *value, byte up) {
-		int v = (byte)(*value) + (up? 1 : -1);
+	void constrain_step_value(STEP_TYPE *value) {
+		inc_step_value(value, 0);
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	void inc_step_value(STEP_TYPE *value, int delta) {
+		int v = (byte)(*value) + delta;
 		int max_note = 127;
 		switch(m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_MOD:
