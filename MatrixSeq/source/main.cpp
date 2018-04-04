@@ -108,13 +108,14 @@ void dispatch_event(int event, uint32_t param) {
 	}
 }
 
+/*
 enum {
 	MENU_PRESS_DOWN = 1, // menu key has been pressed but no action specified yet
 	MENU_PRESS_SHIFT = 2,
 	MENU_PRESS_LAYER_COPY = 3 // a shifted layer button has been pressed
 };
-byte g_menu_press= 0;
-char g_selected_layer = -1;
+byte g_menu_press= 0;*/
+//char g_selected_layer = -1;
 
 void select_layer(byte layer) {
 	g_current_layer = layer;

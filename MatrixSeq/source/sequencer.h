@@ -271,6 +271,8 @@ typedef enum:byte {
 	ACTION_ENC_RIGHT,
 	ACTION_HOLD,
 	ACTION_CLICK,
+	ACTION_SHIFT2,
+	ACTION_SHIFT3,
 	ACTION_END
 } ACTION;
 
@@ -352,46 +354,79 @@ typedef enum:byte {
 			set_scroll_for(layer.m_state.m_copy_step, layer);
 			step_info(layer.m_state.m_copy_step, layer);
 			break;
+		////////////////////////////////////////////////
+		case ACTION_SHIFT2:
+			// EDIT + PASTE - advance cursor and copy the current step
+			if(layer.m_state.m_copy_step) {
+				if(++m_cursor >= CSequenceLayer::MAX_STEPS-1) {
+					m_cursor = 0;
+				}
+				layer.set_step(m_cursor, layer.m_state.m_copy_step);
+			}
+			break;
+			////////////////////////////////////////////////
+		case ACTION_SHIFT3:
+			// EDIT + CLEAR - clear current step and advance cursor
+			layer.clear_step(m_cursor);
+			if(++m_cursor >= CSequenceLayer::MAX_STEPS-1) {
+				m_cursor = 0;
+			}
+			break;
 		default:
 			break;
 		}
 		return 0;
 	}
 
-
 	///////////////////////////////////////////////////////////////////////////////
-	// STUFF WHAT THE PASTE BUTTON DOES
+	// PASTE BUTTON
 	void paste_action(CSequenceLayer& layer, ACTION what) {
-
 		switch(what) {
-		case ACTION_BEGIN:
-			set_scroll_for(layer.m_state.m_copy_step, layer);
-			step_info(layer.m_state.m_copy_step, layer);
+		////////////////////////////////////////////////
+		case ACTION_CLICK:
+			// a click pastes note to new step
+			if(layer.m_state.m_copy_step) {
+				layer.set_step(m_cursor, layer.m_state.m_copy_step);
+			}
 			break;
+			////////////////////////////////////////////////
 		case ACTION_ENC_LEFT:
 		case ACTION_ENC_RIGHT:
+			// hold-turn pastes multiple notes
 			if(!layer.is_note_mode() || (layer.m_state.m_copy_step & CSequenceLayer::IS_ACTIVE)) {
 				layer.set_step(m_cursor, layer.m_state.m_copy_step);
 			}
 			cursor_action(what);
 			break;
-		case ACTION_HOLD:
-		case ACTION_END:
-		case ACTION_CLICK:
+		default:
 			break;
 		}
 	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	// CLEAR BUTTON
 	void clear_action(CSequenceLayer& layer, ACTION what) {
 		switch(what) {
-		case ACTION_BEGIN:
+		////////////////////////////////////////////////
+		case ACTION_CLICK:
+			// a click erases a step, copying it to paste buffer
+			layer.m_state.m_copy_step = layer.get_step(m_cursor);
+			layer.clear_step(m_cursor);
+			break;
+			////////////////////////////////////////////////
 		case ACTION_ENC_LEFT:
 		case ACTION_ENC_RIGHT:
-		case ACTION_HOLD:
-		case ACTION_CLICK:
-		case ACTION_END:
+			// hold-turn erases multiple notes
+			layer.clear_step(m_cursor);
+			cursor_action(what);
+			break;
+		default:
 			break;
 		}
 	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	// GATE BUTTON
 	void gate_action(CSequenceLayer& layer, ACTION what) {
 		switch(what) {
 		case ACTION_BEGIN:
@@ -400,6 +435,8 @@ typedef enum:byte {
 		case ACTION_HOLD:
 		case ACTION_CLICK:
 		case ACTION_END:
+		case ACTION_SHIFT2:
+		case ACTION_SHIFT3:
 			break;
 		}
 	}
@@ -411,6 +448,8 @@ typedef enum:byte {
 		case ACTION_HOLD:
 		case ACTION_CLICK:
 		case ACTION_END:
+		case ACTION_SHIFT2:
+		case ACTION_SHIFT3:
 			break;
 		}
 	}
@@ -440,6 +479,16 @@ typedef enum:byte {
 					m_action_context = param;
 					m_encoder_moved = 0;
 					action(ACTION_BEGIN);
+					break;
+				}
+			}
+			else if(m_action_context == KEY_EDIT) {
+				switch(param) {
+				case KEY_EDIT|KEY_PASTE:
+					action(ACTION_SHIFT2);
+					break;
+				case KEY_EDIT|KEY_CLEAR:
+					action(ACTION_SHIFT3);
 					break;
 				}
 			}
