@@ -19,32 +19,33 @@ public:
 		NO_POS = -1,
 		MAX_STEPS = 32,					// number of steps in the layer
 		IS_ACTIVE = (uint16_t)0x100,	// is step active
-		IS_VEL0 = (uint16_t)0x200, 	// velocity type bit 0
-		IS_VEL1 = (uint16_t)0x400, 	// velocity type bit 1
+		IS_TRIG = (uint16_t)0x200,
+		IS_ACCENT = (uint16_t)0x400,
 		MAX_PLAYING_NOTES = 8,
 		REFERENCE_NOTE = 48,
 		DEFAULT_NOTE = 36,
 		MAX_MOD_VALUE = 12
 	};
 
-	enum {
+/*	enum {
 		VELOCITY_OFF,
 		VELOCITY_LEGATO,
 		VELOCITY_LOW,
 		VELOCITY_MEDIUM,
 		VELOCITY_HIGH
-	};
+	};*/
 
 	// look up table of tick rates
 	static const byte c_tick_rates[V_SQL_STEP_RATE_MAX];
 	static const byte c_step_duration[V_SQL_STEP_DUR_MAX];
 
+	/*
 	static const STEP_TYPE VEL_MASK = (IS_ACTIVE|IS_VEL0|IS_VEL1);
 	static const STEP_TYPE VEL_LEGATO = (IS_ACTIVE);
 	static const STEP_TYPE VEL_LOW = (IS_ACTIVE|IS_VEL0);
 	static const STEP_TYPE VEL_MEDIUM = (IS_ACTIVE|IS_VEL1);
 	static const STEP_TYPE VEL_HIGH = (IS_ACTIVE|IS_VEL0|IS_VEL1);
-
+*/
 	// step word contains both gate and CV info
 	// CV info is 1 byte. Interpretation depends on mode. Always 1 unit per grid cell
 	//
@@ -64,7 +65,7 @@ public:
 		byte 			m_loop_from;		// loop start point
 		byte 			m_loop_to;			// loop end point
 		char			m_transpose;		// manual transpose amount for the layer
-		V_SQL_TRANSPOSE_MOD	m_transpose_mod;	// automatic transpose source for the layer
+		//V_SQL_TRANSPOSE_MOD	m_transpose_mod;	// automatic transpose source for the layer
 		V_SQL_STEP_DUR	m_note_dur;
 //		V_SQL_VEL_MOD	m_midi_vel_mod;		// MIDI velocity modulation
 		byte 			m_enabled;
@@ -117,7 +118,7 @@ public:
 		m_cfg.m_loop_from	= 0;
 		m_cfg.m_loop_to		= 15;
 		m_cfg.m_transpose	= 0;
-		m_cfg.m_transpose_mod = V_SQL_TRANSPOSE_MOD_OFF;
+		//m_cfg.m_transpose_mod = V_SQL_TRANSPOSE_MOD_OFF;
 		m_cfg.m_midi_channel 	= V_SQL_MIDI_CHAN_NONE;
 		m_cfg.m_midi_cc = 1;
 		m_cfg.m_enabled = 1;
@@ -211,15 +212,33 @@ public:
 		}
 	}
 
-
 	///////////////////////////////////////////////////////////////////////////////
-	void clear_step(byte index) {
+	void clear_step_value(byte index) {
 		switch(m_cfg.m_mode) {
+		case V_SQL_SEQ_MODE_SCALE:
+		case V_SQL_SEQ_MODE_CHROMATIC:
+			m_cfg.m_step[index] = 0; // clear gate and note
+			break;
 		case V_SQL_SEQ_MODE_TRANSPOSE:
-			m_cfg.m_step[index] = 64;
+			m_cfg.m_step[index] &= 0xFF00; // clear gate and set value to mid point
+			m_cfg.m_step[index] |= 64;
 			break;
 		default:
-			m_cfg.m_step[index] = 0;
+			m_cfg.m_step[index] &= 0xFF00; // only clear value leave gate
+			break;
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	void paste_step_value(byte index, STEP_TYPE step) {
+		switch(m_cfg.m_mode) {
+		case V_SQL_SEQ_MODE_SCALE:
+		case V_SQL_SEQ_MODE_CHROMATIC:
+			m_cfg.m_step[index] = step;
+			break;
+		default:
+			m_cfg.m_step[index] &= 0xFF00; // clear gate and set value to mid point
+			m_cfg.m_step[index] |= (byte)step;
 			break;
 		}
 	}
@@ -297,6 +316,7 @@ public:
 		m_state.m_play_pos = pos;
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
 	void start(uint32_t ticks, byte parts_tick) {
 		m_state.m_next_tick = ticks;
 	}
@@ -369,7 +389,7 @@ public:
 		}
 	}
 
-
+/*
 	static int get_velocity(const STEP_TYPE& step) {
 		switch(step & VEL_MASK) {
 		case VEL_LEGATO: return VELOCITY_LEGATO;
@@ -389,7 +409,51 @@ public:
 		case VELOCITY_HIGH: step |= VEL_HIGH; break;
 		}
 	}
+*/
 
+
+	///////////////////////////////////////////////////////////////////////////////
+	static void inc_gate(STEP_TYPE *value, byte as_note, byte rollover) {
+		if(*value & IS_ACCENT) {
+			if(rollover) {
+				*value &= ~(IS_TRIG|IS_ACCENT);
+				if(!as_note) {
+					*value &= ~IS_ACTIVE;
+				}
+			}
+		}
+		else if(*value & IS_TRIG) {
+			if(as_note) {
+				*value |= IS_ACCENT;
+			}
+			else if(rollover) {
+				*value &= ~(IS_TRIG|IS_ACCENT|IS_ACTIVE);
+			}
+		}
+		else if(*value & IS_ACTIVE) {
+			*value |= IS_TRIG;
+		}
+		else if (!as_note) {
+			*value |= IS_ACTIVE;
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	static void dec_gate(STEP_TYPE *value, byte as_note) {
+		if(*value & IS_ACCENT) {
+			*value &= ~IS_ACCENT;
+			*value |= IS_TRIG;
+		}
+		else if(*value & IS_TRIG) {
+			*value &= ~IS_TRIG;
+			*value |= IS_ACTIVE;
+		}
+		else if(*value & IS_ACTIVE && !as_note) {
+			*value &= ~IS_ACTIVE;
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
 	void constrain_step_value(STEP_TYPE *value) {
 		inc_step_value(value, 0);
 	}
@@ -513,7 +577,7 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	// Play a step for a note mode
-	void action_step_note(byte which, STEP_TYPE step_for_transpose, byte midi_vel_hi, byte midi_vel_med, byte midi_vel_lo, byte action_gate) {
+	void action_step_note(byte which, STEP_TYPE step_for_transpose, byte midi_vel_accent, byte midi_vel, byte action_gate) {
 		STEP_TYPE step = 0;
 		if(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
 			int transposed = (int)STEP_VALUE(step_for_transpose) + (int)STEP_VALUE(m_state.m_step_value) - 64;
@@ -530,13 +594,15 @@ public:
 		CCVGate::GATE_STATE gate_state = CCVGate::GATE_CLOSED;
 		byte legato = 0;
 		byte velocity = 0;
-		byte active = 1;
-		switch(get_velocity(step)) {
-		case VELOCITY_LOW: velocity = midi_vel_lo; break;
-		case VELOCITY_MEDIUM: velocity = midi_vel_med; break;
-		case VELOCITY_HIGH: velocity = midi_vel_hi; break;
-		case VELOCITY_LEGATO: legato = 1; break; // legato only set for active step
-		case VELOCITY_OFF: active = 0; break;
+		byte active = !!(step & IS_ACTIVE);
+		if(step & IS_ACCENT) {
+			velocity = midi_vel_accent;
+		}
+		else if(step & IS_TRIG) {
+			velocity = midi_vel;
+		}
+		else {
+			legato = 1;
 		}
 
 		// Kill "open" notes which are timed to step boundaries rather than by a timeout
@@ -673,30 +739,23 @@ public:
 	// Play the gate for a step
 	void action_step_gate(byte which) {
 		STEP_TYPE step = m_state.m_step_value;
-		switch(get_velocity(step)) {
-		case VELOCITY_LOW:
-		case VELOCITY_MEDIUM:
-		case VELOCITY_HIGH:
+		if(step & IS_TRIG) {
 			g_cv_gate.gate(which, CCVGate::GATE_RETRIG);
-			break;
-		case VELOCITY_LEGATO:
+		}
+		else if(step & IS_ACTIVE) {
 			g_cv_gate.gate(which, CCVGate::GATE_OPEN);
-			break;
-		case VELOCITY_OFF:
-			// gate closes based on step duration
-			break;
 		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void test() {
-		m_cfg.m_step[0] = 45|IS_VEL1|IS_ACTIVE;
-		m_cfg.m_step[1] = 45|IS_VEL1|IS_ACTIVE;
-		m_cfg.m_step[4] = 46|IS_VEL1|IS_ACTIVE;
-		m_cfg.m_step[5] = 48|IS_VEL1|IS_ACTIVE;
-		m_cfg.m_step[8] = 50|IS_VEL1|IS_ACTIVE;
-		m_cfg.m_step[9] = 50|IS_VEL1|IS_ACTIVE;
-		m_cfg.m_step[12] = 52|IS_VEL1|IS_ACTIVE;
+		m_cfg.m_step[0] = 45|IS_ACTIVE;
+		m_cfg.m_step[1] = 45|IS_ACTIVE;
+		m_cfg.m_step[4] = 46|IS_ACTIVE;
+		m_cfg.m_step[5] = 48|IS_ACTIVE;
+		m_cfg.m_step[8] = 50|IS_ACTIVE;
+		m_cfg.m_step[9] = 50|IS_ACTIVE;
+		m_cfg.m_step[12] = 52|IS_ACTIVE;
 	}
 
 	/*

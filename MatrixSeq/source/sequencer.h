@@ -41,9 +41,8 @@ public:
 	typedef struct {
 		V_SQL_SCALE_TYPE scale_type;
 		V_SQL_SCALE_ROOT scale_root;
-		byte 			m_midi_vel_hi;
-		byte 			m_midi_vel_med;
-		byte 			m_midi_vel_lo;
+		byte 			m_midi_vel_accent;
+		byte 			m_midi_vel;
 	} CONFIG;
 	CONFIG m_cfg;
 
@@ -62,15 +61,16 @@ public:
 	byte m_scale[11];
 	byte m_scale_size;
 
+	int m_sel_from;
+	int m_sel_to;
 
 
 	///////////////////////////////////////////////////////////////////////////////
 	void init_config() {
 		m_cfg.scale_type = V_SQL_SCALE_TYPE_IONIAN;
 		m_cfg.scale_root = V_SQL_SCALE_ROOT_C;
-		m_cfg.m_midi_vel_hi = 127;
-		m_cfg.m_midi_vel_med = 100;
-		m_cfg.m_midi_vel_lo = 50;
+		m_cfg.m_midi_vel_accent = 127;
+		m_cfg.m_midi_vel = 100;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -84,6 +84,8 @@ public:
 		m_value = 0;
 		m_scale_size = 0;
 		m_is_running = 0;
+		m_sel_from = -1;
+		m_sel_to = -1;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -91,9 +93,8 @@ public:
 		switch(param) {
 		case P_SQL_SCALE_TYPE: m_cfg.scale_type = (V_SQL_SCALE_TYPE)value; break;
 		case P_SQL_SCALE_ROOT: m_cfg.scale_root = (V_SQL_SCALE_ROOT)value; break;
-		case P_SQL_MIDI_VEL_HI: m_cfg.m_midi_vel_hi = value; break;
-		case P_SQL_MIDI_VEL_MED: m_cfg.m_midi_vel_med = value; break;
-		case P_SQL_MIDI_VEL_LO: m_cfg.m_midi_vel_lo = value; break;
+		case P_SQL_MIDI_VEL_ACCENT: m_cfg.m_midi_vel_accent = value; break;
+		case P_SQL_MIDI_VEL: m_cfg.m_midi_vel = value; break;
 		default: m_layers[m_layer].set(param,value);
 		}
 	}
@@ -103,9 +104,8 @@ public:
 		switch(param) {
 		case P_SQL_SCALE_TYPE: return m_cfg.scale_type;
 		case P_SQL_SCALE_ROOT: return m_cfg.scale_root;
-		case P_SQL_MIDI_VEL_HI: return m_cfg.m_midi_vel_hi;
-		case P_SQL_MIDI_VEL_MED: return m_cfg.m_midi_vel_med;
-		case P_SQL_MIDI_VEL_LO: return m_cfg.m_midi_vel_lo;
+		case P_SQL_MIDI_VEL_ACCENT: return m_cfg.m_midi_vel_accent;
+		case P_SQL_MIDI_VEL: return m_cfg.m_midi_vel;
 		default: return m_layers[m_layer].get(param);
 		}
 	}
@@ -129,9 +129,8 @@ public:
 				break;
 			}
 			break;
-		case P_SQL_MIDI_VEL_HI:
-		case P_SQL_MIDI_VEL_MED:
-		case P_SQL_MIDI_VEL_LO:
+		case P_SQL_MIDI_VEL:
+		case P_SQL_MIDI_VEL_ACCENT:
 			switch(m_layers[m_layer].m_cfg.m_mode) {
 			case V_SQL_SEQ_MODE_CHROMATIC:
 			case V_SQL_SEQ_MODE_TRANSPOSE:
@@ -341,15 +340,15 @@ typedef enum:byte {
 			if(!layer.is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
 				// we are dragging a note around
 				value_action(layer, &layer.m_state.m_copy_step, what);
-				layer.set_step(m_cursor, layer.m_state.m_copy_step);
+				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 			}
 			else {
 				// no note in copy buffer so we invent one based on scroll offset
 				// and insert it into the pattern
 				if(!(layer.m_state.m_copy_step & CSequenceLayer::IS_ACTIVE)) {
-					layer.m_state.m_copy_step = layer.m_state.m_scroll_ofs|CSequenceLayer::IS_VEL1|CSequenceLayer::IS_ACTIVE;
+					layer.m_state.m_copy_step = layer.m_state.m_scroll_ofs|CSequenceLayer::IS_TRIG|CSequenceLayer::IS_ACTIVE;
 				}
-				layer.set_step(m_cursor, layer.m_state.m_copy_step);
+				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 			}
 			set_scroll_for(layer.m_state.m_copy_step, layer);
 			step_info(layer.m_state.m_copy_step, layer);
@@ -361,16 +360,17 @@ typedef enum:byte {
 				if(++m_cursor >= CSequenceLayer::MAX_STEPS-1) {
 					m_cursor = 0;
 				}
-				layer.set_step(m_cursor, layer.m_state.m_copy_step);
+				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 			}
 			break;
 			////////////////////////////////////////////////
 		case ACTION_SHIFT3:
-			// EDIT + CLEAR - clear current step and advance cursor
-			layer.clear_step(m_cursor);
+			// EDIT + CLEAR - insert rest and advance cursor
+			layer.clear_step_value(m_cursor);
 			if(++m_cursor >= CSequenceLayer::MAX_STEPS-1) {
 				m_cursor = 0;
 			}
+			layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 			break;
 		default:
 			break;
@@ -386,7 +386,7 @@ typedef enum:byte {
 		case ACTION_CLICK:
 			// a click pastes note to new step
 			if(layer.m_state.m_copy_step) {
-				layer.set_step(m_cursor, layer.m_state.m_copy_step);
+				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 			}
 			break;
 			////////////////////////////////////////////////
@@ -394,7 +394,7 @@ typedef enum:byte {
 		case ACTION_ENC_RIGHT:
 			// hold-turn pastes multiple notes
 			if(!layer.is_note_mode() || (layer.m_state.m_copy_step & CSequenceLayer::IS_ACTIVE)) {
-				layer.set_step(m_cursor, layer.m_state.m_copy_step);
+				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 			}
 			cursor_action(what);
 			break;
@@ -411,13 +411,13 @@ typedef enum:byte {
 		case ACTION_CLICK:
 			// a click erases a step, copying it to paste buffer
 			layer.m_state.m_copy_step = layer.get_step(m_cursor);
-			layer.clear_step(m_cursor);
+			layer.clear_step_value(m_cursor);
 			break;
 			////////////////////////////////////////////////
 		case ACTION_ENC_LEFT:
 		case ACTION_ENC_RIGHT:
 			// hold-turn erases multiple notes
-			layer.clear_step(m_cursor);
+			layer.clear_step_value(m_cursor);
 			cursor_action(what);
 			break;
 		default:
@@ -425,31 +425,67 @@ typedef enum:byte {
 		}
 	}
 
+
+
+
+
 	///////////////////////////////////////////////////////////////////////////////
 	// GATE BUTTON
 	void gate_action(CSequenceLayer& layer, ACTION what) {
+		CSequenceLayer::STEP_TYPE step = layer.get_step(m_cursor);
 		switch(what) {
-		case ACTION_BEGIN:
+		////////////////////////////////////////////////
 		case ACTION_ENC_LEFT:
+			layer.dec_gate(&step,layer.is_note_mode());
+			layer.set_step(m_cursor, step);
+			break;
+		////////////////////////////////////////////////
 		case ACTION_ENC_RIGHT:
-		case ACTION_HOLD:
+			layer.inc_gate(&step,layer.is_note_mode(),0);
+			layer.set_step(m_cursor, step);
+			break;
+		////////////////////////////////////////////////
 		case ACTION_CLICK:
-		case ACTION_END:
-		case ACTION_SHIFT2:
-		case ACTION_SHIFT3:
+			layer.inc_gate(&step,layer.is_note_mode(),1);
+			layer.set_step(m_cursor, step);
+			break;
+		default:
 			break;
 		}
 	}
+
+	///////////////////////////////////////////////////////////////////////////////
 	void loop_action(CSequenceLayer& layer, ACTION what) {
 		switch(what) {
-		case ACTION_BEGIN:
+		////////////////////////////////////////////////
 		case ACTION_ENC_LEFT:
 		case ACTION_ENC_RIGHT:
-		case ACTION_HOLD:
-		case ACTION_CLICK:
+			if(m_sel_from < 0) {
+				m_sel_from = m_cursor;
+			}
+			cursor_action(what);
+			m_sel_to = m_cursor;
+			break;
+		////////////////////////////////////////////////
 		case ACTION_END:
-		case ACTION_SHIFT2:
-		case ACTION_SHIFT3:
+			if(m_sel_from < 0) {
+				layer.set_pos(m_cursor);
+			}
+			else {
+				if(m_sel_to >= m_sel_from) {
+					layer.m_cfg.m_loop_from = m_sel_from;
+					layer.m_cfg.m_loop_to = m_sel_to;
+				}
+				else {
+					layer.m_cfg.m_loop_from = m_sel_to;
+					layer.m_cfg.m_loop_to = m_sel_from;
+				}
+				layer.set_pos(layer.m_cfg.m_loop_from);
+				m_sel_to = -1;
+				m_sel_from = -1;
+			}
+			break;
+		default:
 			break;
 		}
 	}
@@ -745,10 +781,27 @@ typedef enum:byte {
 		int c = 0;
 		int n;
 
+		int ruler_from;
+		int ruler_to;
+		if(m_sel_from >= 0) {
+			if(m_sel_to >= m_sel_from) {
+				ruler_from = m_sel_from;
+				ruler_to = m_sel_to;
+			}
+			else {
+				ruler_to = m_sel_from;
+				ruler_from = m_sel_to;
+			}
+		}
+		else {
+			ruler_from = layer->m_cfg.m_loop_from;
+			ruler_to = layer->m_cfg.m_loop_to;
+		}
+
 		for(i=0; i<32; ++i) {
 
 			// show the "ruler" at the bottom of screen
-			if(i >= layer->m_cfg.m_loop_from && i <= layer->m_cfg.m_loop_to) {
+			if(i >= ruler_from && i <= ruler_to) {
 				if(!(c & 0x03)) { // steps 0, 4, 8 etc
 					g_ui.raster(15) |= mask;
 				}
@@ -817,46 +870,17 @@ typedef enum:byte {
 
 
 			// Display the sequencer steps
-			int vel;
-			switch(layer->m_cfg.m_mode) {
-			case V_SQL_SEQ_MODE_CHROMATIC:
-			case V_SQL_SEQ_MODE_SCALE:
-			case V_SQL_SEQ_MODE_MOD:
-				if(step & CSequenceLayer::IS_ACTIVE) {
-					vel = CSequenceLayer::get_velocity(step);
-					if(m_action == ACTION_EDIT_TRIG) {
-						if(vel == CSequenceLayer::VELOCITY_HIGH) {
-							g_ui.raster(12) |= mask;
-						}
-						else {
-							g_ui.hilite(12) |= mask;
-						}
-						if(vel == CSequenceLayer::VELOCITY_MEDIUM) {
-							g_ui.raster(13) |= mask;
-						}
-						else {
-							g_ui.hilite(13) |= mask;
-						}
-						if(vel == CSequenceLayer::VELOCITY_LOW) {
-							g_ui.raster(14) |= mask;
-						}
-						else {
-							g_ui.hilite(14) |= mask;
-						}
-					}
-					else {
-						if(vel >= CSequenceLayer::VELOCITY_LOW) {
-							g_ui.raster(14) |= mask;
-						}
-						else {
-							g_ui.hilite(14) |= mask;
-						}
-					}
-				}
-				break;
-			default:
-				break;
+			if(step & CSequenceLayer::IS_ACCENT) {
+				g_ui.raster(14) |= mask;
+				g_ui.hilite(14) |= mask;
 			}
+			else if(step & CSequenceLayer::IS_TRIG) {
+				g_ui.raster(14) |= mask;
+			}
+			else if(step & CSequenceLayer::IS_ACTIVE) {
+				g_ui.hilite(14) |= mask;
+			}
+
 			mask>>=1;
 		}
 	}
@@ -897,9 +921,8 @@ typedef enum:byte {
 							layer.action_step_note(
 									i,
 									0,
-									m_cfg.m_midi_vel_hi,
-									m_cfg.m_midi_vel_med,
-									m_cfg.m_midi_vel_lo,
+									m_cfg.m_midi_vel_accent,
+									m_cfg.m_midi_vel,
 									1
 							);
 
@@ -918,9 +941,8 @@ typedef enum:byte {
 									other_layer.action_step_note(
 											j,
 											layer.m_state.m_step_value,
-											m_cfg.m_midi_vel_hi,
-											m_cfg.m_midi_vel_med,
-											m_cfg.m_midi_vel_lo,
+											m_cfg.m_midi_vel_accent,
+											m_cfg.m_midi_vel,
 											0
 									);
 								}

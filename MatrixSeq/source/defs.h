@@ -45,9 +45,8 @@ typedef enum:byte {
 	P_SQL_SCALE_TYPE,
 	P_SQL_SCALE_ROOT,
 	P_SQL_FORCE_SCALE,
-	P_SQL_MIDI_VEL_HI,
-	P_SQL_MIDI_VEL_MED,
-	P_SQL_MIDI_VEL_LO,
+	P_SQL_MIDI_VEL_ACCENT,
+	P_SQL_MIDI_VEL,
 	P_SQL_CVSCALE,
 	P_SQL_CVRANGE,
 	P_SQL_LOAD_PATTERN,
@@ -113,6 +112,7 @@ typedef enum:byte {
 	V_SQL_FORCE_SCALE_MAX
 } V_SQL_FORCE_SCALE;
 
+/*
 typedef enum:byte {
 	V_SQL_VEL_MOD_OFF,
 	V_SQL_VEL_MOD_LAYER1,
@@ -121,7 +121,8 @@ typedef enum:byte {
 	V_SQL_VEL_MOD_LAYER4,
 	V_SQL_VEL_MOD_MAX,
 } V_SQL_VEL_MOD;
-
+*/
+/*
 typedef enum:byte {
 	V_SQL_TRANSPOSE_MOD_OFF,
 	V_SQL_TRANSPOSE_MOD_LAYER1,
@@ -130,7 +131,7 @@ typedef enum:byte {
 	V_SQL_TRANSPOSE_MOD_LAYER4,
 	V_SQL_TRANSPOSE_MOD_MAX,
 } V_SQL_TRANSPOSE_MOD;
-
+*/
 typedef enum:byte {
 	V_SQL_MIDI_CHAN_NONE,
 	V_SQL_MIDI_CHAN_1,
