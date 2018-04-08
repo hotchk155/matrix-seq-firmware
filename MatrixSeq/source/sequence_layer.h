@@ -513,8 +513,18 @@ public:
 	inline void set_step(int index, uint16_t step) {
 		m_cfg.m_step[index] =step;
 	}
+	///////////////////////////////////////////////////////////////////////////////
+	inline void set_step_value(int index, STEP_TYPE step) {
+		if(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD) {
+			m_cfg.m_step[index] &= 0xFF00;
+			m_cfg.m_step[index] |= (step & 0x00FF);
+		}
+		else {
+			m_cfg.m_step[index] =step;
+		}
+	}
 
-	byte vertical_move(int offset) {
+	byte shift_vertical(int offset) {
 		for(int i = 0; i<MAX_STEPS; ++i) {
 			STEP_TYPE step = m_cfg.m_step[i];
 			if(step & IS_ACTIVE) {
@@ -535,16 +545,16 @@ public:
 	void shift_left() {
 		STEP_TYPE step = m_cfg.m_step[0];
 		for(int i = 0; i<MAX_STEPS-1; ++i) {
-			m_cfg.m_step[i] = m_cfg.m_step[i+1];
+			set_step_value(i, m_cfg.m_step[i+1]);
 		}
-		m_cfg.m_step[MAX_STEPS-1] = step;
+		set_step_value(MAX_STEPS-1, step);
 	}
 	void shift_right() {
 		STEP_TYPE step = m_cfg.m_step[MAX_STEPS-1];
 		for(int i = MAX_STEPS-1; i>0; --i) {
-			m_cfg.m_step[i] = m_cfg.m_step[i-1];
+			set_step_value(i, m_cfg.m_step[i-1]);
 		}
-		m_cfg.m_step[0] = step;
+		set_step_value(0, step);
 	}
 
 	///////////////////////////////////////////////////////////////////////////////

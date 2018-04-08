@@ -270,13 +270,13 @@ typedef enum:byte {
 	ACTION_ENC_RIGHT,
 	ACTION_HOLD,
 	ACTION_CLICK,
-	ACTION_SHIFT2,
-	ACTION_SHIFT3,
+	ACTION_EDIT_KEYS,
 	ACTION_END
 } ACTION;
 
 	uint32_t m_action_context = 0;
 	byte m_encoder_moved = 0;
+	uint32_t m_edit_keys = 0;
 
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -336,41 +336,88 @@ typedef enum:byte {
 		////////////////////////////////////////////////
 		case ACTION_ENC_LEFT:
 		case ACTION_ENC_RIGHT:
-			// encoder moved while the button is held
-			if(!layer.is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
-				// we are dragging a note around
-				value_action(layer, &layer.m_state.m_copy_step, what);
-				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
-			}
-			else {
-				// no note in copy buffer so we invent one based on scroll offset
-				// and insert it into the pattern
-				if(!(layer.m_state.m_copy_step & CSequenceLayer::IS_ACTIVE)) {
-					layer.m_state.m_copy_step = layer.m_state.m_scroll_ofs|CSequenceLayer::IS_TRIG|CSequenceLayer::IS_ACTIVE;
+			switch(m_edit_keys) {
+			case KEY_EDIT|KEY_GATE:
+				// action to shift all points up or down
+				if(what == ACTION_ENC_LEFT) {
+					if(layer.shift_vertical(-1)) {
+						--m_value;
+					}
 				}
-				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
+				else {
+					if(layer.shift_vertical(+1)) {
+						++m_value;
+					}
+				}
+				g_popup.show_offset(m_value);
+				break;
+			case KEY_EDIT|KEY_LOOP:
+				// action to shift all points left or right
+				if(what == ACTION_ENC_LEFT) {
+					if(--m_value <= -31) {
+						m_value = 0;
+					}
+					layer.shift_left();
+				}
+				else {
+					if(++m_value >= 31) {
+						m_value = 0;
+					}
+					layer.shift_right();
+				}
+				g_popup.show_offset(m_value);
+				break;
+			default:
+				// encoder moved while the button is held
+				if(!layer.is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
+					// we are dragging a note around
+					value_action(layer, &layer.m_state.m_copy_step, what);
+					layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
+				}
+				else {
+					// no note in copy buffer so we invent one based on scroll offset
+					// and insert it into the pattern
+					if(!(layer.m_state.m_copy_step & CSequenceLayer::IS_ACTIVE)) {
+						layer.m_state.m_copy_step = layer.m_state.m_scroll_ofs|CSequenceLayer::IS_TRIG|CSequenceLayer::IS_ACTIVE;
+					}
+					layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
+				}
+				set_scroll_for(layer.m_state.m_copy_step, layer);
+				step_info(layer.m_state.m_copy_step, layer);
+				break;
 			}
-			set_scroll_for(layer.m_state.m_copy_step, layer);
-			step_info(layer.m_state.m_copy_step, layer);
 			break;
 		////////////////////////////////////////////////
-		case ACTION_SHIFT2:
-			// EDIT + PASTE - advance cursor and copy the current step
-			if(layer.m_state.m_copy_step) {
+		case ACTION_EDIT_KEYS:
+			switch(m_edit_keys) {
+			case KEY_EDIT|KEY_PASTE:
+				// EDIT + PASTE - advance cursor and copy the current step
+				if(layer.m_state.m_copy_step) {
+					if(++m_cursor >= CSequenceLayer::MAX_STEPS-1) {
+						m_cursor = 0;
+					}
+					layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
+				}
+				break;
+			case KEY_EDIT|KEY_CLEAR:
+				// EDIT + CLEAR - insert rest and advance cursor
+				layer.clear_step_value(m_cursor);
 				if(++m_cursor >= CSequenceLayer::MAX_STEPS-1) {
 					m_cursor = 0;
 				}
 				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
+				break;
+			case KEY_EDIT|KEY_GATE:
+				m_value = 0;
+				g_popup.text("VERT", 4);
+				g_popup.align(CPopup::ALIGN_RIGHT);
+				break;
+			case KEY_EDIT|KEY_LOOP:
+				m_value = 0;
+				g_popup.text("HORZ", 4);
+				g_popup.align(CPopup::ALIGN_RIGHT);
+				break;
 			}
-			break;
-			////////////////////////////////////////////////
-		case ACTION_SHIFT3:
-			// EDIT + CLEAR - insert rest and advance cursor
-			layer.clear_step_value(m_cursor);
-			if(++m_cursor >= CSequenceLayer::MAX_STEPS-1) {
-				m_cursor = 0;
-			}
-			layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 			break;
 		default:
 			break;
@@ -515,18 +562,20 @@ typedef enum:byte {
 					m_action_context = param;
 					m_encoder_moved = 0;
 					action(ACTION_BEGIN);
-					break;
 				}
 			}
 			else if(m_action_context == KEY_EDIT) {
-				switch(param) {
-				case KEY_EDIT|KEY_PASTE:
-					action(ACTION_SHIFT2);
-					break;
-				case KEY_EDIT|KEY_CLEAR:
-					action(ACTION_SHIFT3);
-					break;
-				}
+				m_edit_keys = param;
+				action(ACTION_EDIT_KEYS);
+			}
+			break;
+		case EV_KEY_RELEASE:
+			if(param & m_edit_keys) {
+				m_edit_keys = 0;
+			}
+			if(param == m_action_context) {
+				action(ACTION_END);
+				m_action_context = 0;
 			}
 			break;
 		case EV_KEY_HOLD:
@@ -537,12 +586,6 @@ typedef enum:byte {
 		case EV_KEY_CLICK:
 			if(param == m_action_context) {
 				action(ACTION_CLICK);
-			}
-			break;
-		case EV_KEY_RELEASE:
-			if(param == m_action_context) {
-				action(ACTION_END);
-				m_action_context = 0;
 			}
 			break;
 		case EV_ENCODER:
