@@ -6,7 +6,6 @@
 #ifndef MIDI_H_
 #define MIDI_H_
 
-#include "fsl_uart.h"
 
 class CMidi {
 
@@ -99,13 +98,10 @@ public:
 
 };
 
-extern CMidi g_midi;
-#ifdef MAIN_INCLUDE
 CMidi g_midi;
 extern "C" void UART0_IRQHandler(void)
 {
 	g_midi.irq_handler();
 }
-#endif
 
 #endif /* MIDI_H_ */

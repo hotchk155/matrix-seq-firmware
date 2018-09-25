@@ -1,27 +1,22 @@
-/*
- * ui.h
- *
- *  Created on: 2 Apr 2018
- *      Author: jason
- */
+//////////////////////////////////////////////////////////////////////////////
+//
+// MATRIX SEQUENCER
+// 2018/Sixty Four Pixels
+//
+// Display and keyboard driver
+//
+//////////////////////////////////////////////////////////////////////////////
 
 #ifndef UI_H_
 #define UI_H_
 
-CDigitalOut<kGPIO_PORTD, 5> pKDAT;
-CDigitalOut<kGPIO_PORTC, 1> pKCLK;
-CDigitalOut<kGPIO_PORTC, 0> pARCK;
-CDigitalOut<kGPIO_PORTB, 3> pADAT;
-CDigitalOut<kGPIO_PORTB, 2> pASCK;
-CDigitalOut<kGPIO_PORTA, 1> pENABLE;
+//////////////////////////////////////////////////////////////////////////////
+//
+// MACRO DEFS
+//
+//////////////////////////////////////////////////////////////////////////////
 
-CDigitalIn<kGPIO_PORTC, 6> pKeyScan1;
-CDigitalIn<kGPIO_PORTD, 7> pKeyScan2;
-CDigitalIn<kGPIO_PORTD, 6> pKeyScan3;
-
-CDigitalIn<kGPIO_PORTD, 0> pEncoder1;
-CDigitalIn<kGPIO_PORTD, 1> pEncoder2;
-
+// declare the GPIO bits used for fast access to data in port registers
 #define BIT_KDAT		MK_GPIOA_BIT(PORTD_BASE, 5)
 #define BIT_KCLK		MK_GPIOA_BIT(PORTC_BASE, 1)
 #define BIT_ARCK		MK_GPIOA_BIT(PORTC_BASE, 0)
@@ -34,16 +29,7 @@ CDigitalIn<kGPIO_PORTD, 1> pEncoder2;
 #define BIT_ENCODER1	MK_GPIOA_BIT(PORTD_BASE, 0)
 #define BIT_ENCODER2	MK_GPIOA_BIT(PORTD_BASE, 1)
 
-
-#define DEBOUNCE_MS_PRESS 		50
-#define DEBOUNCE_MS_RELEASE		50
-
-
-#define DISPLAY_BUF_SIZE 32
-extern uint32_t g_render_buf[DISPLAY_BUF_SIZE];
-extern volatile byte g_disp_update;
-
-
+// key scan bits for left side buttons (reserved for future use)
 #define KEY_L1	(1U<<0)
 #define KEY_L2	(1U<<1)
 #define KEY_L3	(1U<<2)
@@ -53,6 +39,7 @@ extern volatile byte g_disp_update;
 #define KEY_L7	(1U<<17)
 #define KEY_L8	(1U<<16)
 
+// key scan bits for bottom side buttons
 #define KEY_B1	(1U<<9)
 #define KEY_B2	(1U<<8)
 #define KEY_B3	(1U<<10)
@@ -62,6 +49,7 @@ extern volatile byte g_disp_update;
 #define KEY_B7	(1U<<14)
 #define KEY_B8	(1U<<15)
 
+// key scan bits for right side buttons (reserved for future use)
 #define KEY_R1	(1U<<7)
 #define KEY_R2	(1U<<6)
 #define KEY_R3	(1U<<5)
@@ -71,26 +59,68 @@ extern volatile byte g_disp_update;
 #define KEY_R7	(1U<<22)
 #define KEY_R8	(1U<<23)
 
+// maximum key scan bit
 #define KEY_MAXBIT	(1U<<23)
 
-// map specific key functions
-#define KEY_EDIT	KEY_B1
-#define KEY_PASTE	KEY_B2
-#define KEY_CLEAR	KEY_B3
-#define KEY_GATE	KEY_B4
-#define KEY_LOOP	KEY_B5
-#define KEY_STORE	KEY_B6
-#define KEY_RUN		KEY_B7
-#define KEY_MENU	KEY_B8
-
+// define aliases for specific key bits based on their function
+#define KEY_EDIT		KEY_B1
+#define KEY_PASTE		KEY_B2
+#define KEY_CLEAR		KEY_B3
+#define KEY_GATE		KEY_B4
+#define KEY_LOOP		KEY_B5
+#define KEY_STORE		KEY_B6
+#define KEY_RUN			KEY_B7
+#define KEY_MENU		KEY_B8
 #define KEY2_LAYER1		KEY_B1
 #define KEY2_LAYER2		KEY_B2
 #define KEY2_LAYER3		KEY_B3
 #define KEY2_LAYER4		KEY_B4
 #define KEY2_LAYER_MUTE	KEY_B7
 
-#define LONG_PRESS_TIME 800
 
+// debounce times (ms)
+#define DEBOUNCE_MS_PRESS 		50		// after a button is pressed
+#define DEBOUNCE_MS_RELEASE		50		// after a button is released
+
+// long press time (ms)
+#define LONG_PRESS_TIME 		800
+
+// size of the memory map for display buffer (uint32_t)
+#define DISPLAY_BUF_SIZE 32
+
+//////////////////////////////////////////////////////////////////////////////
+//
+// GLOBAL DATA DEFINITIONS
+//
+//////////////////////////////////////////////////////////////////////////////
+
+// define the output pins used to drive the screen (also initialise the ports)
+CDigitalOut<kGPIO_PORTD, 5> g_pin_kdat;
+CDigitalOut<kGPIO_PORTC, 1> g_pin_kclk;
+CDigitalOut<kGPIO_PORTC, 0> g_pin_arck;
+CDigitalOut<kGPIO_PORTB, 3> g_pin_adat;
+CDigitalOut<kGPIO_PORTB, 2> g_pin_asck;
+CDigitalOut<kGPIO_PORTA, 1> g_pin_enable;
+
+// define the input pins used to read from keyboard scan (also initialise the ports)
+CDigitalIn<kGPIO_PORTC, 6> g_pin_keyscan1;
+CDigitalIn<kGPIO_PORTD, 7> g_pin_keyscan2;
+CDigitalIn<kGPIO_PORTD, 6> g_pin_keyscan3;
+
+// define the input pins used to read from encode (also initialise the ports)
+CDigitalIn<kGPIO_PORTD, 0> g_pin_encoder1;
+CDigitalIn<kGPIO_PORTD, 1> g_pin_encoder2;
+
+extern uint32_t g_render_buf[DISPLAY_BUF_SIZE];
+extern volatile byte g_disp_update;
+
+//////////////////////////////////////////////////////////////////////////////
+//
+// CLASS DEFINITION
+//
+//////////////////////////////////////////////////////////////////////////////
+
+// This class wraps up the driver for the UI
 class CUI {
 
 	typedef enum:byte {
@@ -146,7 +176,7 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////////////
 	void init() {
-		pENABLE.set(1);
+		g_pin_enable.set(1);
 		m_next_pit_period = m_periodShort;
 		EnableIRQ(PIT_CH1_IRQn);
 		PIT_EnableInterrupts(PIT, kPIT_Chnl_1, kPIT_TimerInterruptEnable);
@@ -536,13 +566,14 @@ public:
 
 };
 
-
-extern CUI g_ui;
-#ifdef MAIN_INCLUDE
+//////////////////////////////////////////////////////////////////////////////////
+// define a single instance of the UI class
 CUI g_ui;
+
+//////////////////////////////////////////////////////////////////////////////////
+// The timer interrupt handler which refreshes the screen
 extern "C" void PIT_CH1_IRQHandler(void) {
 	g_ui.isr();
 }
-#endif
 
 #endif /* UI_H_ */

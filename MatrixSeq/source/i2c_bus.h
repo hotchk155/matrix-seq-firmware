@@ -8,7 +8,7 @@
 #ifndef I2C_BUS_H_
 #define I2C_BUS_H_
 
-#include "fsl_i2c.h"
+//#include "fsl_i2c.h"
 
 
 void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle, status_t status, void *userData);
@@ -138,8 +138,6 @@ public:
 	}
 };
 
-extern CI2CBus g_i2c_bus;
-#ifdef MAIN_INCLUDE
 CI2CBus g_i2c_bus;
 void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle, status_t status, void *userData)
 {
@@ -148,6 +146,5 @@ void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle, status_t s
 }
 volatile byte CI2CBus::s_busy = 0;
 volatile byte CI2CBus::m_transaction = 0;
-#endif
 
 #endif /* I2C_BUS_H_ */

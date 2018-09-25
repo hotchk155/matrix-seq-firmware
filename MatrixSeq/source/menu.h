@@ -219,9 +219,6 @@ public:
 	}
 };
 
-extern CMenu g_menu;
-#ifdef MAIN_INCLUDE
 CMenu g_menu;
-#endif
 
 #endif

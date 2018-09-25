@@ -33,8 +33,6 @@
  * @brief   Application entry point.
  */
 
-#define MAIN_INCLUDE
-
 #include <digital_out.h>
 #include <stdio.h>
 #include "board.h"
@@ -45,6 +43,11 @@
 #include "fsl_clock.h"
 #include "fsl_spi.h"
 #include "fsl_pit.h"
+#include "fsl_common.h"
+#include "fsl_kbi.h"
+#include "fsl_gpio.h"
+#include "fsl_i2c.h"
+#include "fsl_uart.h"
 
 
 #include "defs.h"

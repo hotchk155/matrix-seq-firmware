@@ -1,7 +1,14 @@
+//////////////////////////////////////////////////////////////////////////////
+//
+// MATRIX SEQUENCER
+// 2018/Sixty Four Pixels
+//
+// Character set definition
+//
+//////////////////////////////////////////////////////////////////////////////
 #ifndef _CHARS_H_
 #define _CHARS_H_
 
-#include "defs.h"
 extern const uint32_t char4x5[];
 #define CHAR4X5_ALPHA		0
 #define CHAR4X5_HASH		26
@@ -13,7 +20,6 @@ extern const uint32_t char4x5[];
 #define CHAR4X5_PLUS		46
 #define CHAR4X5_BLOCK		47
 
-#ifdef MAIN_INCLUDE
 const uint32_t char4x5[30] = {
 		// A thru H
 		0xEEECEEEAU,
@@ -52,6 +58,6 @@ const uint32_t char4x5[30] = {
 		0xA200444FU,
 		0xEE048A0FU,
 };
-#endif
+
 
 #endif // _CHARS_H_

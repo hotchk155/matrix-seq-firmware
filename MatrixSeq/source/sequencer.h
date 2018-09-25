@@ -1026,9 +1026,6 @@ typedef enum:byte {
 
 };
 
-extern CSequencer g_sequencer;
-#ifdef MAIN_INCLUDE
-	CSequencer g_sequencer;
-#endif
+CSequencer g_sequencer;
 
 #endif /* SEQUENCER_H_ */

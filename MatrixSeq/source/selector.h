@@ -96,10 +96,7 @@ public:
 	}
 };
 
-extern CSelector g_selector;
-#ifdef MAIN_INCLUDE
 CSelector g_selector;
-#endif
 
 
 #endif /* SELECTOR_H_ */

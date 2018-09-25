@@ -30,9 +30,6 @@ public:
 		p=p;
 	}
 };
-extern CStorage g_storage;
-#ifdef MAIN_INCLUDE
 CStorage g_storage;
-#endif
 
 #endif /* STORAGE_H_ */

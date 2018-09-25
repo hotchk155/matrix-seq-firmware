@@ -214,9 +214,6 @@ public:
 	}
 };
 
-extern CPopup g_popup;
-#ifdef MAIN_INCLUDE
 CPopup g_popup;
-#endif
 
 #endif /* POPUP_H_ */

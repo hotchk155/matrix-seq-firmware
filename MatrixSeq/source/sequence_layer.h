@@ -851,10 +851,8 @@ public:
 
 };
 
-
-#ifdef MAIN_INCLUDE
+//TODO
 const byte CSequenceLayer::c_tick_rates[V_SQL_STEP_RATE_MAX] = {96,72,48,36,32,24,18,16,12,9,8,6,4,3};
 const byte CSequenceLayer::c_step_duration[] = {3,4,6,8,9,12,16,18,24,32,36,48,72,96};
-#endif
 
 #endif /* SEQUENCE_LAYER_H_ */

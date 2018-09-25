@@ -18,6 +18,12 @@
 #define BIT_GATE3		MK_GPIOA_BIT(PORTD_BASE, PORTD_BIT_GATE3)
 #define BIT_GATE1		MK_GPIOA_BIT(PORTA_BASE, PORTA_BIT_GATE1)
 
+// These definitions are used to initialise the port
+CDigitalOut<kGPIO_PORTA, PORTA_BIT_GATE1> g_gate_1;
+CDigitalOut<kGPIO_PORTD, PORTD_BIT_GATE2> g_gate_2;
+CDigitalOut<kGPIO_PORTD, PORTD_BIT_GATE3> g_gate_3;
+CDigitalOut<kGPIO_PORTD, PORTD_BIT_GATE4> g_gate_4;
+
 
 /////////////////////////////////////////////////////////////////////////////////
 class CCVGate {
@@ -72,6 +78,7 @@ public:
 	typedef uint16_t DAC_TYPE;
 
 
+	/////////////////////////////////////////////////////////////////////////////////
 	CCVGate() {
 		memset((byte*)m_dac,0,sizeof m_dac);
 		memset((byte*)m_gate,0,sizeof m_gate);
@@ -80,6 +87,7 @@ public:
 	}
 
 
+	/////////////////////////////////////////////////////////////////////////////////
 	void gate(byte which, GATE_STATE gate) {
 		if(m_gate[which] != gate) {
 			switch(gate) {
@@ -101,15 +109,16 @@ public:
 			}
 		}
 	}
-/*
-	V_SQL_CVSCALE_1VOCT = 0,
-	V_SQL_CVSCALE_1_2VOCT,
-	V_SQL_CVSCALE_HZVOLT,
-	V_SQL_CVSCALE_MAX
-} V_SQL_CVSCALE;
-	*/
+
+	/////////////////////////////////////////////////////////////////////////////////
 	void pitch_cv(int which, int note, V_SQL_CVSCALE scaling) {
+
+		// convert the note to DAC value
+		// TODO support other note/cv mappings
 		int dac = (500 * (int)note)/12;
+
+		// get the appropriate offset into the DAC structure
+		// for the target CV output
 		int ofs;
 		switch(which) {
 		case 1: ofs = 1; break;
@@ -117,6 +126,8 @@ public:
 		case 3: ofs = 0; break;
 		default: ofs = 3; break;
 		}
+
+		// if the output has changed then load the new one
 		if(m_dac[ofs] != dac) {
 			g_cv_led.blink(g_cv_led.MEDIUM_BLINK);
 			m_dac[ofs] = dac;
@@ -124,10 +135,12 @@ public:
 		}
 	}
 
+	/////////////////////////////////////////////////////////////////////////////////
 	void mod_cv(int which, byte value, byte volt_range) {
-
+//TODO
 	}
 
+	/////////////////////////////////////////////////////////////////////////////////
 	void run() {
 
 		// if we have CV data to send and the bus is clear
@@ -150,17 +163,8 @@ public:
 
 };
 
-extern CCVGate g_cv_gate;
-#ifdef MAIN_INCLUDE
-
+// define global instance of the CV/Gate controller
 CCVGate g_cv_gate;
-
-// These definitions are used to initialise the port
-CDigitalOut<kGPIO_PORTD, PORTD_BIT_GATE4> pGate4;
-CDigitalOut<kGPIO_PORTD, PORTD_BIT_GATE2> pGate2;
-CDigitalOut<kGPIO_PORTD, PORTD_BIT_GATE3> pGate3;
-CDigitalOut<kGPIO_PORTA, PORTA_BIT_GATE1> pGate1;
-#endif
 
 
 #endif /* CV_GATE_H_ */

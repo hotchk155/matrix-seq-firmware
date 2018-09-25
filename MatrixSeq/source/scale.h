@@ -121,8 +121,5 @@ public:
 
 };
 
-extern CScale g_scale;
-#ifdef MAIN_INCLUDE
 CScale g_scale;
-#endif
 #endif /* SCALE_H_ */
