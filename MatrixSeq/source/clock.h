@@ -1,10 +1,6 @@
-/*
- * clock.h
- *
- *  Created on: 22 Feb 2018
- *      Author: jason
- */
-
+/////////////////////////////////////////////////////////////////
+// BEAT CLOCK GENERATOR
+/////////////////////////////////////////////////////////////////
 #ifndef CLOCK_H_
 #define CLOCK_H_
 
@@ -24,11 +20,21 @@
  */
 //
 
+// define the GPIO pins used for clock (will initialise the port)
+CDigitalIn<kGPIO_PORTA, 0> g_clock_in;
+CPulseOut<kGPIO_PORTC, 5> g_clock_out;
 
-
+/////////////////////////////////////////////////////////////////
+// This class maintains a count of 24ppqn ticks based on the
+// current BPM or the external MIDI clock. Internal clock is
+// generated based on a once-per-millisecond interrupt
 class CClock {
+
+
 public:
 
+	// Define different musical beat intervals based on
+	// number of 24ppqn ticks
 	enum
 	{
 	  RATE_1    = 96,
@@ -49,36 +55,49 @@ public:
 
 
 	float m_bpm;
-	volatile double m_part_tick;
 	volatile double m_ticks_per_ms;
+	volatile double m_part_tick;
 	volatile byte m_ms_tick;
 	volatile uint32_t m_ticks;
-	uint32_t m_midi_ticks;
+	//uint32_t m_midi_ticks;
+	volatile byte m_beat_count;
+	volatile byte m_pulse_clock_count;
+	byte m_pulse_clock_div;
 
 	typedef struct {
 		V_CLOCK_SRC m_source;
+		byte m_pulse_clock_div;
 	} CONFIG;
 	CONFIG m_cfg;
 
+	///////////////////////////////////////////////////////////////////////////////
 	CClock() {
 		init_config();
 		init_state();
 	}
 
-	void init_state() {
-		m_part_tick = 0.0;
-		m_ms_tick = 0;
-		m_ticks = 0;
-		m_midi_ticks = 0;
-		set_bpm(120);
+	///////////////////////////////////////////////////////////////////////////////
+	void set_bpm(float bpm) {
+		m_bpm = bpm;
+		m_ticks_per_ms = ((double)bpm * RATE_4) / (60.0 * 1000.0);
 	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	void init_state() {
+		m_ms_tick = 0;
+		set_bpm(120);
+		on_restart();
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
 	void init_config() {
 		m_cfg.m_source = V_CLOCK_SRC_INTERNAL;
+		m_cfg.m_pulse_clock_div = RATE_16;
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
 	void init() {
-
-		// configure a timer to cause an interrupt once per second
+		// configure a timer to cause an interrupt once per millisecond
 		CLOCK_EnableClock(kCLOCK_Pit0);
 		pit_config_t timerConfig = {
 		 .enableRunInDebug = true,
@@ -97,12 +116,27 @@ public:
 		KBI_Init(KBI0, &kbiConfig);
 	}
 
+	inline void private_on_tick() {
+		if(!m_beat_count) {
+			g_tempo_led.blink(g_tempo_led.MEDIUM_BLINK);
+		}
+		if(++m_beat_count >= 24) {
+			m_beat_count = 0;
+		}
+
+		if(!m_pulse_clock_count) {
+			g_clock_out.blink(15);
+		}
+		if(++m_pulse_clock_count >= m_cfg.m_pulse_clock_div) {
+			m_pulse_clock_count = 0;
+		}
+	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void set(PARAM_ID param, int value) {
 		switch(param) {
 			case P_CLOCK_BPM: set_bpm(value); break;
-			case P_CLOCK_SRC: m_cfg.m_source = (V_CLOCK_SRC)value;
+			case P_CLOCK_SRC: m_cfg.m_source = (V_CLOCK_SRC)value; break;
 		default:
 			break;
 		}
@@ -125,11 +159,7 @@ public:
 		}
 	}
 
-	void set_bpm(float bpm) {
-		m_bpm = bpm;
-		m_ticks_per_ms = ((double)bpm * RATE_4) / (60.0 * 1000.0);
-	}
-
+	///////////////////////////////////////////////////////////////////////////////
 	void wait_ms(int ms) {
 		while(ms) {
 			m_ms_tick = 0;
@@ -138,51 +168,71 @@ public:
 		}
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
 	inline uint32_t get_ticks() {
-		if(m_cfg.m_source == V_CLOCK_SRC_INTERNAL) {
-			return m_ticks;
-		}
-		else {
-			return m_midi_ticks;
-		}
+		return m_ticks;
 	}
+
+	///////////////////////////////////////////////////////////////////////////////
 	inline byte get_part_ticks() {
 		if(m_cfg.m_source == V_CLOCK_SRC_INTERNAL) {
 			return (byte)(256*m_part_tick);
 		}
 		else {
+			//TODO..?
 			return 0;
 		}
 	}
+
+	///////////////////////////////////////////////////////////////////////////////
 	void on_midi_tick() {
-		++m_midi_ticks;
+		if(m_cfg.m_source == V_CLOCK_SRC_MIDI) {
+			++m_ticks;
+			private_on_tick();
+		}
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
+	void on_restart() {
+		m_ticks = 0;
+		m_part_tick = 0.0;
+		m_beat_count = 0;
+		m_pulse_clock_count = 0;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	// Interrupt service routine called once per millisecond
 	inline void tick_isr() {
+
+		// set flag to indicate that a milliecond has elapsed
+		// this is used for general timing purposes
 		m_ms_tick = 1;
 
-		m_part_tick += m_ticks_per_ms;
-		int int_part = (int)m_part_tick;
-		if(int_part) {
-			++m_ticks;
-			m_part_tick -= (int)m_part_tick;
+		if(m_cfg.m_source == V_CLOCK_SRC_INTERNAL) {
+			// add the fractional number of ticks per millisecond to
+			// the tick counter and see whether we now have at least
+			// one complete tick
+			m_part_tick += m_ticks_per_ms;
+			int whole_tick = (int)m_part_tick;
+			if(whole_tick) {
+				m_ticks ++;
+				m_part_tick -= whole_tick;
+				private_on_tick();
+			}
 		}
-
 	}
 };
 
-// declare global instance of the sequencer clock
-extern CClock g_clock;
 
 
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 #ifdef MAIN_INCLUDE
 
 // define the clock instance
 CClock g_clock;
 
-// define the GPIO pins used for clock (will initialise the port)
-CDigitalIn<kGPIO_PORTA, 0> pClockIn;
-CDigitalOut<kGPIO_PORTC, 5> pClockOut;
 
 // ISR for the millisecond timer
 extern "C" void PIT_CH0_IRQHandler(void) {
@@ -194,11 +244,17 @@ extern "C" void PIT_CH0_IRQHandler(void) {
 extern "C" void KBI0_IRQHandler(void)
 {
     if (KBI_IsInterruptRequestDetected(KBI0)) {
+//TODO - clock based on interpolated pulse in
         KBI_ClearInterruptFlag(KBI0);
     }
 }
 
-#endif
+#else //MAIN_INCLUDE
+
+// declare global instance of the sequencer clock
+extern CClock g_clock;
+
+#endif //MAIN_INCLUDE
 
 
-#endif /* CLOCK_H_ */
+#endif // CLOCK_H_

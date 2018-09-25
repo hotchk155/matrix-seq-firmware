@@ -48,6 +48,8 @@
 
 
 #include "defs.h"
+#include "digital_out.h"
+#include "leds.h"
 #include "chars.h"
 #include "ui.h"
 #include "clock.h"
@@ -57,7 +59,6 @@
 #include "cv_gate.h"
 #include "scale.h"
 #include "sequence_layer.h"
-#include "digital_out.h"
 #include "popup.h"
 #include "sequencer.h"
 #include "params.h"
@@ -68,9 +69,7 @@
 
 /* TODO: insert other definitions and declarations here. */
 
- CIndicatorLED<kGPIO_PORTB, 5> LED1;
- CIndicatorLED<kGPIO_PORTC, 3> LED2;
- CIndicatorLED<kGPIO_PORTC, 2> LED3;
+
  CDigitalOut<kGPIO_PORTE, 2> PowerControl;
  CDigitalIn<kGPIO_PORTE, 1> OffSwitch;
 
@@ -83,6 +82,7 @@ typedef enum:byte {
  } VIEW_TYPE;
 
 VIEW_TYPE g_view = VIEW_SEQUENCER;
+
 
 
 void dispatch_event(int event, uint32_t param) {
@@ -217,6 +217,7 @@ int main(void) {
     g_ui.init();
     g_sequencer.m_layers[0].test();
 
+
     while(1) {
 
     	if(g_clock.m_ms_tick) {
@@ -247,6 +248,11 @@ int main(void) {
     		if(!OffSwitch.get()) {
     			PowerControl.set(0);
     		}
+
+    		g_cv_led.run();
+    		g_gate_led.run();
+    		g_tempo_led.run();
+    		g_clock_out.run();
 
     	}
     }

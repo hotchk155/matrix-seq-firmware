@@ -53,8 +53,8 @@ extern volatile byte g_disp_update;
 #define KEY_L7	(1U<<17)
 #define KEY_L8	(1U<<16)
 
-#define KEY_B1	(1U<<8)
-#define KEY_B2	(1U<<9)
+#define KEY_B1	(1U<<9)
+#define KEY_B2	(1U<<8)
 #define KEY_B3	(1U<<10)
 #define KEY_B4	(1U<<11)
 #define KEY_B5	(1U<<12)

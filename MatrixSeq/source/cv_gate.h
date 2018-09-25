@@ -8,14 +8,18 @@
 #ifndef CV_GATE_H_
 #define CV_GATE_H_
 
+#define PORTD_BIT_GATE4 4
+#define PORTD_BIT_GATE2 3
+#define PORTD_BIT_GATE3 2
+#define PORTA_BIT_GATE1 6
 
-#define BIT_GATE1		MK_GPIOA_BIT(PORTD_BASE, 3)
-#define BIT_GATE2		MK_GPIOA_BIT(PORTD_BASE, 2)
-#define BIT_GATE3		MK_GPIOA_BIT(PORTD_BASE, 4)
-#define BIT_GATE4		MK_GPIOA_BIT(PORTA_BASE, 6)
+#define BIT_GATE4		MK_GPIOA_BIT(PORTD_BASE, PORTD_BIT_GATE4)
+#define BIT_GATE2		MK_GPIOA_BIT(PORTD_BASE, PORTD_BIT_GATE2)
+#define BIT_GATE3		MK_GPIOA_BIT(PORTD_BASE, PORTD_BIT_GATE3)
+#define BIT_GATE1		MK_GPIOA_BIT(PORTA_BASE, PORTA_BIT_GATE1)
 
 
-	/////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 class CCVGate {
 public:
 	typedef enum:byte  {
@@ -28,7 +32,7 @@ public:
 		MAX_GATE = 4
 	};
 
-private:
+public:
 	uint16_t m_dac[MAX_CV];
 	GATE_STATE m_gate[MAX_GATE];
 	byte m_cv_pending;
@@ -87,10 +91,12 @@ public:
 					gate_off(which);
 					m_gate[which] = GATE_OPEN;
 					m_gate_pending = 1;
+					g_gate_led.blink(g_gate_led.MEDIUM_BLINK);
 					break;
 				case GATE_OPEN:
 					m_gate[which] = GATE_OPEN;
 					m_gate_pending = 1;
+					g_gate_led.blink(g_gate_led.MEDIUM_BLINK);
 					break;
 			}
 		}
@@ -104,8 +110,16 @@ public:
 	*/
 	void pitch_cv(int which, int note, V_SQL_CVSCALE scaling) {
 		int dac = (500 * (int)note)/12;
-		if(m_dac[which] != dac) {
-			m_dac[which] = dac;
+		int ofs;
+		switch(which) {
+		case 1: ofs = 1; break;
+		case 2: ofs = 2; break;
+		case 3: ofs = 0; break;
+		default: ofs = 3; break;
+		}
+		if(m_dac[ofs] != dac) {
+			g_cv_led.blink(g_cv_led.MEDIUM_BLINK);
+			m_dac[ofs] = dac;
 			m_cv_pending = 1;
 		}
 	}
@@ -138,11 +152,14 @@ public:
 
 extern CCVGate g_cv_gate;
 #ifdef MAIN_INCLUDE
+
 CCVGate g_cv_gate;
-CDigitalOut<kGPIO_PORTA, 6> pGate4;
-CDigitalOut<kGPIO_PORTD, 4> pGate3;
-CDigitalOut<kGPIO_PORTD, 3> pGate2;
-CDigitalOut<kGPIO_PORTD, 2> pGate1;
+
+// These definitions are used to initialise the port
+CDigitalOut<kGPIO_PORTD, PORTD_BIT_GATE4> pGate4;
+CDigitalOut<kGPIO_PORTD, PORTD_BIT_GATE2> pGate2;
+CDigitalOut<kGPIO_PORTD, PORTD_BIT_GATE3> pGate3;
+CDigitalOut<kGPIO_PORTA, PORTA_BIT_GATE1> pGate1;
 #endif
 
 

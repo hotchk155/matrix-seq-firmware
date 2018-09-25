@@ -114,7 +114,7 @@ public:
 		m_cfg.m_mode 		= V_SQL_SEQ_MODE_SCALE;
 		m_cfg.m_force_scale = V_SQL_FORCE_SCALE_OFF;
 		m_cfg.m_step_rate	= V_SQL_STEP_RATE_16;
-		m_cfg.m_note_dur	= V_SQL_STEP_DUR_FULL;
+		m_cfg.m_note_dur	= V_SQL_STEP_DUR_16;
 		m_cfg.m_loop_from	= 0;
 		m_cfg.m_loop_to		= 15;
 		m_cfg.m_transpose	= 0;
@@ -417,9 +417,9 @@ public:
 		if(*value & IS_ACCENT) {
 			if(rollover) {
 				*value &= ~(IS_TRIG|IS_ACCENT);
-				if(!as_note) {
+				//if(!as_note) {
 					*value &= ~IS_ACTIVE;
-				}
+				//}
 			}
 		}
 		else if(*value & IS_TRIG) {
@@ -433,7 +433,8 @@ public:
 		else if(*value & IS_ACTIVE) {
 			*value |= IS_TRIG;
 		}
-		else if (!as_note) {
+		else //if (!as_note)
+		{
 			*value |= IS_ACTIVE;
 		}
 	}
@@ -448,7 +449,7 @@ public:
 			*value &= ~IS_TRIG;
 			*value |= IS_ACTIVE;
 		}
-		else if(*value & IS_ACTIVE && !as_note) {
+		else if(*value & IS_ACTIVE /*&& !as_note*/) {
 			*value &= ~IS_ACTIVE;
 		}
 	}

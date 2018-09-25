@@ -83,6 +83,7 @@ public:
 				g_clock.on_midi_tick();
 				break;
 			case MIDI_START:
+				g_clock.on_restart();
 				fire_event(EV_SEQ_RESTART, 0);
 				break;
 			case MIDI_CONTINUE:
