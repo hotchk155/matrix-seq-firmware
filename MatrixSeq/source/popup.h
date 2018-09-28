@@ -164,6 +164,13 @@ public:
 		m_timeout = DISPLAY_TIMEOUT;
 	}
 
+	void num3digits(int value) {
+		m_len = 0;
+		format_number(value, 100);
+		m_render = 1;
+		m_timeout = DISPLAY_TIMEOUT;
+	}
+
 	void show_offset(int value) {
 		m_len = 0;
 		if(value >= 0) {

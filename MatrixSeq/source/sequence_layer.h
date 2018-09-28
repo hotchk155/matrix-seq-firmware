@@ -18,34 +18,26 @@ public:
 	enum {
 		NO_POS = -1,
 		MAX_STEPS = 32,					// number of steps in the layer
-		IS_ACTIVE = (uint16_t)0x100,	// is step active
-		IS_TRIG = (uint16_t)0x200,
-		IS_ACCENT = (uint16_t)0x400,
+
+		IS_VALUE_SET = (uint16_t)0x100,	// is there a user set value at this step?
+
+		IS_GATE = (uint16_t)0x200,		// is the gate open
+		IS_TRIG = (uint16_t)0x400,		// is there a trigger at this point
+		IS_ACCENT = (uint16_t)0x800,    // is there an accent (MIDI velocity) at this point
+
+		GATE_MASK =	IS_GATE|IS_TRIG|IS_ACCENT,
+
+
 		MAX_PLAYING_NOTES = 8,
 		REFERENCE_NOTE = 48,
 		DEFAULT_NOTE = 36,
-		MAX_MOD_VALUE = 12
+		//MAX_MOD_VALUE = 127
 	};
-
-/*	enum {
-		VELOCITY_OFF,
-		VELOCITY_LEGATO,
-		VELOCITY_LOW,
-		VELOCITY_MEDIUM,
-		VELOCITY_HIGH
-	};*/
 
 	// look up table of tick rates
 	static const byte c_tick_rates[V_SQL_STEP_RATE_MAX];
 	static const byte c_step_duration[V_SQL_STEP_DUR_MAX];
 
-	/*
-	static const STEP_TYPE VEL_MASK = (IS_ACTIVE|IS_VEL0|IS_VEL1);
-	static const STEP_TYPE VEL_LEGATO = (IS_ACTIVE);
-	static const STEP_TYPE VEL_LOW = (IS_ACTIVE|IS_VEL0);
-	static const STEP_TYPE VEL_MEDIUM = (IS_ACTIVE|IS_VEL1);
-	static const STEP_TYPE VEL_HIGH = (IS_ACTIVE|IS_VEL0|IS_VEL1);
-*/
 	// step word contains both gate and CV info
 	// CV info is 1 byte. Interpretation depends on mode. Always 1 unit per grid cell
 	//
@@ -65,9 +57,7 @@ public:
 		byte 			m_loop_from;		// loop start point
 		byte 			m_loop_to;			// loop end point
 		char			m_transpose;		// manual transpose amount for the layer
-		//V_SQL_TRANSPOSE_MOD	m_transpose_mod;	// automatic transpose source for the layer
 		V_SQL_STEP_DUR	m_note_dur;
-//		V_SQL_VEL_MOD	m_midi_vel_mod;		// MIDI velocity modulation
 		byte 			m_enabled;
 		V_SQL_MIDI_CHAN m_midi_channel;		// MIDI channel
 		byte 			m_midi_cc;			// MIDI CC
@@ -207,7 +197,7 @@ public:
 	// preserve trigs but clear all data
 	void reset_values(byte value) {
 		for(int i=0; i<MAX_STEPS; ++i) {
-			m_cfg.m_step[i] &= 0xFF00;
+			m_cfg.m_step[i] &= GATE_MASK;
 			m_cfg.m_step[i] |= value;
 		}
 	}
@@ -220,11 +210,12 @@ public:
 			m_cfg.m_step[index] = 0; // clear gate and note
 			break;
 		case V_SQL_SEQ_MODE_TRANSPOSE:
-			m_cfg.m_step[index] &= 0xFF00; // clear gate and set value to mid point
+			m_cfg.m_step[index] &= GATE_MASK; // preserve gate into
 			m_cfg.m_step[index] |= 64;
 			break;
-		default:
-			m_cfg.m_step[index] &= 0xFF00; // only clear value leave gate
+		case V_SQL_SEQ_MODE_MOD:
+			m_cfg.m_step[index] &= GATE_MASK; // preserve gate into
+			interpolate();
 			break;
 		}
 	}
@@ -234,11 +225,18 @@ public:
 		switch(m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_SCALE:
 		case V_SQL_SEQ_MODE_CHROMATIC:
-			m_cfg.m_step[index] = step;
+			m_cfg.m_step[index] = step |= CSequenceLayer::IS_VALUE_SET;
 			break;
-		default:
-			m_cfg.m_step[index] &= 0xFF00; // clear gate and set value to mid point
+		case V_SQL_SEQ_MODE_TRANSPOSE:
+			m_cfg.m_step[index] &= GATE_MASK;
+			m_cfg.m_step[index] |= CSequenceLayer::IS_VALUE_SET;
 			m_cfg.m_step[index] |= (byte)step;
+			break;
+		case V_SQL_SEQ_MODE_MOD:
+			m_cfg.m_step[index] &= GATE_MASK;
+			m_cfg.m_step[index] |= CSequenceLayer::IS_VALUE_SET;
+			m_cfg.m_step[index] |= (byte)step;
+			interpolate();
 			break;
 		}
 	}
@@ -269,7 +267,7 @@ public:
 				for(int i=0; i<MAX_STEPS; ++i) {
 					byte value = m_cfg.m_step[i] & 0xFF;
 					value = g_scale.note_to_index(value);
-					m_cfg.m_step[i] &= 0xFF00;
+					m_cfg.m_step[i] &= 0xFF;
 					m_cfg.m_step[i] |= value;
 				}
 				m_state.m_scroll_ofs = g_scale.note_to_index(m_state.m_scroll_ofs);
@@ -389,108 +387,79 @@ public:
 		}
 	}
 
-/*
-	static int get_velocity(const STEP_TYPE& step) {
-		switch(step & VEL_MASK) {
-		case VEL_LEGATO: return VELOCITY_LEGATO;
-		case VEL_LOW: return VELOCITY_LOW;
-		case VEL_MEDIUM: return VELOCITY_MEDIUM;
-		case VEL_HIGH: return VELOCITY_HIGH;
-		}
-		return VELOCITY_OFF;
-	}
-	static void set_velocity(STEP_TYPE& step, int value) {
-		step &= ~VEL_MASK;
-		switch(value) {
-		case VELOCITY_OFF: break;
-		case VELOCITY_LEGATO: step |= VEL_LEGATO; break;
-		case VELOCITY_LOW: step |= VEL_LOW; break;
-		case VELOCITY_MEDIUM: step |= VEL_MEDIUM; break;
-		case VELOCITY_HIGH: step |= VEL_HIGH; break;
-		}
-	}
-*/
-
 
 	///////////////////////////////////////////////////////////////////////////////
-	static void inc_gate(STEP_TYPE *value, byte as_note, byte rollover) {
-		if(*value & IS_ACCENT) {
-			if(rollover) {
-				*value &= ~(IS_TRIG|IS_ACCENT);
-				//if(!as_note) {
-					*value &= ~IS_ACTIVE;
-				//}
-			}
+	static void inc_gate(STEP_TYPE *value) {
+		if(*value & IS_TRIG) {
+			*value |= IS_ACCENT;
 		}
-		else if(*value & IS_TRIG) {
-			if(as_note) {
-				*value |= IS_ACCENT;
-			}
-			else if(rollover) {
-				*value &= ~(IS_TRIG|IS_ACCENT|IS_ACTIVE);
-			}
-		}
-		else if(*value & IS_ACTIVE) {
+		else if(*value & IS_GATE) {
 			*value |= IS_TRIG;
 		}
-		else //if (!as_note)
+		else
 		{
-			*value |= IS_ACTIVE;
+			*value |= IS_GATE;
 		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	static void dec_gate(STEP_TYPE *value, byte as_note) {
+	static void dec_gate(STEP_TYPE *value) {
 		if(*value & IS_ACCENT) {
 			*value &= ~IS_ACCENT;
 			*value |= IS_TRIG;
 		}
 		else if(*value & IS_TRIG) {
 			*value &= ~IS_TRIG;
-			*value |= IS_ACTIVE;
+			*value |= IS_GATE;
 		}
-		else if(*value & IS_ACTIVE /*&& !as_note*/) {
-			*value &= ~IS_ACTIVE;
+		else if(*value & IS_GATE) {
+			*value &= ~IS_GATE;
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	static void toggle_gate(STEP_TYPE *value) {
+		if(*value & (IS_GATE|IS_ACCENT|IS_TRIG)) {
+			*value &= ~GATE_MASK;
+		}
+		else {
+			*value |= IS_TRIG;
 		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void constrain_step_value(STEP_TYPE *value) {
-		inc_step_value(value, 0);
+		inc_step_value(value, 0, 0);
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	void inc_step_value(STEP_TYPE *value, int delta) {
-		int v = (byte)(*value) + delta;
-		int max_note = 127;
+	void inc_step_value(STEP_TYPE *value, int delta, byte fine) {
+		int v = (byte)(*value);
+		int max_value = 127;
 		switch(m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_MOD:
-			if(v < 0) {
-				v = 0;
+			if(fine) {
+				v+= delta;
 			}
-			else if(v > MAX_MOD_VALUE) {
-				v = MAX_MOD_VALUE;
-			}
-			break;
-		case V_SQL_SEQ_MODE_TRANSPOSE:
-			if(v < 0) {
-				v = 0;
-			}
-			else if(v > 127) {
-				v = 127;
+			else {
+				v = 10*(v/10 + delta);
 			}
 			break;
 		case V_SQL_SEQ_MODE_SCALE:
-			max_note = g_scale.max_index();
-		case V_SQL_SEQ_MODE_CHROMATIC:
-		default:
-			if(v < 0) {
-				v = 0;
-			}
-			else if(v > max_note) {
-				v = max_note;
-			}
+			v+=delta;
+			max_value = g_scale.max_index();
 			break;
+		case V_SQL_SEQ_MODE_CHROMATIC:
+		case V_SQL_SEQ_MODE_TRANSPOSE:
+		default:
+			v+=delta;
+			break;
+		}
+		if(v<0) {
+			v = 0;
+		}
+		else if(v>max_value) {
+			v = max_value;
 		}
 		*value &= 0xFF00;
 		*value |= v;
@@ -528,7 +497,7 @@ public:
 	byte shift_vertical(int offset) {
 		for(int i = 0; i<MAX_STEPS; ++i) {
 			STEP_TYPE step = m_cfg.m_step[i];
-			if(step & IS_ACTIVE) {
+			if(step & IS_VALUE_SET) {
 				int v = (int)STEP_VALUE(step) + offset;
 				if(v < 0 || v > 127) {
 					return 0;
@@ -537,7 +506,7 @@ public:
 		}
 		for(int i = 0; i<MAX_STEPS; ++i) {
 			STEP_TYPE step = m_cfg.m_step[i];
-			if(step & IS_ACTIVE) {
+			if(step & IS_VALUE_SET) {
 				m_cfg.m_step[i] = (step & 0xFF00) | (STEP_VALUE(step) + offset);
 			}
 		}
@@ -556,6 +525,72 @@ public:
 			set_step_value(i, m_cfg.m_step[i-1]);
 		}
 		set_step_value(0, step);
+	}
+
+
+	///////////////////////////////////////////////////////////////////////////////
+	// Create interpolated points between two waypoints
+	void interpolate_section(int pos, int end) {
+
+		// calculate the number of new points that we will need to
+		// crate during the interpolation
+		int num_points = end - pos;
+		if(num_points < 0) {
+			num_points += MAX_STEPS;
+		}
+		if(num_points > 0) {
+
+			// starting point and gradient
+			double value =  (byte)m_cfg.m_step[pos];
+			double gradient = ((byte)m_cfg.m_step[end] - value)/num_points;
+			while(--num_points > 0) {
+				// wrap around the column
+				if(++pos >= MAX_STEPS) {
+					pos = 0;
+				}
+				value += gradient;
+				m_cfg.m_step[pos] = (m_cfg.m_step[pos] & GATE_MASK) | (byte)(value+0.5);
+			}
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	// Interpolate all points
+	void interpolate() {
+		int i;
+		int first_waypoint = -1;
+		int prev_waypoint = -1;
+		for(i=0; i<32; ++i) {
+			if(m_cfg.m_step[i] & IS_VALUE_SET) {
+				if(prev_waypoint < 0) {
+					first_waypoint = i;
+				}
+				else {
+					interpolate_section(prev_waypoint, i);
+				}
+				prev_waypoint = i;
+			}
+		}
+
+		if(first_waypoint < 0) {
+			// no waypoints defined
+			for(i=0; i<32; ++i) {
+				m_cfg.m_step[i] &= GATE_MASK; // data is 0
+			}
+		}
+		else if(prev_waypoint == first_waypoint) {
+			// only one waypoint defined
+			for(i=0; i<32; ++i) {
+				if(i!=prev_waypoint) {
+					m_cfg.m_step[i] &= GATE_MASK;
+					m_cfg.m_step[i] |= (byte)(m_cfg.m_step[first_waypoint]);
+				}
+			}
+		}
+		else {
+			// multiple waypoints defined
+			interpolate_section(prev_waypoint, first_waypoint);
+		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -605,7 +640,7 @@ public:
 		CCVGate::GATE_STATE gate_state = CCVGate::GATE_CLOSED;
 		byte legato = 0;
 		byte velocity = 0;
-		byte active = !!(step & IS_ACTIVE);
+		byte active = !!(step & IS_GATE);
 		if(step & IS_ACCENT) {
 			velocity = midi_vel_accent;
 		}
@@ -753,20 +788,20 @@ public:
 		if(step & IS_TRIG) {
 			g_cv_gate.gate(which, CCVGate::GATE_RETRIG);
 		}
-		else if(step & IS_ACTIVE) {
+		else if(step & IS_GATE) {
 			g_cv_gate.gate(which, CCVGate::GATE_OPEN);
 		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void test() {
-		m_cfg.m_step[0] = 45|IS_ACTIVE;
-		m_cfg.m_step[1] = 45|IS_ACTIVE;
-		m_cfg.m_step[4] = 46|IS_ACTIVE;
-		m_cfg.m_step[5] = 48|IS_ACTIVE;
-		m_cfg.m_step[8] = 50|IS_ACTIVE;
-		m_cfg.m_step[9] = 50|IS_ACTIVE;
-		m_cfg.m_step[12] = 52|IS_ACTIVE;
+		m_cfg.m_step[0] = 45|IS_GATE|IS_VALUE_SET;
+		m_cfg.m_step[1] = 45|IS_GATE|IS_VALUE_SET;
+		m_cfg.m_step[4] = 46|IS_GATE|IS_VALUE_SET;
+		m_cfg.m_step[5] = 48|IS_GATE|IS_VALUE_SET;
+		m_cfg.m_step[8] = 50|IS_GATE|IS_VALUE_SET;
+		m_cfg.m_step[9] = 50|IS_GATE|IS_VALUE_SET;
+		m_cfg.m_step[12] = 52|IS_GATE|IS_VALUE_SET;
 	}
 
 	/*

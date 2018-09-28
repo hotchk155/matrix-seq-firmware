@@ -26,7 +26,7 @@ public:
 		ACTION_NONE,
 		ACTION_CREATE_STEP,
 		ACTION_EDIT_STEP,
-		ACTION_EDIT_TRIG,
+		//ACTION_EDIT_TRIG,
 		ACTION_ERASE_STEP,
 		ACTION_CLONE_STEP,
 		ACTION_SET_LOOP,
@@ -212,6 +212,8 @@ public:
 			g_popup.show_offset(((int)value)-64);
 			break;
 		case V_SQL_SEQ_MODE_MOD:
+			g_popup.num3digits(value);
+			break;
 		case V_SQL_SEQ_MODE_VELOCITY:
 		case V_SQL_SEQ_MODE_MAX:
 			break;
@@ -281,13 +283,13 @@ typedef enum:byte {
 
 	///////////////////////////////////////////////////////////////////////////////
 	// change step value based on encode event
-	void value_action(CSequenceLayer& layer, CSequenceLayer::STEP_TYPE *value, ACTION what) {
+	void value_action(CSequenceLayer& layer, CSequenceLayer::STEP_TYPE *value, ACTION what, byte fine) {
 		switch(what) {
 		case ACTION_ENC_LEFT:
-			layer.inc_step_value(value, -1);
+			layer.inc_step_value(value, -1, fine);
 			break;
 		case ACTION_ENC_RIGHT:
-			layer.inc_step_value(value, +1);
+			layer.inc_step_value(value, +1, fine);
 			break;
 		default:
 			break;
@@ -320,12 +322,14 @@ typedef enum:byte {
 		switch(what) {
 		////////////////////////////////////////////////
 		case ACTION_BEGIN:
-			if(!layer.is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
+			if(!layer.is_note_mode() || (step & CSequenceLayer::IS_VALUE_SET)) {
 				// there is a valid note in this column so we copy it to our
 				// paste buffer, scroll it into view and show note name on screen
 				layer.m_state.m_copy_step = step;
 				set_scroll_for(layer.m_state.m_copy_step, layer);
-				step_info(layer.m_state.m_copy_step, layer);
+				if(!layer.is_mod_mode()) {
+					step_info(layer.m_state.m_copy_step, layer);
+				}
 			}
 			break;
 		////////////////////////////////////////////////
@@ -337,6 +341,15 @@ typedef enum:byte {
 		case ACTION_ENC_LEFT:
 		case ACTION_ENC_RIGHT:
 			switch(m_edit_keys) {
+
+				// fine edit in mod mode
+			case KEY_EDIT|KEY_CLEAR:
+				if(layer.is_mod_mode()) {
+					value_action(layer, &layer.m_state.m_copy_step, what, 1);
+					layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
+					step_info(layer.m_state.m_copy_step, layer);
+				}
+				break;
 			case KEY_EDIT|KEY_GATE:
 				// action to shift all points up or down
 				if(what == ACTION_ENC_LEFT) {
@@ -369,21 +382,23 @@ typedef enum:byte {
 				break;
 			default:
 				// encoder moved while the button is held
-				if(!layer.is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
+				if(!layer.is_note_mode() || (step & CSequenceLayer::IS_VALUE_SET)) {
 					// we are dragging a note around
-					value_action(layer, &layer.m_state.m_copy_step, what);
-					layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
+					value_action(layer, &layer.m_state.m_copy_step, what, 0);
+
 				}
 				else {
 					// no note in copy buffer so we invent one based on scroll offset
 					// and insert it into the pattern
-					if(!(layer.m_state.m_copy_step & CSequenceLayer::IS_ACTIVE)) {
-						layer.m_state.m_copy_step = layer.m_state.m_scroll_ofs|CSequenceLayer::IS_TRIG|CSequenceLayer::IS_ACTIVE;
+					if(!(layer.m_state.m_copy_step)) {
+						layer.m_state.m_copy_step = layer.m_state.m_scroll_ofs|CSequenceLayer::IS_TRIG|CSequenceLayer::IS_GATE;
 					}
-					layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 				}
+				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 				set_scroll_for(layer.m_state.m_copy_step, layer);
-				step_info(layer.m_state.m_copy_step, layer);
+				if(!layer.is_mod_mode()) {
+					step_info(layer.m_state.m_copy_step, layer);
+				}
 				break;
 			}
 			break;
@@ -400,12 +415,14 @@ typedef enum:byte {
 				}
 				break;
 			case KEY_EDIT|KEY_CLEAR:
-				// EDIT + CLEAR - insert rest and advance cursor
-				layer.clear_step_value(m_cursor);
-				if(++m_cursor >= CSequenceLayer::MAX_STEPS-1) {
-					m_cursor = 0;
+				if(layer.is_note_mode()) {
+					// EDIT + CLEAR - insert rest and advance cursor
+					layer.clear_step_value(m_cursor);
+					if(++m_cursor >= CSequenceLayer::MAX_STEPS-1) {
+						m_cursor = 0;
+					}
+					layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 				}
-				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 				break;
 			case KEY_EDIT|KEY_GATE:
 				m_value = 0;
@@ -440,7 +457,7 @@ typedef enum:byte {
 		case ACTION_ENC_LEFT:
 		case ACTION_ENC_RIGHT:
 			// hold-turn pastes multiple notes
-			if(!layer.is_note_mode() || (layer.m_state.m_copy_step & CSequenceLayer::IS_ACTIVE)) {
+			if(!layer.is_note_mode() || (layer.m_state.m_copy_step & CSequenceLayer::IS_VALUE_SET)) {
 				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 			}
 			cursor_action(what);
@@ -483,17 +500,17 @@ typedef enum:byte {
 		switch(what) {
 		////////////////////////////////////////////////
 		case ACTION_ENC_LEFT:
-			layer.dec_gate(&step,layer.is_note_mode());
+			layer.dec_gate(&step);
 			layer.set_step(m_cursor, step);
 			break;
 		////////////////////////////////////////////////
 		case ACTION_ENC_RIGHT:
-			layer.inc_gate(&step,layer.is_note_mode(),0);
+			layer.inc_gate(&step);
 			layer.set_step(m_cursor, step);
 			break;
 		////////////////////////////////////////////////
 		case ACTION_CLICK:
-			layer.inc_gate(&step,layer.is_note_mode(),1);
+			layer.toggle_gate(&step);
 			layer.set_step(m_cursor, step);
 			break;
 		default:
@@ -618,181 +635,22 @@ typedef enum:byte {
 
 
 
-	/*
-	void xevent(int evt, uint32_t param) {
-		CSequenceLayer *layer = &m_layers[m_layer];
-		CSequenceLayer::STEP_TYPE step;
-		switch(evt) {
-		/////////////////////////////////////////////////////////////////////////////////////////////
-		// ENCODER INC/DEC
-		case EV_ENCODER:
-			if(m_action == ACTION_CREATE_STEP) {
-				m_copy_step = layer->get_step(m_cursor) | CSequenceLayer::IS_ACTIVE;
-				layer->set_step(m_cursor, m_copy_step);
-				set_scroll_for(m_copy_step, layer);
-				step_info(m_copy_step, layer);
-				m_action = ACTION_EDIT_STEP;
-			}
-			else if(m_action == ACTION_EDIT_STEP) {
-				m_copy_step = layer->get_step(m_cursor);
-				layer->inc_step(&m_copy_step, (int)param);
-				layer->set_step(m_cursor, m_copy_step);
-				set_scroll_for(m_copy_step, layer);
-				step_info(m_copy_step, layer);
-			}
-			else if(m_action == ACTION_EDIT_TRIG) {
-				CSequenceLayer::STEP_TYPE step = layer->get_step(m_cursor);
-				int vel = CSequenceLayer::get_velocity(step);
-				if(vel > CSequenceLayer::VELOCITY_OFF && ((int)param) < 0) {
-					CSequenceLayer::set_velocity(step, vel-1);
-				}
-				else if(vel < CSequenceLayer::VELOCITY_HIGH && ((int)param) > 0) {
-					CSequenceLayer::set_velocity(step, vel+1);
-				}
-				layer->set_step(m_cursor, step);
-			}
-			else if(m_action == ACTION_MOVE_VERT) {
-				if(layer->vertical_move((int)param)) {
-					m_value += (int)param;
-				}
-				g_popup.show_offset(m_value);
-			}
-			else if(m_action == ACTION_MOVE_HORZ) {
-				if((int)param < 0 && m_value > -31) {
-					layer->shift_left();
-					--m_value;
-				}
-				else if((int)param > 0 && m_value < 31) {
-					layer->shift_right();
-					++m_value;
-				}
-				g_popup.show_offset(m_value);
-			}
-			else {
-				if(m_action == ACTION_SET_LOOP) {
-					layer->set_loop_start(m_cursor);
-					m_action = ACTION_DRAG_LOOP;
-				}
-				else if(m_action == ACTION_ERASE_STEP) {
-					layer->clear_step(m_cursor);
-				}
-				if((int)param < 0) {
-					if(m_cursor > 0) {
-						--m_cursor;
-					}
-				}
-				else {
-					if(++m_cursor >=  MAX_CURSOR) {
-						m_cursor = MAX_CURSOR;
-					}
-				}
-				g_popup.avoid(m_cursor);
-				if(m_action == ACTION_CLONE_STEP) {
-					layer->set_step(m_cursor, m_copy_step);
-				}
-				else if(m_action == ACTION_DRAG_LOOP) {
-					layer->set_loop_end(m_cursor);
-				}
-			}
-			break;
-		/////////////////////////////////////////////////////////////////////////////////////////////
-		// BUTTON PRESS
-		case EV_KEY_PRESS:
-			if(m_action == ACTION_EDIT_STEP || m_action == ACTION_CREATE_STEP) {
-				switch(param) {
-				case KEY_B2:
-//					step = layer->get_step(m_cursor);
-//					if(!layer->is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
-//						layer->set_step(m_cursor, step ^ CSequenceLayer::IS_TRIG);
-//					}
-					m_action = ACTION_EDIT_TRIG;
-					break;
-				case KEY_B3:
-					m_value = 0;
-					g_popup.show_offset(m_value);
-					m_action = ACTION_MOVE_VERT;
-					break;
-				case KEY_B4:
-					m_value = 0;
-					g_popup.show_offset(m_value);
-					m_action = ACTION_MOVE_HORZ;
-					break;
-				}
-			}
-			else if(m_action == ACTION_NONE) {
-				switch(param) {
-
-				//////////////////////////////////////////////////////////
-				// STEP EDIT
-				case KEY_B1:
-					// check if there is a step in this column
-					step = layer->get_step(m_cursor);
-					if(step & CSequenceLayer::IS_ACTIVE) {
-						set_scroll_for(step, layer);
-						step_info(step, layer);
-						m_action = ACTION_EDIT_STEP;
-					}
-					else {
-						// no active note step - do we have a previous step to copy?
-						if(m_copy_step) {
-							layer->set_step(m_cursor, STEP_VALUE(m_copy_step)|CSequenceLayer::IS_VEL1);
-						}
-						else {
-							layer->set_step(m_cursor, layer->m_state.m_scroll_ofs|CSequenceLayer::IS_VEL1);
-						}
-						m_action = ACTION_CREATE_STEP;
-					}
-					break;
-
-
-				case KEY_B2:
-					step = layer->get_step(m_cursor);
-					m_copy_step = layer->get_step(m_cursor);
-					if(!layer->is_note_mode() || (step & CSequenceLayer::IS_ACTIVE)) {
-						m_action = ACTION_CLONE_STEP;
-					}
-					break;
-				case KEY_B3:
-					layer->clear_step(m_cursor);
-					m_action = ACTION_ERASE_STEP;
-					break;
-				case KEY_B4:
-					layer->set_pos(m_cursor);
-					m_action = ACTION_SET_LOOP;
-					break;
-				}
-
-			} // if m_action == ACTION_NONE
-			break;
-
-		/////////////////////////////////////////////////////////////////////////////////////////////
-		// BUTTON RELEASE
-		case EV_KEY_RELEASE:
-			if(m_action == ACTION_EDIT_TRIG && param == KEY_B2) {
-				m_action = ACTION_EDIT_STEP;
-			}
-			else {
-				m_action = ACTION_NONE;
-			}
-			break;
-                                                                                         		}
-	}*/
-
 	/////////////////////////////////////////////////////////////////////////////////////////////
 	void repaint() {
 		int i;
 		uint32_t mask;
 		CSequenceLayer *layer = &m_layers[m_layer];
 
+		// Clear the display
 		g_ui.clear();
 
-		int max_row = (m_action == ACTION_EDIT_TRIG)? 11 : 12;
-
+		// insert the "graticule", which provides the grid lines to in the background
+		// of note based modes
 		int graticule_row = 0;
 		int graticule_spacing = 0;
 		if(layer->get_graticule(&graticule_row, &graticule_spacing)) {
 			while(graticule_row < 16) {
-				if(graticule_row>= 0 && graticule_row<=max_row) {
+				if(graticule_row>= 0 && graticule_row<=12) {
 					g_ui.hilite(graticule_row) = 0x11111111U;
 				}
 				if(graticule_spacing > 0) {
@@ -806,11 +664,12 @@ typedef enum:byte {
 
 		// displaying the cursor
 		mask = g_ui.bit(m_cursor);
-		for(i=0; i<=max_row; ++i) {
+		for(i=0; i<=12; ++i) {
 			g_ui.raster(i) &= ~mask;
 			g_ui.hilite(i) |= mask;
 		}
 
+		// show the play position on the lowest row
 		mask = g_ui.bit(layer->m_state.m_play_pos);
 		g_ui.raster(15) |= mask;
 		g_ui.hilite(15) |= mask;
@@ -824,6 +683,7 @@ typedef enum:byte {
 		int c = 0;
 		int n;
 
+		// determine where the "ruler" will be drawn
 		int ruler_from;
 		int ruler_to;
 		if(m_sel_from >= 0) {
@@ -841,6 +701,8 @@ typedef enum:byte {
 			ruler_to = layer->m_cfg.m_loop_to;
 		}
 
+
+		// scan over the full 32 columns
 		for(i=0; i<32; ++i) {
 
 			// show the "ruler" at the bottom of screen
@@ -861,13 +723,13 @@ typedef enum:byte {
 			switch(layer->m_cfg.m_mode) {
 			case V_SQL_SEQ_MODE_CHROMATIC:
 			case V_SQL_SEQ_MODE_SCALE:
-				show_step = !!(step & CSequenceLayer::IS_ACTIVE);	// note nodes hide the note unless a trigger present
+				show_step = !!(step & CSequenceLayer::IS_VALUE_SET);
 				// fall thru
 			case V_SQL_SEQ_MODE_TRANSPOSE:
 				if(show_step) {
 					n = STEP_VALUE(step);
 					n = 12 - n + layer->m_state.m_scroll_ofs;
-					if(n >= 0 && n <= max_row) {
+					if(n >= 0 && n <= 12) {
 						g_ui.raster(n) |= mask;
 						if(i == layer->m_state.m_play_pos && m_is_running) {
 							g_ui.hilite(n) |= mask;
@@ -879,32 +741,23 @@ typedef enum:byte {
 				}
 				break;
 			case V_SQL_SEQ_MODE_MOD:
-				n = STEP_VALUE(step);
-				if(n>0) {
-					// baseline
-					g_ui.hilite(CSequenceLayer::MAX_MOD_VALUE) |= mask;
-				}
-
-				if(n>CSequenceLayer::MAX_MOD_VALUE) {
+				n = 12 - STEP_VALUE(step)/10;
+				if(n<0) {
 					n=0;
 				}
-				else {
-					n=CSequenceLayer::MAX_MOD_VALUE-n;
-				}
-//				for(int j=n; j<=13; ++j) {
-//					CRenderBuf::raster(j) &= ~mask;
-//					CRenderBuf::hilite(j) |= mask;
-//				}
 				if(i == layer->m_state.m_play_pos && m_is_running) {
 					g_ui.raster(n) |= mask;
 					g_ui.hilite(n) |= mask;
 				}
-				else {
+				else if(step & CSequenceLayer::IS_VALUE_SET) {
 					g_ui.raster(n) |= mask;
 					g_ui.hilite(n) &= ~mask;
 
 				}
-
+				else {
+					g_ui.hilite(n) |= mask;
+					g_ui.raster(n) &= ~mask;
+				}
 				break;
 			case V_SQL_SEQ_MODE_VELOCITY:
 			case V_SQL_SEQ_MODE_MAX:
@@ -912,7 +765,7 @@ typedef enum:byte {
 			}
 
 
-			// Display the sequencer steps
+			// DISPLAY THE GATE INFO
 			if(step & CSequenceLayer::IS_ACCENT) {
 				g_ui.raster(14) |= mask;
 				g_ui.hilite(14) |= mask;
@@ -920,7 +773,7 @@ typedef enum:byte {
 			else if(step & CSequenceLayer::IS_TRIG) {
 				g_ui.raster(14) |= mask;
 			}
-			else if(step & CSequenceLayer::IS_ACTIVE) {
+			else if(step & CSequenceLayer::IS_GATE) {
 				g_ui.hilite(14) |= mask;
 			}
 
