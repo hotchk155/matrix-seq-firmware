@@ -487,7 +487,7 @@ public:
 	inline void set_step_value(int index, STEP_TYPE step) {
 		if(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD) {
 			m_cfg.m_step[index] &= 0xFF00;
-			m_cfg.m_step[index] |= (step & 0x00FF);
+			m_cfg.m_step[index] |= (byte)step;
 		}
 		else {
 			m_cfg.m_step[index] =step;
@@ -775,10 +775,24 @@ public:
 		}
 	}
 
+	int next_step_index(int index) {
+		++index;
+		if(index > m_cfg.m_loop_to) {
+			index -= m_cfg.m_loop_to;
+		}
+		if(index < m_cfg.m_loop_from) {
+			index += m_cfg.m_loop_from;
+		}
+		return index;
+	}
+
 	///////////////////////////////////////////////////////////////////////////////
 	void action_step_mod(byte which) {
-		byte value = STEP_VALUE(m_state.m_step_value);
-		g_cv_gate.mod_cv(which, value, m_cfg.m_cv_range);
+		byte value1 = (byte)m_cfg.m_step[m_state.m_play_pos];
+		int next = next_step_index(m_state.m_play_pos);
+		byte value2 = (byte)m_cfg.m_step[next];
+		int ms = g_clock.get_ms_for_measure(m_cfg.m_step_rate);
+		g_cv_gate.mod_cv(which, value1, m_cfg.m_cv_range, value2, ms);
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -790,6 +804,9 @@ public:
 		}
 		else if(step & IS_GATE) {
 			g_cv_gate.gate(which, CCVGate::GATE_OPEN);
+		}
+		else {
+			g_cv_gate.gate(which, CCVGate::GATE_CLOSED);
 		}
 	}
 

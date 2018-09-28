@@ -72,6 +72,10 @@ public:
 		m_ticks_per_ms = ((double)bpm * RATE_4) / (60.0 * 1000.0);
 	}
 
+	int get_ms_for_measure(int measure) {
+		return measure/m_ticks_per_ms;
+	}
+
 	///////////////////////////////////////////////////////////////////////////////
 	void init_state() {
 		m_ms_tick = 0;

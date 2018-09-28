@@ -843,7 +843,7 @@ typedef enum:byte {
 									);
 								}
 								else if(other_layer.m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY) {
-									g_cv_gate.mod_cv(j, layer.m_state.m_last_velocity, other_layer.m_cfg.m_cv_range);
+									g_cv_gate.mod_cv(j, layer.m_state.m_last_velocity, other_layer.m_cfg.m_cv_range,0,0);
 								}
 							}
 

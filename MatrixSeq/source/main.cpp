@@ -258,6 +258,9 @@ int main(void) {
     		g_clock_out.run();
 
     	}
+
+    	g_cv_gate.service();
+
     }
     return 0 ;
 }

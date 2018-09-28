@@ -38,7 +38,16 @@ public:
 		MAX_GATE = 4
 	};
 
+	typedef struct {
+		int pitch;			// 32-bit current pitch value (dac << 16)
+		int target;  		// 32-bit current target value (dac << 16)
+		int glide_rate;  	// glide rate applied per ms to the pitch
+	} CV_STATE;
+
+
+
 public:
+	CV_STATE m_cv[MAX_CV];
 	uint16_t m_dac[MAX_CV];
 	GATE_STATE m_gate[MAX_GATE];
 	byte m_cv_pending;
@@ -80,6 +89,7 @@ public:
 
 	/////////////////////////////////////////////////////////////////////////////////
 	CCVGate() {
+		memset((byte*)m_cv,0,sizeof m_cv);
 		memset((byte*)m_dac,0,sizeof m_dac);
 		memset((byte*)m_gate,0,sizeof m_gate);
 		m_cv_pending = 0;
@@ -116,7 +126,11 @@ public:
 		// convert the note to DAC value
 		// TODO support other note/cv mappings
 		int dac = (500 * (int)note)/12;
+		set_cv(which, dac);
+	}
 
+	void set_cv(int which, int dac)
+	{
 		// get the appropriate offset into the DAC structure
 		// for the target CV output
 		int ofs;
@@ -136,12 +150,22 @@ public:
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	void mod_cv(int which, byte value, byte volt_range) {
-//TODO
+	void mod_cv(int which, int value, int volt_range, int value2, int sweep_time) {
+		m_cv[which].pitch = (500*volt_range*value)<<9; // divide by 128 then left shift by 16
+		if(sweep_time) {
+			m_cv[which].target = (500*volt_range*value2)<<9;
+			m_cv[which].glide_rate = (m_cv[which].target - m_cv[which].pitch)/sweep_time;
+		}
+		else {
+			m_cv[which].glide_rate = 0;
+		}
+
+		int dac = m_cv[which].pitch>>16;
+		set_cv(which, dac);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	void run() {
+	void service() {
 
 		// if we have CV data to send and the bus is clear
 		// then send out the CV data to DAC
@@ -150,13 +174,39 @@ public:
 				g_i2c_bus.dac_write(m_dac);
 				m_cv_pending = 0;
 			}
-			else if(m_gate_pending) { // rising edge pending?
-				for(int i=0; i<4; ++i) {
-					if(m_gate[i] == GATE_OPEN) {
-						gate_on(i);
+		}
+		if(m_gate_pending) { // rising edge pending?
+			for(int i=0; i<4; ++i) {
+				if(m_gate[i] == GATE_OPEN) {
+					gate_on(i);
+				}
+			}
+			m_gate_pending = 0;
+		}
+	//TODO gate sync with CV in note mode
+	}
+
+
+	/////////////////////////////////////////////////////////////////////////////////
+	// called once per ms
+	void run() {
+		for(int i=0; i<MAX_CV; ++i) {
+			if(m_cv[i].glide_rate) {
+				m_cv[i].pitch += m_cv[i].glide_rate;
+				if(m_cv[i].glide_rate < 0) {
+					if(m_cv[i].pitch <= m_cv[i].target) {
+						m_cv[i].pitch = m_cv[i].target;
+						m_cv[i].glide_rate = 0;
 					}
 				}
-				m_gate_pending = 0;
+				else {
+					if(m_cv[i].pitch >= m_cv[i].target) {
+						m_cv[i].pitch = m_cv[i].target;
+						m_cv[i].glide_rate = 0;
+					}
+				}
+				int dac = m_cv[i].pitch>>16;
+				set_cv(i, dac);
 			}
 		}
 	}
