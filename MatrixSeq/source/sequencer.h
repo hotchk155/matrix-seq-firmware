@@ -117,7 +117,8 @@ public:
 		case P_SQL_SCALE_ROOT:
 			switch(m_layers[m_layer].m_cfg.m_mode) {
 			case V_SQL_SEQ_MODE_CHROMATIC:
-			case V_SQL_SEQ_MODE_TRANSPOSE:
+			case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
+			case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
 				return (m_layers[m_layer].m_cfg.m_force_scale == V_SQL_FORCE_SCALE_ON);
 			case V_SQL_SEQ_MODE_SCALE:
 				return 1;
@@ -133,7 +134,8 @@ public:
 		case P_SQL_MIDI_VEL_ACCENT:
 			switch(m_layers[m_layer].m_cfg.m_mode) {
 			case V_SQL_SEQ_MODE_CHROMATIC:
-			case V_SQL_SEQ_MODE_TRANSPOSE:
+			case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
+			case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
 			case V_SQL_SEQ_MODE_SCALE:
 				return 1;
 			case V_SQL_SEQ_MODE_MOD:
@@ -208,7 +210,8 @@ public:
 		case V_SQL_SEQ_MODE_CHROMATIC:
 			g_popup.note_name(value);
 			break;
-		case V_SQL_SEQ_MODE_TRANSPOSE:
+		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
+		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
 			g_popup.show_offset(((int)value)-64);
 			break;
 		case V_SQL_SEQ_MODE_MOD:
@@ -725,7 +728,8 @@ typedef enum:byte {
 			case V_SQL_SEQ_MODE_SCALE:
 				show_step = !!(step & CSequenceLayer::IS_VALUE_SET);
 				// fall thru
-			case V_SQL_SEQ_MODE_TRANSPOSE:
+			case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
+			case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
 				if(show_step) {
 					n = STEP_VALUE(step);
 					n = 12 - n + layer->m_state.m_scroll_ofs;
@@ -806,7 +810,8 @@ typedef enum:byte {
 							break;
 
 						//////////////////////////////////////////////////
-						case V_SQL_SEQ_MODE_TRANSPOSE:
+						case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
+						case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
 						case V_SQL_SEQ_MODE_VELOCITY:
 							layer.action_step_gate(i);
 							break;
@@ -831,7 +836,8 @@ typedef enum:byte {
 									// info to further layers
 									break;
 								}
-								else if(other_layer.m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
+								else if(other_layer.m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE_ALL ||
+										other_layer.m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE_LOCK) {
 									// transpose layer, action as a note layer passing in the
 									// note from the active layer to be transposed
 									other_layer.action_step_note(

@@ -185,7 +185,7 @@ public:
 	int is_valid_param(PARAM_ID param) {
 		switch(param) {
 		case P_SQL_MIDI_CHAN: return !(m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY);
-		case P_SQL_FORCE_SCALE: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC||m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE);
+		case P_SQL_FORCE_SCALE: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC||m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE_ALL || m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE_LOCK);
 		case P_SQL_MIDI_CC:	return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
 		case P_SQL_CVRANGE: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD || m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY);
 		case P_SQL_CVSCALE: return !(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD || m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY);
@@ -209,7 +209,8 @@ public:
 		case V_SQL_SEQ_MODE_CHROMATIC:
 			m_cfg.m_step[index] = 0; // clear gate and note
 			break;
-		case V_SQL_SEQ_MODE_TRANSPOSE:
+		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
+		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
 			m_cfg.m_step[index] &= GATE_MASK; // preserve gate into
 			m_cfg.m_step[index] |= 64;
 			break;
@@ -227,7 +228,8 @@ public:
 		case V_SQL_SEQ_MODE_CHROMATIC:
 			m_cfg.m_step[index] = step |= CSequenceLayer::IS_VALUE_SET;
 			break;
-		case V_SQL_SEQ_MODE_TRANSPOSE:
+		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
+		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
 			m_cfg.m_step[index] &= GATE_MASK;
 			m_cfg.m_step[index] |= CSequenceLayer::IS_VALUE_SET;
 			m_cfg.m_step[index] |= (byte)step;
@@ -279,9 +281,13 @@ public:
 			}
 			break;
 
-		case V_SQL_SEQ_MODE_TRANSPOSE:
-			reset_values(64);
-			m_state.m_scroll_ofs = 60;
+		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
+		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+			if(m_cfg.m_mode != V_SQL_SEQ_MODE_TRANSPOSE_ALL &&
+				m_cfg.m_mode != V_SQL_SEQ_MODE_TRANSPOSE_LOCK) {
+				reset_values(64);
+				m_state.m_scroll_ofs = 60;
+			}
 			break;
 
 		case V_SQL_SEQ_MODE_MOD:
@@ -457,7 +463,8 @@ public:
 			max_value = g_scale.max_index();
 			break;
 		case V_SQL_SEQ_MODE_CHROMATIC:
-		case V_SQL_SEQ_MODE_TRANSPOSE:
+		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
+		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
 		default:
 			v+=delta;
 			break;
@@ -616,7 +623,8 @@ public:
 			*baseline = 12 - n + m_state.m_scroll_ofs; // now take scroll offset into account
 			*spacing = 7;
 			return 1;
-		case V_SQL_SEQ_MODE_TRANSPOSE:
+		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
+		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
 			*baseline = 64;
 			*spacing = 0;
 			return 1;
@@ -632,11 +640,22 @@ public:
 	// Play a step for a note mode
 	void action_step_note(byte which, STEP_TYPE step_for_transpose, byte midi_vel_accent, byte midi_vel, byte action_gate) {
 		STEP_TYPE step = 0;
-		if(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
+		if(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE_ALL) {
 			int transposed = (int)STEP_VALUE(step_for_transpose) + (int)STEP_VALUE(m_state.m_step_value) - 64;
 			if(transposed >= 0 && transposed < 128) {
 				step = (step_for_transpose & 0xFF00) | transposed;
 			}
+		}
+		else if((m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE_LOCK)) {
+			 if(!(step_for_transpose & IS_ACCENT)) {
+				 int transposed = (int)STEP_VALUE(step_for_transpose) + (int)STEP_VALUE(m_state.m_step_value) - 64;
+				 if(transposed >= 0 && transposed < 128) {
+					 step = (step_for_transpose & 0xFF00) | transposed;
+				 }
+			 }
+			 else {
+				 step = step_for_transpose & ~IS_ACCENT;
+			 }
 		}
 		else {
 			step = m_state.m_step_value;

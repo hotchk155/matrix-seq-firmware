@@ -121,6 +121,14 @@ public:
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
+	void close_all_gates() {
+		for(int i=0; i<MAX_GATE; ++i) {
+			gate_off(i);
+			m_gate[i] = GATE_CLOSED;
+		}
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////
 	void pitch_cv(int which, int note, V_SQL_CVSCALE scaling) {
 
 		// convert the note to DAC value

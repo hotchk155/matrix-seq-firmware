@@ -161,6 +161,7 @@ void fire_event(int event, uint32_t param) {
 	///////////////////////////////////
 	case EV_SEQ_STOP:
 		g_sequencer.stop();
+		g_cv_gate.close_all_gates();
 		g_popup.text("STOP", 4);
 		g_popup.align(CPopup::ALIGN_RIGHT);
 		break;
