@@ -389,8 +389,8 @@ public:
 
 
 	///////////////////////////////////////////////////////////////////////////////
-	static void inc_gate(STEP_TYPE *value) {
-		if(*value & IS_TRIG) {
+	void inc_gate(STEP_TYPE *value) {
+		if(*value & IS_TRIG && is_note_mode()) {
 			*value |= IS_ACCENT;
 		}
 		else if(*value & IS_GATE) {
@@ -418,12 +418,19 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	static void toggle_gate(STEP_TYPE *value) {
+	void toggle_gate(STEP_TYPE *value) {
 		if(*value & (IS_GATE|IS_ACCENT|IS_TRIG)) {
 			*value &= ~GATE_MASK;
+			if(is_note_mode()) {
+				*value &= IS_VALUE_SET;
+			}
 		}
 		else {
 			*value |= IS_TRIG;
+			if(is_note_mode() && ((byte)*value)) {
+				*value |= IS_VALUE_SET;
+
+			}
 		}
 	}
 
