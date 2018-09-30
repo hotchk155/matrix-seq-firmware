@@ -61,6 +61,7 @@
 #include "midi.h"
 #include "cv_gate.h"
 #include "scale.h"
+#include "sequence_step.h"
 #include "sequence_layer.h"
 #include "popup.h"
 #include "sequencer.h"
