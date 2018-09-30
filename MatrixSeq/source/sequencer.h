@@ -225,16 +225,18 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	void scroll(int dist) {
-		int scroll_ofs = m_layers[m_layer].m_state.m_scroll_ofs + dist;
-		if(scroll_ofs < 0) {
-			scroll_ofs = 0;
+	void scroll(int dir) {
+		CSequenceLayer& layer = m_layers[m_layer];
+		if(!layer.is_mod_mode()) {
+			int scroll_ofs = m_layers[m_layer].m_state.m_scroll_ofs + dir;
+			if(scroll_ofs < 0) {
+				scroll_ofs = 0;
+			}
+			else if(scroll_ofs > 114) {
+				scroll_ofs = 114;
+			}
+			m_layers[m_layer].m_state.m_scroll_ofs = scroll_ofs;
 		}
-		else if(scroll_ofs > 114) {
-//TODO: for each type of layer
-			scroll_ofs = 114;
-		}
-		m_layers[m_layer].m_state.m_scroll_ofs = scroll_ofs;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -325,7 +327,7 @@ typedef enum:byte {
 		switch(what) {
 		////////////////////////////////////////////////
 		case ACTION_BEGIN:
-			if(!layer.is_note_mode() || (step & CSequenceLayer::IS_VALUE_SET)) {
+			if(!layer.is_note_mode() || (step & CSequenceLayer::IS_DATA_POINT)) {
 				// there is a valid note in this column so we copy it to our
 				// paste buffer, scroll it into view and show note name on screen
 				layer.m_state.m_copy_step = step;
@@ -373,19 +375,19 @@ typedef enum:byte {
 					if(--m_value <= -31) {
 						m_value = 0;
 					}
-					layer.shift_left();
+					layer.shift_horizontal(-1);
 				}
 				else {
 					if(++m_value >= 31) {
 						m_value = 0;
 					}
-					layer.shift_right();
+					layer.shift_horizontal(+1);
 				}
 				g_popup.show_offset(m_value);
 				break;
 			default:
 				// encoder moved while the button is held
-				if(!layer.is_note_mode() || (step & CSequenceLayer::IS_VALUE_SET)) {
+				if(!layer.is_note_mode() || (step & CSequenceLayer::IS_DATA_POINT)) {
 					// we are dragging a note around
 					value_action(layer, &layer.m_state.m_copy_step, what, 0);
 
@@ -460,7 +462,7 @@ typedef enum:byte {
 		case ACTION_ENC_LEFT:
 		case ACTION_ENC_RIGHT:
 			// hold-turn pastes multiple notes
-			if(!layer.is_note_mode() || (layer.m_state.m_copy_step & CSequenceLayer::IS_VALUE_SET)) {
+			if(!layer.is_note_mode() || (layer.m_state.m_copy_step & CSequenceLayer::IS_DATA_POINT)) {
 				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 			}
 			cursor_action(what);
@@ -493,28 +495,21 @@ typedef enum:byte {
 	}
 
 
-
-
-
 	///////////////////////////////////////////////////////////////////////////////
 	// GATE BUTTON
 	void gate_action(CSequenceLayer& layer, ACTION what) {
-		CSequenceLayer::STEP_TYPE step = layer.get_step(m_cursor);
 		switch(what) {
 		////////////////////////////////////////////////
 		case ACTION_ENC_LEFT:
-			layer.dec_gate(&step);
-			layer.set_step(m_cursor, step);
+			layer.dec_gate(m_cursor);
 			break;
 		////////////////////////////////////////////////
 		case ACTION_ENC_RIGHT:
-			layer.inc_gate(&step);
-			layer.set_step(m_cursor, step);
+			layer.inc_gate(m_cursor);
 			break;
 		////////////////////////////////////////////////
 		case ACTION_CLICK:
-			layer.toggle_gate(&step);
-			layer.set_step(m_cursor, step);
+			layer.toggle_gate(m_cursor);
 			break;
 		default:
 			break;
@@ -557,6 +552,22 @@ typedef enum:byte {
 		}
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
+	// MENU BUTTON
+	void menu_action(CSequenceLayer& layer, ACTION what) {
+		switch(what) {
+			////////////////////////////////////////////////
+		case ACTION_ENC_LEFT:
+			scroll(+1);
+			break;
+		case ACTION_ENC_RIGHT:
+			scroll(-1);
+			break;
+		default:
+			break;
+		}
+	}
+
 
 	void action(ACTION what) {
 		CSequenceLayer& layer(m_layers[m_layer]);
@@ -566,6 +577,7 @@ typedef enum:byte {
 		case KEY_CLEAR: clear_action(layer,what); break;
 		case KEY_GATE: gate_action(layer,what); break;
 		case KEY_LOOP: loop_action(layer,what); break;
+		case KEY_MENU: menu_action(layer,what); break;
 		}
 	}
 
@@ -579,6 +591,7 @@ typedef enum:byte {
 				case KEY_CLEAR:
 				case KEY_GATE:
 				case KEY_LOOP:
+				case KEY_MENU:
 					m_action_context = param;
 					m_encoder_moved = 0;
 					action(ACTION_BEGIN);
@@ -726,7 +739,7 @@ typedef enum:byte {
 			switch(layer->m_cfg.m_mode) {
 			case V_SQL_SEQ_MODE_CHROMATIC:
 			case V_SQL_SEQ_MODE_SCALE:
-				show_step = !!(step & CSequenceLayer::IS_VALUE_SET);
+				show_step = !!(step & CSequenceLayer::IS_DATA_POINT);
 				// fall thru
 			case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
 			case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
@@ -734,11 +747,12 @@ typedef enum:byte {
 					n = STEP_VALUE(step);
 					n = 12 - n + layer->m_state.m_scroll_ofs;
 					if(n >= 0 && n <= 12) {
-						g_ui.raster(n) |= mask;
 						if(i == layer->m_state.m_play_pos && m_is_running) {
 							g_ui.hilite(n) |= mask;
+							g_ui.raster(n) |= mask;
 						}
 						else {
+							g_ui.raster(n) |= mask;
 							g_ui.hilite(n) &= ~mask;
 						}
 					}
@@ -753,7 +767,7 @@ typedef enum:byte {
 					g_ui.raster(n) |= mask;
 					g_ui.hilite(n) |= mask;
 				}
-				else if(step & CSequenceLayer::IS_VALUE_SET) {
+				else if(step & CSequenceLayer::IS_DATA_POINT) {
 					g_ui.raster(n) |= mask;
 					g_ui.hilite(n) &= ~mask;
 

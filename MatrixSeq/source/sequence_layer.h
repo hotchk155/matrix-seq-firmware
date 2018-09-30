@@ -13,19 +13,121 @@ class CSequencer;
 // This class defines a single layer of a sequence
 class CSequenceLayer {
 
+
+	///////////////////////////////////////////////////////////////////////////////
+	void impl_shift_left(uint16_t mask) {
+		STEP_TYPE step = m_cfg.m_step[0] & mask;
+		for(int i = 0; i<MAX_STEPS-1; ++i) {
+				m_cfg.m_step[i] &= ~mask;
+				m_cfg.m_step[i] |= (m_cfg.m_step[i+1] & mask);
+		}
+		m_cfg.m_step[MAX_STEPS-1] &= ~mask;
+		m_cfg.m_step[MAX_STEPS-1] |= step;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	void impl_shift_right(uint16_t mask) {
+		STEP_TYPE step = m_cfg.m_step[MAX_STEPS-1] & mask;
+		for(int i = 0; i<MAX_STEPS-1; ++i) {
+				m_cfg.m_step[i] &= ~mask;
+				m_cfg.m_step[i] |= (m_cfg.m_step[i-1] & mask);
+		}
+		m_cfg.m_step[0] &= ~mask;
+		m_cfg.m_step[0] |= step;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	// Create interpolated points between two waypoints
+	void impl_interpolate_section(int pos, int end)
+	{
+		// calculate the number of new points that we will need to
+		// crate during the interpolation
+		int num_points = end - pos;
+		if(num_points < 0) {
+			num_points += MAX_STEPS;
+		}
+		if(num_points > 0) {
+
+			// starting point and gradient
+			double value =  (byte)m_cfg.m_step[pos];
+			double gradient = ((byte)m_cfg.m_step[end] - value)/num_points;
+			while(--num_points > 0) {
+				// wrap around the column
+				if(++pos >= MAX_STEPS) {
+					pos = 0;
+				}
+				value += gradient;
+				m_cfg.m_step[pos] = (m_cfg.m_step[pos] & GATE_MASK) | (byte)(value+0.5);
+			}
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	void impl_interpolate()
+	{
+		int i;
+		int first_waypoint = -1;
+		int prev_waypoint = -1;
+		for(i=0; i<32; ++i) {
+			if(m_cfg.m_step[i] & IS_DATA_POINT) {
+				if(prev_waypoint < 0) {
+					first_waypoint = i;
+				}
+				else {
+					impl_interpolate_section(prev_waypoint, i);
+				}
+				prev_waypoint = i;
+			}
+		}
+
+		if(first_waypoint < 0) {
+			// no waypoints defined
+			for(i=0; i<32; ++i) {
+				m_cfg.m_step[i] &= GATE_MASK; // data is 0
+			}
+		}
+		else if(prev_waypoint == first_waypoint) {
+			// only one waypoint defined
+			for(i=0; i<32; ++i) {
+				if(i!=prev_waypoint) {
+					m_cfg.m_step[i] &= GATE_MASK;
+					m_cfg.m_step[i] |= (byte)(m_cfg.m_step[first_waypoint]);
+				}
+			}
+		}
+		else {
+			// multiple waypoints defined
+			impl_interpolate_section(prev_waypoint, first_waypoint);
+		}
+	}
+
+	int next_step_index(int index) {
+		++index;
+		if(index > m_cfg.m_loop_to) {
+			index -= m_cfg.m_loop_to;
+		}
+		if(index < m_cfg.m_loop_from) {
+			index += m_cfg.m_loop_from;
+		}
+		return index;
+	}
+
+
 public:
 	typedef uint16_t STEP_TYPE;
+	enum : uint16_t {
+		IS_DATA_POINT = (uint16_t)0x0100,	// is there a user set value at this step?
+
+		IS_GATE = (uint16_t)0x1000,		// gate open
+		IS_TRIG = (uint16_t)0x2000,		// retrigger (takes precendence over open)
+		IS_ACCENT = (uint16_t)0x4000,    // accent (
+
+		GATE_MASK =	IS_GATE|IS_TRIG|IS_ACCENT,
+	};
 	enum {
 		NO_POS = -1,
 		MAX_STEPS = 32,					// number of steps in the layer
 
-		IS_VALUE_SET = (uint16_t)0x100,	// is there a user set value at this step?
-
-		IS_GATE = (uint16_t)0x200,		// is the gate open
-		IS_TRIG = (uint16_t)0x400,		// is there a trigger at this point
-		IS_ACCENT = (uint16_t)0x800,    // is there an accent (MIDI velocity) at this point
-
-		GATE_MASK =	IS_GATE|IS_TRIG|IS_ACCENT,
 
 
 		MAX_PLAYING_NOTES = 8,
@@ -63,6 +165,7 @@ public:
 		byte 			m_midi_cc;			// MIDI CC
 		V_SQL_CVSCALE	m_cv_scale;
 		byte 			m_cv_range;
+		V_SQL_CVGLIDE	m_cv_glide;
 	} CONFIG;
 
 
@@ -114,6 +217,7 @@ public:
 		m_cfg.m_enabled = 1;
 		m_cfg.m_cv_scale = V_SQL_CVSCALE_1VOCT;
 		m_cfg.m_cv_range = 5;
+		m_cfg.m_cv_glide = V_SQL_CVGLIDE_OFF;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -127,6 +231,8 @@ public:
 		memset(m_state.m_playing,0,sizeof(m_state.m_playing));
 		reset();
 	}
+
+	///////////////////////////////////////////////////////////////////////////////
 	void reset() {
 		m_state.m_step_value = 0;
 		m_state.m_stepped = 0;
@@ -134,6 +240,7 @@ public:
 		m_state.m_next_tick = 0;
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
 	void copy_from(const CSequenceLayer& layer) {
 		CONFIG cfg = m_cfg;
 
@@ -145,8 +252,6 @@ public:
 		m_state = layer.m_state;
 		m_state.m_last_note = 0;
 		memset(m_state.m_playing,0,sizeof(m_state.m_playing));
-
-
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -160,6 +265,7 @@ public:
 		case P_SQL_MIDI_CC: m_cfg.m_midi_cc = value; break;
 		case P_SQL_CVSCALE: m_cfg.m_cv_scale = (V_SQL_CVSCALE)value; break;
 		case P_SQL_CVRANGE: m_cfg.m_cv_range = value; break;
+		case P_SQL_CVGLIDE: m_cfg.m_cv_glide = (V_SQL_CVGLIDE)value; break;
 		default: break;
 		}
 	}
@@ -175,11 +281,10 @@ public:
 		case P_SQL_MIDI_CC: return m_cfg.m_midi_cc;
 		case P_SQL_CVSCALE: return m_cfg.m_cv_scale;
 		case P_SQL_CVRANGE: return m_cfg.m_cv_range;
+		case P_SQL_CVGLIDE: return m_cfg.m_cv_glide;
 		default:return 0;
 		}
 	}
-
-
 
 	///////////////////////////////////////////////////////////////////////////////
 	int is_valid_param(PARAM_ID param) {
@@ -195,7 +300,7 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	// preserve trigs but clear all data
-	void reset_values(byte value) {
+	void reset_data_points(byte value) {
 		for(int i=0; i<MAX_STEPS; ++i) {
 			m_cfg.m_step[i] &= GATE_MASK;
 			m_cfg.m_step[i] |= value;
@@ -216,9 +321,9 @@ public:
 			break;
 		case V_SQL_SEQ_MODE_MOD:
 			m_cfg.m_step[index] &= GATE_MASK; // preserve gate into
-			interpolate();
 			break;
 		}
+		recalc_data_points();
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -226,21 +331,21 @@ public:
 		switch(m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_SCALE:
 		case V_SQL_SEQ_MODE_CHROMATIC:
-			m_cfg.m_step[index] = step |= CSequenceLayer::IS_VALUE_SET;
+			m_cfg.m_step[index] = step |= CSequenceLayer::IS_DATA_POINT;
 			break;
 		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
 		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
 			m_cfg.m_step[index] &= GATE_MASK;
-			m_cfg.m_step[index] |= CSequenceLayer::IS_VALUE_SET;
+			m_cfg.m_step[index] |= CSequenceLayer::IS_DATA_POINT;
 			m_cfg.m_step[index] |= (byte)step;
 			break;
 		case V_SQL_SEQ_MODE_MOD:
 			m_cfg.m_step[index] &= GATE_MASK;
-			m_cfg.m_step[index] |= CSequenceLayer::IS_VALUE_SET;
+			m_cfg.m_step[index] |= CSequenceLayer::IS_DATA_POINT;
 			m_cfg.m_step[index] |= (byte)step;
-			interpolate();
 			break;
 		}
+		recalc_data_points();
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -258,7 +363,7 @@ public:
 				m_state.m_scroll_ofs = g_scale.index_to_note(m_state.m_scroll_ofs);
 			}
 			else {
-				reset_values(DEFAULT_NOTE);
+				reset_data_points(DEFAULT_NOTE);
 				m_state.m_scroll_ofs = DEFAULT_NOTE - 5;
 			}
 			break;
@@ -276,7 +381,7 @@ public:
 			}
 			else {
 				int default_index = g_scale.note_to_index(DEFAULT_NOTE);
-				reset_values(default_index);
+				reset_data_points(default_index);
 				m_state.m_scroll_ofs = default_index - 5;
 			}
 			break;
@@ -285,13 +390,13 @@ public:
 		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
 			if(m_cfg.m_mode != V_SQL_SEQ_MODE_TRANSPOSE_ALL &&
 				m_cfg.m_mode != V_SQL_SEQ_MODE_TRANSPOSE_LOCK) {
-				reset_values(64);
+				reset_data_points(64);
 				m_state.m_scroll_ofs = 60;
 			}
 			break;
 
 		case V_SQL_SEQ_MODE_MOD:
-			reset_values(0);
+			reset_data_points(0);
 			break;
 		default:
 			break;
@@ -395,54 +500,46 @@ public:
 
 
 	///////////////////////////////////////////////////////////////////////////////
-	void inc_gate(STEP_TYPE *value) {
-		if(*value & IS_TRIG && is_note_mode()) {
-			*value |= IS_ACCENT;
+	void inc_gate(int index) {
+		STEP_TYPE step = m_cfg.m_step[index];
+		if(step & IS_TRIG && is_note_mode()) {
+			step = IS_ACCENT;
 		}
-		else if(*value & IS_GATE) {
-			*value |= IS_TRIG;
+		else if(step & IS_GATE) {
+			step = IS_TRIG;
 		}
 		else
 		{
-			*value |= IS_GATE;
+			step = IS_GATE;
 		}
+		m_cfg.m_step[index] &= ~GATE_MASK;
+		m_cfg.m_step[index] |= (step & GATE_MASK);
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	static void dec_gate(STEP_TYPE *value) {
-		if(*value & IS_ACCENT) {
-			*value &= ~IS_ACCENT;
-			*value |= IS_TRIG;
+	void dec_gate(int index) {
+		STEP_TYPE step = m_cfg.m_step[index];
+		if(step & IS_ACCENT) {
+			step = IS_TRIG;
 		}
-		else if(*value & IS_TRIG) {
-			*value &= ~IS_TRIG;
-			*value |= IS_GATE;
+		else if(step & IS_TRIG) {
+			step = IS_GATE;
 		}
-		else if(*value & IS_GATE) {
-			*value &= ~IS_GATE;
-		}
+		m_cfg.m_step[index] &= ~GATE_MASK;
+		m_cfg.m_step[index] |= (step & GATE_MASK);
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	void toggle_gate(STEP_TYPE *value) {
-		if(*value & (IS_GATE|IS_ACCENT|IS_TRIG)) {
-			*value &= ~GATE_MASK;
-			if(is_note_mode()) {
-				*value &= IS_VALUE_SET;
-			}
+	void toggle_gate(int index) {
+		if(m_cfg.m_step[index] & GATE_MASK) {
+			// toggle gate off (any mode)
+			m_cfg.m_step[index] &= ~GATE_MASK;
 		}
-		else {
-			*value |= IS_TRIG;
-			if(is_note_mode() && ((byte)*value)) {
-				*value |= IS_VALUE_SET;
-
-			}
+		else if(!is_note_mode() || (m_cfg.m_step[index] & IS_DATA_POINT)){
+			// toggle gate on (in note mode this can only be done if there
+			// is a data point at this position)
+			m_cfg.m_step[index] |= IS_TRIG;
 		}
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	void constrain_step_value(STEP_TYPE *value) {
-		inc_step_value(value, 0, 0);
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -478,6 +575,7 @@ public:
 		*value &= 0xFF00;
 		*value |= v;
 	}
+
 	///////////////////////////////////////////////////////////////////////////////
 	inline byte is_mod_mode() {
 		return(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
@@ -494,116 +592,57 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	inline void set_step(int index, uint16_t step) {
-		m_cfg.m_step[index] =step;
-	}
-	///////////////////////////////////////////////////////////////////////////////
-	inline void set_step_value(int index, STEP_TYPE step) {
-		if(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD) {
-			m_cfg.m_step[index] &= 0xFF00;
-			m_cfg.m_step[index] |= (byte)step;
-		}
-		else {
-			m_cfg.m_step[index] =step;
-		}
-	}
-
-	byte shift_vertical(int offset) {
+	// shift pattern vertically up or down by one space
+	byte shift_vertical(int dir) {
+		// first make sure that the shift will not exceed the bounds at
+		// the top of the bottom of the pattern
 		for(int i = 0; i<MAX_STEPS; ++i) {
 			STEP_TYPE step = m_cfg.m_step[i];
-			if(step & IS_VALUE_SET) {
-				int v = (int)STEP_VALUE(step) + offset;
+			if(step & IS_DATA_POINT) {
+				int v = (int)STEP_VALUE(step) + dir;
 				if(v < 0 || v > 127) {
 					return 0;
 				}
 			}
 		}
+
+		// perform the actual shift of all the data points
 		for(int i = 0; i<MAX_STEPS; ++i) {
 			STEP_TYPE step = m_cfg.m_step[i];
-			if(step & IS_VALUE_SET) {
-				m_cfg.m_step[i] = (step & 0xFF00) | (STEP_VALUE(step) + offset);
+			if(step & IS_DATA_POINT) {
+				m_cfg.m_step[i] = (step & 0xFF00) | (STEP_VALUE(step) + dir);
 			}
 		}
+
+		// perform any recalculation needed in the pattern
+		recalc_data_points();
 		return 1;
-	}
-	void shift_left() {
-		STEP_TYPE step = m_cfg.m_step[0];
-		for(int i = 0; i<MAX_STEPS-1; ++i) {
-			set_step_value(i, m_cfg.m_step[i+1]);
-		}
-		set_step_value(MAX_STEPS-1, step);
-	}
-	void shift_right() {
-		STEP_TYPE step = m_cfg.m_step[MAX_STEPS-1];
-		for(int i = MAX_STEPS-1; i>0; --i) {
-			set_step_value(i, m_cfg.m_step[i-1]);
-		}
-		set_step_value(0, step);
 	}
 
 
 	///////////////////////////////////////////////////////////////////////////////
-	// Create interpolated points between two waypoints
-	void interpolate_section(int pos, int end) {
-
-		// calculate the number of new points that we will need to
-		// crate during the interpolation
-		int num_points = end - pos;
-		if(num_points < 0) {
-			num_points += MAX_STEPS;
+	// shift pattern horizontally by one step
+	void shift_horizontal(int dir) {
+		uint16_t mask = ~GATE_MASK;
+		if(is_note_mode()) {
+			mask = ~0;
 		}
-		if(num_points > 0) {
-
-			// starting point and gradient
-			double value =  (byte)m_cfg.m_step[pos];
-			double gradient = ((byte)m_cfg.m_step[end] - value)/num_points;
-			while(--num_points > 0) {
-				// wrap around the column
-				if(++pos >= MAX_STEPS) {
-					pos = 0;
-				}
-				value += gradient;
-				m_cfg.m_step[pos] = (m_cfg.m_step[pos] & GATE_MASK) | (byte)(value+0.5);
-			}
+		if(dir<0) {
+			impl_shift_left(mask);
 		}
+		else {
+			impl_shift_right(mask);
+		}
+		recalc_data_points();
 	}
+
+
 
 	///////////////////////////////////////////////////////////////////////////////
 	// Interpolate all points
-	void interpolate() {
-		int i;
-		int first_waypoint = -1;
-		int prev_waypoint = -1;
-		for(i=0; i<32; ++i) {
-			if(m_cfg.m_step[i] & IS_VALUE_SET) {
-				if(prev_waypoint < 0) {
-					first_waypoint = i;
-				}
-				else {
-					interpolate_section(prev_waypoint, i);
-				}
-				prev_waypoint = i;
-			}
-		}
-
-		if(first_waypoint < 0) {
-			// no waypoints defined
-			for(i=0; i<32; ++i) {
-				m_cfg.m_step[i] &= GATE_MASK; // data is 0
-			}
-		}
-		else if(prev_waypoint == first_waypoint) {
-			// only one waypoint defined
-			for(i=0; i<32; ++i) {
-				if(i!=prev_waypoint) {
-					m_cfg.m_step[i] &= GATE_MASK;
-					m_cfg.m_step[i] |= (byte)(m_cfg.m_step[first_waypoint]);
-				}
-			}
-		}
-		else {
-			// multiple waypoints defined
-			interpolate_section(prev_waypoint, first_waypoint);
+	void recalc_data_points() {
+		if(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD) {
+			impl_interpolate();
 		}
 	}
 
@@ -636,6 +675,8 @@ public:
 		return 0;
 	}
 
+
+/*
 	///////////////////////////////////////////////////////////////////////////////
 	// Play a step for a note mode
 	void action_step_note(byte which, STEP_TYPE step_for_transpose, byte midi_vel_accent, byte midi_vel, byte action_gate) {
@@ -663,10 +704,11 @@ public:
 
 
 		// Get step type: active / legato / velocity level
+		int glide_time = 0;
 		CCVGate::GATE_STATE gate_state = CCVGate::GATE_CLOSED;
 		byte legato = 0;
 		byte velocity = 0;
-		byte active = !!(step & IS_GATE);
+		byte active = !!(step & IS_DATA_POINT);
 		if(step & IS_ACCENT) {
 			velocity = midi_vel_accent;
 		}
@@ -674,7 +716,11 @@ public:
 			velocity = midi_vel;
 		}
 		else {
+			// active step with no trigger or no gate
 			legato = 1;
+			if(m_cfg.m_cv_glide == V_SQL_CVGLIDE_ON) {
+				glide_time = g_clock.get_ms_for_measure(m_cfg.m_step_rate);
+			}
 		}
 
 		// Kill "open" notes which are timed to step boundaries rather than by a timeout
@@ -792,7 +838,184 @@ public:
 					m_state.m_last_note = note;
 					m_state.m_playing[slot].note = note;
 					m_state.m_playing[slot].count = duration;
-					g_cv_gate.pitch_cv(which, note, m_cfg.m_cv_scale);
+					g_cv_gate.pitch_cv(which, note, m_cfg.m_cv_scale, glide_time);
+					if(action_gate) {
+						g_cv_gate.gate(which, gate_state);
+					}
+				}
+			}
+		}
+	}
+*/
+
+	///////////////////////////////////////////////////////////////////////////////
+	// Play a step for a note mode
+	void action_step_note(byte which, STEP_TYPE step_for_transpose, byte midi_vel_accent, byte midi_vel, byte action_gate) {
+
+
+		// determine the step value to be processed, which may come from a different layer
+		// in the case of transposition
+		STEP_TYPE step = 0;
+		int transposed;
+		switch(m_cfg.m_mode) {
+		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
+			transposed = (int)STEP_VALUE(step_for_transpose) + (int)STEP_VALUE(m_state.m_step_value) - 64;
+			if(transposed >= 0 && transposed < 128) {
+				step = (step_for_transpose & 0xFF00) | transposed;
+			}
+			break;
+		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+			 if(!(step_for_transpose & IS_ACCENT)) {
+				 transposed = (int)STEP_VALUE(step_for_transpose) + (int)STEP_VALUE(m_state.m_step_value) - 64;
+				 if(transposed >= 0 && transposed < 128) {
+					 step = (step_for_transpose & 0xFF00) | transposed;
+				 }
+			 }
+			 else {
+				 step = step_for_transpose & ~IS_ACCENT;
+			 }
+			 break;
+		default:
+			step = m_state.m_step_value;
+		}
+
+
+		// Get step type: active / legato / velocity level
+		int glide_time = 0;
+		CCVGate::GATE_STATE gate_state = CCVGate::GATE_CLOSED;
+		byte legato = 0;
+		byte velocity = 0;
+		byte active = !!(step & IS_DATA_POINT);
+		if(step & IS_ACCENT) {
+			velocity = midi_vel_accent;
+		}
+		else if(step & IS_TRIG) {
+			velocity = midi_vel;
+		}
+		else {
+			// active step with no trigger or no gate
+			legato = 1;
+			if(m_cfg.m_cv_glide == V_SQL_CVGLIDE_ON) {
+				glide_time = g_clock.get_ms_for_measure(m_cfg.m_step_rate);
+			}
+		}
+
+		// Kill "open" notes which are timed to step boundaries rather than by a timeout
+		byte kill_open_notes = 1;
+		if(m_cfg.m_note_dur == V_SQL_STEP_DUR_STEP) {
+			kill_open_notes = !legato;
+		}
+		else if(m_cfg.m_note_dur == V_SQL_STEP_DUR_FULL) {
+			kill_open_notes = active && !legato;
+		}
+		if(kill_open_notes) {
+			for(int i=0; i<MAX_PLAYING_NOTES;++i) {
+				if(m_state.m_playing[i].note && !m_state.m_playing[i].count) {
+					if(m_state.m_playing[i].note == m_state.m_last_note) {
+						gate_state = CCVGate::GATE_CLOSED;
+					}
+					send_midi_note(m_state.m_playing[i].note,0);
+					m_state.m_playing[i].note = 0;
+				}
+			}
+		}
+
+
+		// is there anything going on at this step
+		if(active) {
+
+			// force to scale if needed
+			byte note = STEP_VALUE(step);
+			if(m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
+				note = g_scale.index_to_note(note);
+			}
+			else if(m_cfg.m_force_scale == V_SQL_FORCE_SCALE_ON) {
+				note = g_scale.force_to_scale(note);
+			}
+
+			if(note) {
+				// decide duration. a duration 0 is open ended
+				byte duration = 0;
+				if(m_cfg.m_note_dur >= V_SQL_STEP_DUR_32) {
+					duration = c_step_duration[m_cfg.m_note_dur - V_SQL_STEP_DUR_32];
+				}
+
+				// scan list of playing note slots to find a usable slot where
+				// we can track this note
+				int free = -1;
+				int same = -1;
+				int last = -1;
+				int steal = -1;
+				int steal_count = -1;
+				for(int i=0; i<MAX_PLAYING_NOTES;++i) {
+					if(!m_state.m_playing[i].note) {
+						// we have a free slot
+						free = i;
+					}
+					else if(m_state.m_playing[i].note == note) {
+						// the same note is already playing. we will use this slot so
+						// there is no need to carry on looking
+						same = i;
+						break;
+					}
+					else if(m_state.m_playing[i].note == m_state.m_last_note) {
+						// this slot is playing the last note output from this channel
+						// (and it is still playing!)
+						last = i;
+					}
+					else if(m_state.m_playing[i].count < steal_count || steal_count == -1) {
+						// this is the note that has the least time remaining to play
+						// so we might steal it's slot if we have to...
+						steal_count = m_state.m_playing[i].count;
+						steal = i;
+					}
+				}
+
+				// For legato steps there is no velocity information... we use the
+				// velocity for the last played note
+				if(velocity) {
+					m_state.m_last_velocity = velocity;
+				}
+
+				// decide which of the possible slots we're going to use
+				int slot = -1;
+				if(same>=0) {
+					// slot for same note will always be reused
+					if(!legato) {
+						// retrigger the note
+						send_midi_note(note,0);
+						send_midi_note(note,m_state.m_last_velocity);
+						gate_state = CCVGate::GATE_RETRIG;
+					}
+					slot = same;
+				}
+				else if(last>=0 && legato) {
+					// the last played note is still sounding, in legato mode we will
+					// replace that note, but only stop it after the new note starts
+					send_midi_note(note,m_state.m_last_velocity);
+					send_midi_note(m_state.m_playing[last].note,0);
+					gate_state = CCVGate::GATE_OPEN;
+					slot = last;
+				}
+				else if(free>=0) {
+					// else a free slot will be used if available
+					send_midi_note(note,m_state.m_last_velocity);
+					gate_state = legato? CCVGate::GATE_OPEN : CCVGate::GATE_RETRIG;
+					slot = free;
+				}
+				else if(steal>=0) {
+					// final option we'll steal a slot from another note, so we need to stop that note playing
+					send_midi_note(m_state.m_playing[steal].note,0);
+					send_midi_note(note,m_state.m_last_velocity);
+					gate_state = legato? CCVGate::GATE_OPEN : CCVGate::GATE_RETRIG;
+					slot = steal;
+				}
+
+				if(slot >= 0) {
+					m_state.m_last_note = note;
+					m_state.m_playing[slot].note = note;
+					m_state.m_playing[slot].count = duration;
+					g_cv_gate.pitch_cv(which, note, m_cfg.m_cv_scale, glide_time);
 					if(action_gate) {
 						g_cv_gate.gate(which, gate_state);
 					}
@@ -801,24 +1024,19 @@ public:
 		}
 	}
 
-	int next_step_index(int index) {
-		++index;
-		if(index > m_cfg.m_loop_to) {
-			index -= m_cfg.m_loop_to;
-		}
-		if(index < m_cfg.m_loop_from) {
-			index += m_cfg.m_loop_from;
-		}
-		return index;
-	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void action_step_mod(byte which) {
 		byte value1 = (byte)m_cfg.m_step[m_state.m_play_pos];
-		int next = next_step_index(m_state.m_play_pos);
-		byte value2 = (byte)m_cfg.m_step[next];
-		int ms = g_clock.get_ms_for_measure(m_cfg.m_step_rate);
-		g_cv_gate.mod_cv(which, value1, m_cfg.m_cv_range, value2, ms);
+		if(m_cfg.m_cv_glide == V_SQL_CVGLIDE_ON) {
+			int next = next_step_index(m_state.m_play_pos);
+			byte value2 = (byte)m_cfg.m_step[next];
+			int ms = g_clock.get_ms_for_measure(m_cfg.m_step_rate);
+			g_cv_gate.mod_cv(which, value1, m_cfg.m_cv_range, value2, ms);
+		}
+		else {
+			g_cv_gate.mod_cv(which, value1, m_cfg.m_cv_range, 0, 0);
+		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -838,94 +1056,14 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	void test() {
-		m_cfg.m_step[0] = 45|IS_GATE|IS_VALUE_SET;
-		m_cfg.m_step[1] = 45|IS_GATE|IS_VALUE_SET;
-		m_cfg.m_step[4] = 46|IS_GATE|IS_VALUE_SET;
-		m_cfg.m_step[5] = 48|IS_GATE|IS_VALUE_SET;
-		m_cfg.m_step[8] = 50|IS_GATE|IS_VALUE_SET;
-		m_cfg.m_step[9] = 50|IS_GATE|IS_VALUE_SET;
-		m_cfg.m_step[12] = 52|IS_GATE|IS_VALUE_SET;
+		m_cfg.m_step[0] = 45|IS_GATE|IS_DATA_POINT;
+		m_cfg.m_step[1] = 45|IS_GATE|IS_DATA_POINT;
+		m_cfg.m_step[4] = 46|IS_GATE|IS_DATA_POINT;
+		m_cfg.m_step[5] = 48|IS_GATE|IS_DATA_POINT;
+		m_cfg.m_step[8] = 50|IS_GATE|IS_DATA_POINT;
+		m_cfg.m_step[9] = 50|IS_GATE|IS_DATA_POINT;
+		m_cfg.m_step[12] = 52|IS_GATE|IS_DATA_POINT;
 	}
-
-	/*
-	///////////////////////////////////////////////////////////////////////////////
-	void start_midi_note(byte chan, byte note, byte velocity, byte duration, byte legato) {
-
-		// scan list of playing note slots to find candidate slots
-		int free = -1;
-		int same = -1;
-		int last = -1;
-		int steal = -1;
-		byte steal_count = 255;
-		for(int i=0; i<MAX_PLAYING_NOTES;++i) {
-			if(!m_state.m_playing[i].note) {
-				// we have a free slot
-				free = i;
-			}
-			else if(m_state.m_playing[i].note == note) {
-				// the same note is already playing. we will use this slot so
-				// there is no need to carry on looking
-				same = i;
-				break;
-			}
-			else if(m_state.m_playing[i].note == m_state.m_last_note) {
-				// this slot is playing the last note output from this channel
-				// (and it is still playing!)
-				last = i;
-			}
-			else if(m_state.m_playing[i].count < steal_count) {
-				// this is the note that has the least time remaining to play
-				// so we might steal it's slot if we have to...
-				steal_count = m_state.m_playing[i].count;
-				steal = i;
-			}
-		}
-
-
-		// decide which of the possible slots we're going to use
-		byte legato_note = 0;
-		int slot = -1;
-		if(same>=0) {
-			// slot for same note will always be reused
-			slot = same;
-			if(legato) {
-				// for legato playing we just extend this note, do not retrigger it!
-				m_state.m_playing[same].count = duration;
-				m_state.m_last_note = note;
-				return;
-			}
-		}
-		else if(last>=0 && legato) {
-			// the last played note is still sounding, in legato mode we will
-			// replace that note, but only stop it after the new note starts
-			slot = last;
-			velocity = m_state.m_last_velocity;
-			legato_note = m_state.m_playing[last].note;
-		}
-		else if(free>=0) {
-			// else a free slot will be used if available
-			slot = free;
-		}
-		else if(steal>=0) {
-			// final option we'll steal a slot from another note, so we need to stop that note playing
-			g_midi.send_note(chan, m_state.m_playing[steal].note, 0);
-			slot = steal;
-		}
-
-		if(slot>=0) {
-			// play the the new note
-			m_state.m_playing[slot].note = note;
-			m_state.m_playing[slot].count = duration;
-			m_state.m_last_note = note;
-			m_state.m_last_velocity = velocity;
-			g_midi.send_note(chan, note, velocity);
-		}
-		if(legato_note) {
-			// if there is a "legato" note to stop only after the new note
-			// has been started then stop it now
-			g_midi.send_note(chan, legato_note, 0);
-		}
-	}*/
 
 };
 

@@ -73,6 +73,26 @@ public:
 		}
 	}
 
+	void impl_set_cv(int which, int dac)
+	{
+		// get the appropriate offset into the DAC structure
+		// for the target CV output
+		int ofs;
+		switch(which) {
+		case 1: ofs = 1; break;
+		case 2: ofs = 2; break;
+		case 3: ofs = 0; break;
+		default: ofs = 3; break;
+		}
+
+		// if the output has changed then load the new one
+		if(m_dac[ofs] != dac) {
+			g_cv_led.blink(g_cv_led.MEDIUM_BLINK);
+			m_dac[ofs] = dac;
+			m_cv_pending = 1;
+		}
+	}
+
 public:
 
 	// pitch is defined a 256 * midi note number + fractional part
@@ -129,33 +149,22 @@ public:
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	void pitch_cv(int which, int note, V_SQL_CVSCALE scaling) {
-
+	void pitch_cv(int which, int note, V_SQL_CVSCALE scaling, int glide_time) {
 		// convert the note to DAC value
 		// TODO support other note/cv mappings
 		int dac = (500 * (int)note)/12;
-		set_cv(which, dac);
-	}
 
-	void set_cv(int which, int dac)
-	{
-		// get the appropriate offset into the DAC structure
-		// for the target CV output
-		int ofs;
-		switch(which) {
-		case 1: ofs = 1; break;
-		case 2: ofs = 2; break;
-		case 3: ofs = 0; break;
-		default: ofs = 3; break;
+		if(glide_time) {
+			m_cv[which].target = dac<<16;
+			m_cv[which].glide_rate = (m_cv[which].target - m_cv[which].pitch)/glide_time;
 		}
-
-		// if the output has changed then load the new one
-		if(m_dac[ofs] != dac) {
-			g_cv_led.blink(g_cv_led.MEDIUM_BLINK);
-			m_dac[ofs] = dac;
-			m_cv_pending = 1;
+		else {
+			m_cv[which].pitch = dac<<16;
+			m_cv[which].glide_rate = 0;
+			impl_set_cv(which, dac);
 		}
 	}
+
 
 	/////////////////////////////////////////////////////////////////////////////////
 	void mod_cv(int which, int value, int volt_range, int value2, int sweep_time) {
@@ -169,7 +178,7 @@ public:
 		}
 
 		int dac = m_cv[which].pitch>>16;
-		set_cv(which, dac);
+		impl_set_cv(which, dac);
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -214,7 +223,7 @@ public:
 					}
 				}
 				int dac = m_cv[i].pitch>>16;
-				set_cv(i, dac);
+				impl_set_cv(i, dac);
 			}
 		}
 	}

@@ -49,6 +49,7 @@ typedef enum:byte {
 	P_SQL_MIDI_VEL,
 	P_SQL_CVSCALE,
 	P_SQL_CVRANGE,
+	P_SQL_CVGLIDE,
 	P_SQL_LOAD_PATTERN,
 	P_SQL_SAVE_PATTERN,
 	P_SQL_MAX,
@@ -200,6 +201,11 @@ typedef enum:byte {
 	V_SQL_CVSCALE_HZVOLT,
 	V_SQL_CVSCALE_MAX
 } V_SQL_CVSCALE;
+
+typedef enum:byte {
+	V_SQL_CVGLIDE_OFF= 0,
+	V_SQL_CVGLIDE_ON
+} V_SQL_CVGLIDE;
 
 typedef enum:byte {
 	V_SQL_STEP_TRIG_CLOCK = 0,
