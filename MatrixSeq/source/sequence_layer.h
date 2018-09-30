@@ -6,7 +6,44 @@
 #ifndef SEQUENCE_LAYER_H_
 #define SEQUENCE_LAYER_H_
 
-#define STEP_VALUE(s) ((byte)(s))
+//#define STEP_VALUE(s) ((byte)(s))
+
+class CStep {
+public:
+	byte m_is_data_point:1; // is this a "user" data point rather than an automatic one?
+	byte m_is_accent:1;
+	byte m_is_gate_open:1;
+	byte m_is_trigger:1;
+	byte m_value;
+
+	void copy_data_point(CStep &other) {
+		m_value = other.m_value;
+		m_is_data_point = other.m_is_data_point;
+	}
+
+	// clear data point and gates
+	void reset_all(byte value = 0) {
+		m_is_data_point = 0;
+		m_is_accent = 0;
+		m_is_gate_open = 0;
+		m_is_trigger = 0;
+		m_value = value;
+	}
+
+	// clear data point but preserve gate
+	void reset_data_point(byte value = 0) {
+		m_is_data_point = 0;
+		m_value = value;
+	}
+
+	// clear gate info but preserve data point
+	void reset_gate() {
+		m_is_accent = 0;
+		m_is_gate_open = 0;
+		m_is_trigger = 0;
+
+	}
+};
 
 class CSequencer;
 ///////////////////////////////////////////////////////////////////////////////
@@ -15,25 +52,42 @@ class CSequenceLayer {
 
 
 	///////////////////////////////////////////////////////////////////////////////
-	void impl_shift_left(uint16_t mask) {
-		STEP_TYPE step = m_cfg.m_step[0] & mask;
+	void impl_shift_left(byte with_gates) {
+		CStep step = m_cfg.m_step[0];
 		for(int i = 0; i<MAX_STEPS-1; ++i) {
-				m_cfg.m_step[i] &= ~mask;
-				m_cfg.m_step[i] |= (m_cfg.m_step[i+1] & mask);
+			if(with_gates) {
+				m_cfg.m_step[i] = m_cfg.m_step[i+1];
+			}
+			else {
+				m_cfg.m_step[i].copy_data_point(m_cfg.m_step[i+1]);
+			}
 		}
-		m_cfg.m_step[MAX_STEPS-1] &= ~mask;
-		m_cfg.m_step[MAX_STEPS-1] |= step;
+		if(with_gates) {
+			m_cfg.m_step[MAX_STEPS-1] = step;
+		}
+		else {
+			m_cfg.m_step[MAX_STEPS-1].copy_data_point(step);
+		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	void impl_shift_right(uint16_t mask) {
-		STEP_TYPE step = m_cfg.m_step[MAX_STEPS-1] & mask;
+	void impl_shift_right(byte with_gates) {
+
+		CStep step = m_cfg.m_step[MAX_STEPS-1];
 		for(int i = 0; i<MAX_STEPS-1; ++i) {
-				m_cfg.m_step[i] &= ~mask;
-				m_cfg.m_step[i] |= (m_cfg.m_step[i-1] & mask);
+			if(with_gates) {
+				m_cfg.m_step[i] = m_cfg.m_step[i-1];
+			}
+			else {
+				m_cfg.m_step[i].copy_data_point(m_cfg.m_step[i-1]);
+			}
 		}
-		m_cfg.m_step[0] &= ~mask;
-		m_cfg.m_step[0] |= step;
+		if(with_gates) {
+			m_cfg.m_step[0] = step;
+		}
+		else {
+			m_cfg.m_step[0].copy_data_point(step);
+		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -49,15 +103,15 @@ class CSequenceLayer {
 		if(num_points > 0) {
 
 			// starting point and gradient
-			double value =  (byte)m_cfg.m_step[pos];
-			double gradient = ((byte)m_cfg.m_step[end] - value)/num_points;
+			double value =  m_cfg.m_step[pos].m_value;
+			double gradient = (m_cfg.m_step[end].m_value - value)/num_points;
 			while(--num_points > 0) {
 				// wrap around the column
 				if(++pos >= MAX_STEPS) {
 					pos = 0;
 				}
 				value += gradient;
-				m_cfg.m_step[pos] = (m_cfg.m_step[pos] & GATE_MASK) | (byte)(value+0.5);
+				m_cfg.m_step[pos].m_value = (byte)(value+0.5);
 			}
 		}
 	}
@@ -69,7 +123,7 @@ class CSequenceLayer {
 		int first_waypoint = -1;
 		int prev_waypoint = -1;
 		for(i=0; i<32; ++i) {
-			if(m_cfg.m_step[i] & IS_DATA_POINT) {
+			if(m_cfg.m_step[i].m_is_data_point) {
 				if(prev_waypoint < 0) {
 					first_waypoint = i;
 				}
@@ -83,15 +137,14 @@ class CSequenceLayer {
 		if(first_waypoint < 0) {
 			// no waypoints defined
 			for(i=0; i<32; ++i) {
-				m_cfg.m_step[i] &= GATE_MASK; // data is 0
+				m_cfg.m_step[i].m_value = 0;
 			}
 		}
 		else if(prev_waypoint == first_waypoint) {
 			// only one waypoint defined
 			for(i=0; i<32; ++i) {
 				if(i!=prev_waypoint) {
-					m_cfg.m_step[i] &= GATE_MASK;
-					m_cfg.m_step[i] |= (byte)(m_cfg.m_step[first_waypoint]);
+					m_cfg.m_step[i].m_value = m_cfg.m_step[first_waypoint].m_value;
 				}
 			}
 		}
@@ -114,16 +167,7 @@ class CSequenceLayer {
 
 
 public:
-	typedef uint16_t STEP_TYPE;
-	enum : uint16_t {
-		IS_DATA_POINT = (uint16_t)0x0100,	// is there a user set value at this step?
 
-		IS_GATE = (uint16_t)0x1000,		// gate open
-		IS_TRIG = (uint16_t)0x2000,		// retrigger (takes precendence over open)
-		IS_ACCENT = (uint16_t)0x4000,    // accent (
-
-		GATE_MASK =	IS_GATE|IS_TRIG|IS_ACCENT,
-	};
 	enum {
 		NO_POS = -1,
 		MAX_STEPS = 32,					// number of steps in the layer
@@ -154,7 +198,7 @@ public:
 	typedef struct {
 		V_SQL_SEQ_MODE 	m_mode;				// the mode for this layer (note, mod etc)
 		V_SQL_FORCE_SCALE	m_force_scale;	// force to scale
-		STEP_TYPE		m_step[MAX_STEPS];	// data value and gate for each step
+		CStep		m_step[MAX_STEPS];	// data value and gate for each step
 		V_SQL_STEP_RATE m_step_rate;		// step rate setting
 		byte 			m_loop_from;		// loop start point
 		byte 			m_loop_to;			// loop end point
@@ -178,7 +222,7 @@ public:
 
 	typedef struct {
 		byte m_scroll_ofs;			// lowest step value shown on grid
-		STEP_TYPE m_step_value;			// the last value output by sequencer
+		CStep m_step_value;			// the last value output by sequencer
 		byte m_stepped;				// stepped flag
 		int m_play_pos;
 		byte m_last_note; // last midi note played on channel - and output to CV
@@ -186,7 +230,7 @@ public:
 		uint32_t m_next_tick;
 		byte m_last_tick_lsb;
 		PLAYING_NOTE m_playing[MAX_PLAYING_NOTES];
-		CSequenceLayer::STEP_TYPE m_copy_step;
+		CStep m_copy_step;
 		//byte m_gate;
 //		byte m_reference;
 	} STATE;
@@ -202,7 +246,7 @@ public:
 	///////////////////////////////////////////////////////////////////////////////
 	void init_config() {
 		for(int i=0; i<MAX_STEPS; ++i) {
-			m_cfg.m_step[i] = DEFAULT_NOTE;
+			m_cfg.m_step[i].reset_all(DEFAULT_NOTE);
 		}
 		m_cfg.m_mode 		= V_SQL_SEQ_MODE_SCALE;
 		m_cfg.m_force_scale = V_SQL_FORCE_SCALE_OFF;
@@ -225,16 +269,14 @@ public:
 		m_state.m_scroll_ofs = 48;
 		m_state.m_last_tick_lsb = 0;
 		m_state.m_last_note = 0;
-		m_state.m_copy_step = 0;
-		//m_state.m_gate = CCVGate::GATE_CLOSED;
-		//m_state.m_reference = 0;
+		m_state.m_copy_step.reset_all();
 		memset(m_state.m_playing,0,sizeof(m_state.m_playing));
 		reset();
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void reset() {
-		m_state.m_step_value = 0;
+		m_state.m_step_value.reset_all();
 		m_state.m_stepped = 0;
 		m_state.m_play_pos = 0;
 		m_state.m_next_tick = 0;
@@ -302,63 +344,67 @@ public:
 	// preserve trigs but clear all data
 	void reset_data_points(byte value) {
 		for(int i=0; i<MAX_STEPS; ++i) {
-			m_cfg.m_step[i] &= GATE_MASK;
-			m_cfg.m_step[i] |= value;
+			m_cfg.m_step[i].reset_data_point(value);
 		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
+	// make a default data point
+	void default_data_point(CStep& step) {
+//TODO default for different types of layer
+		step.reset_all(m_state.m_scroll_ofs);
+		step.m_is_gate_open = 1;
+		step.m_is_trigger = 1;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+// TODO reset data_point
 	void clear_step_value(byte index) {
 		switch(m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_SCALE:
 		case V_SQL_SEQ_MODE_CHROMATIC:
-			m_cfg.m_step[index] = 0; // clear gate and note
+			m_cfg.m_step[index].reset_all(); // clear gate and note
 			break;
 		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
 		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
-			m_cfg.m_step[index] &= GATE_MASK; // preserve gate into
-			m_cfg.m_step[index] |= 64;
+			m_cfg.m_step[index].reset_data_point(64); // preserve gate into, set data to midpoint
 			break;
 		case V_SQL_SEQ_MODE_MOD:
-			m_cfg.m_step[index] &= GATE_MASK; // preserve gate into
+			m_cfg.m_step[index].reset_data_point(0); // preserve gate into, set data to zero
 			break;
 		}
 		recalc_data_points();
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	void paste_step_value(byte index, STEP_TYPE step) {
+// TODO paste_data_point
+	void paste_step_value(byte index, CStep& step) {
 		switch(m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_SCALE:
 		case V_SQL_SEQ_MODE_CHROMATIC:
-			m_cfg.m_step[index] = step |= CSequenceLayer::IS_DATA_POINT;
+			m_cfg.m_step[index] = step;	// paste all data
 			break;
 		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
 		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
-			m_cfg.m_step[index] &= GATE_MASK;
-			m_cfg.m_step[index] |= CSequenceLayer::IS_DATA_POINT;
-			m_cfg.m_step[index] |= (byte)step;
-			break;
 		case V_SQL_SEQ_MODE_MOD:
-			m_cfg.m_step[index] &= GATE_MASK;
-			m_cfg.m_step[index] |= CSequenceLayer::IS_DATA_POINT;
-			m_cfg.m_step[index] |= (byte)step;
+			m_cfg.m_step[index].copy_data_point(step);	// paste data point, leave gates unaffected
 			break;
 		}
+		step.m_is_data_point = 1;
 		recalc_data_points();
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
+	// change the mode
 	void set_mode(V_SQL_SEQ_MODE value) {
 		switch (value) {
 		case V_SQL_SEQ_MODE_CHROMATIC:
 			if(m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
 				// changing from short scale to chromatic mode...
 				for(int i=0; i<MAX_STEPS; ++i) {
-					byte value = m_cfg.m_step[i] & 0xFF;
-					value = g_scale.index_to_note(value);
-					m_cfg.m_step[i] &= 0xFF00;
-					m_cfg.m_step[i] |= value;
+					if(m_cfg.m_step[i].m_is_data_point) {
+						m_cfg.m_step[i].m_value = g_scale.index_to_note(m_cfg.m_step[i].m_value);
+					}
 				}
 				m_state.m_scroll_ofs = g_scale.index_to_note(m_state.m_scroll_ofs);
 			}
@@ -372,10 +418,9 @@ public:
 			if(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC) {
 				// changing from chromatic to short scale mode...
 				for(int i=0; i<MAX_STEPS; ++i) {
-					byte value = m_cfg.m_step[i] & 0xFF;
-					value = g_scale.note_to_index(value);
-					m_cfg.m_step[i] &= 0xFF;
-					m_cfg.m_step[i] |= value;
+					if(m_cfg.m_step[i].m_is_data_point) {
+						m_cfg.m_step[i].m_value = g_scale.note_to_index(m_cfg.m_step[i].m_value);
+					}
 				}
 				m_state.m_scroll_ofs = g_scale.note_to_index(m_state.m_scroll_ofs);
 			}
@@ -402,7 +447,9 @@ public:
 			break;
 		}
 		m_cfg.m_mode = value;
-		m_state.m_copy_step = 0;
+
+		// clear the paste buffer, since the data type has changed
+		m_state.m_copy_step.reset_all();
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -501,79 +548,73 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	void inc_gate(int index) {
-		STEP_TYPE step = m_cfg.m_step[index];
-		if(step & IS_TRIG && is_note_mode()) {
-			step = IS_ACCENT;
+		if(!m_cfg.m_step[index].m_is_gate_open) {
+			m_cfg.m_step[index].m_is_gate_open = 1;
 		}
-		else if(step & IS_GATE) {
-			step = IS_TRIG;
+		else if(!m_cfg.m_step[index].m_is_trigger) {
+			m_cfg.m_step[index].m_is_trigger = 1;
 		}
-		else
-		{
-			step = IS_GATE;
+		else if(!m_cfg.m_step[index].m_is_accent) {
+			m_cfg.m_step[index].m_is_accent = 1;
 		}
-		m_cfg.m_step[index] &= ~GATE_MASK;
-		m_cfg.m_step[index] |= (step & GATE_MASK);
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void dec_gate(int index) {
-		STEP_TYPE step = m_cfg.m_step[index];
-		if(step & IS_ACCENT) {
-			step = IS_TRIG;
+		if(m_cfg.m_step[index].m_is_accent) {
+			m_cfg.m_step[index].m_is_accent = 0;
 		}
-		else if(step & IS_TRIG) {
-			step = IS_GATE;
+		else if(m_cfg.m_step[index].m_is_trigger) {
+			m_cfg.m_step[index].m_is_trigger = 0;
 		}
-		m_cfg.m_step[index] &= ~GATE_MASK;
-		m_cfg.m_step[index] |= (step & GATE_MASK);
+		else if(m_cfg.m_step[index].m_is_gate_open) {
+			m_cfg.m_step[index].m_is_gate_open = 0;
+		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void toggle_gate(int index) {
-		if(m_cfg.m_step[index] & GATE_MASK) {
-			// toggle gate off (any mode)
-			m_cfg.m_step[index] &= ~GATE_MASK;
+		if(m_cfg.m_step[index].m_is_gate_open) {
+			m_cfg.m_step[index].reset_gate();
 		}
-		else if(!is_note_mode() || (m_cfg.m_step[index] & IS_DATA_POINT)){
-			// toggle gate on (in note mode this can only be done if there
-			// is a data point at this position)
-			m_cfg.m_step[index] |= IS_TRIG;
+		else {
+			m_cfg.m_step[index].m_is_gate_open = 1;
+			m_cfg.m_step[index].m_is_trigger = 1;
 		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	void inc_step_value(STEP_TYPE *value, int delta, byte fine) {
-		int v = (byte)(*value);
+	void inc_step_value(CStep& step, int delta, byte fine) {
+		int value = step.m_value;
 		int max_value = 127;
 		switch(m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_MOD:
 			if(fine) {
-				v+= delta;
+				value += delta;
 			}
 			else {
-				v = 10*(v/10 + delta);
+				value = 10*(value/10 + delta);
 			}
 			break;
 		case V_SQL_SEQ_MODE_SCALE:
-			v+=delta;
+			value += delta;
 			max_value = g_scale.max_index();
 			break;
 		case V_SQL_SEQ_MODE_CHROMATIC:
 		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
 		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
 		default:
-			v+=delta;
+			value += delta;
 			break;
 		}
-		if(v<0) {
-			v = 0;
+		if(value<0) {
+			value = 0;
 		}
-		else if(v>max_value) {
-			v = max_value;
+		else if(value>max_value) {
+			value = max_value;
 		}
-		*value &= 0xFF00;
-		*value |= v;
+		step.m_value = value;
+		step.m_is_data_point = 1;	// the data point has been set by user
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -587,7 +628,7 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	inline uint16_t get_step(int index) {
+	inline CStep get_step(int index) {
 		return m_cfg.m_step[index];
 	}
 
@@ -597,10 +638,10 @@ public:
 		// first make sure that the shift will not exceed the bounds at
 		// the top of the bottom of the pattern
 		for(int i = 0; i<MAX_STEPS; ++i) {
-			STEP_TYPE step = m_cfg.m_step[i];
-			if(step & IS_DATA_POINT) {
-				int v = (int)STEP_VALUE(step) + dir;
-				if(v < 0 || v > 127) {
+			CStep step = m_cfg.m_step[i];
+			if(step.m_is_data_point) {
+				int new_value = (int)step.m_value + dir;
+				if(new_value < 0 || new_value > 127) {
 					return 0;
 				}
 			}
@@ -608,9 +649,9 @@ public:
 
 		// perform the actual shift of all the data points
 		for(int i = 0; i<MAX_STEPS; ++i) {
-			STEP_TYPE step = m_cfg.m_step[i];
-			if(step & IS_DATA_POINT) {
-				m_cfg.m_step[i] = (step & 0xFF00) | (STEP_VALUE(step) + dir);
+			CStep step = m_cfg.m_step[i];
+			if(step.m_is_data_point) {
+				m_cfg.m_step[i].m_value += dir;
 			}
 		}
 
@@ -623,15 +664,11 @@ public:
 	///////////////////////////////////////////////////////////////////////////////
 	// shift pattern horizontally by one step
 	void shift_horizontal(int dir) {
-		uint16_t mask = ~GATE_MASK;
-		if(is_note_mode()) {
-			mask = ~0;
-		}
 		if(dir<0) {
-			impl_shift_left(mask);
+			impl_shift_left(is_note_mode());
 		}
 		else {
-			impl_shift_right(mask);
+			impl_shift_right(is_note_mode());
 		}
 		recalc_data_points();
 	}
@@ -850,29 +887,33 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	// Play a step for a note mode
-	void action_step_note(byte which, STEP_TYPE step_for_transpose, byte midi_vel_accent, byte midi_vel, byte action_gate) {
+	void action_step_note(byte which, CStep step_for_transpose, byte midi_vel_accent, byte midi_vel, byte action_gate) {
 
 
 		// determine the step value to be processed, which may come from a different layer
 		// in the case of transposition
-		STEP_TYPE step = 0;
+		CStep step;
+		step.reset_all();
 		int transposed;
 		switch(m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
-			transposed = (int)STEP_VALUE(step_for_transpose) + (int)STEP_VALUE(m_state.m_step_value) - 64;
+			transposed = (int)step_for_transpose.m_value + m_state.m_step_value.m_value - 64;
 			if(transposed >= 0 && transposed < 128) {
-				step = (step_for_transpose & 0xFF00) | transposed;
+				step = step_for_transpose;
+				step.m_value = transposed;
 			}
 			break;
 		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
-			 if(!(step_for_transpose & IS_ACCENT)) {
-				 transposed = (int)STEP_VALUE(step_for_transpose) + (int)STEP_VALUE(m_state.m_step_value) - 64;
+			 if(step_for_transpose.m_is_accent) {
+				 transposed = (int)step_for_transpose.m_value + m_state.m_step_value.m_value - 64;
 				 if(transposed >= 0 && transposed < 128) {
-					 step = (step_for_transpose & 0xFF00) | transposed;
+					step = step_for_transpose;
+					step.m_value = transposed;
 				 }
 			 }
 			 else {
-				 step = step_for_transpose & ~IS_ACCENT;
+				step = step_for_transpose;
+				step.m_is_accent = 0;
 			 }
 			 break;
 		default:
@@ -885,11 +926,11 @@ public:
 		CCVGate::GATE_STATE gate_state = CCVGate::GATE_CLOSED;
 		byte legato = 0;
 		byte velocity = 0;
-		byte active = !!(step & IS_DATA_POINT);
-		if(step & IS_ACCENT) {
+		byte active = step.m_is_data_point;
+		if(step.m_is_accent) {
 			velocity = midi_vel_accent;
 		}
-		else if(step & IS_TRIG) {
+		else if(step.m_is_trigger) {
 			velocity = midi_vel;
 		}
 		else {
@@ -925,7 +966,7 @@ public:
 		if(active) {
 
 			// force to scale if needed
-			byte note = STEP_VALUE(step);
+			byte note = step.m_value;
 			if(m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
 				note = g_scale.index_to_note(note);
 			}
@@ -1027,10 +1068,10 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	void action_step_mod(byte which) {
-		byte value1 = (byte)m_cfg.m_step[m_state.m_play_pos];
+		byte value1 = m_cfg.m_step[m_state.m_play_pos].m_value;
 		if(m_cfg.m_cv_glide == V_SQL_CVGLIDE_ON) {
 			int next = next_step_index(m_state.m_play_pos);
-			byte value2 = (byte)m_cfg.m_step[next];
+			byte value2 = m_cfg.m_step[next].m_value;
 			int ms = g_clock.get_ms_for_measure(m_cfg.m_step_rate);
 			g_cv_gate.mod_cv(which, value1, m_cfg.m_cv_range, value2, ms);
 		}
@@ -1042,11 +1083,11 @@ public:
 	///////////////////////////////////////////////////////////////////////////////
 	// Play the gate for a step
 	void action_step_gate(byte which) {
-		STEP_TYPE step = m_state.m_step_value;
-		if(step & IS_TRIG) {
+		CStep step = m_state.m_step_value;
+		if(step.m_is_trigger) {
 			g_cv_gate.gate(which, CCVGate::GATE_RETRIG);
 		}
-		else if(step & IS_GATE) {
+		else if(step.m_is_gate_open) {
 			g_cv_gate.gate(which, CCVGate::GATE_OPEN);
 		}
 		else {
@@ -1056,13 +1097,13 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	void test() {
-		m_cfg.m_step[0] = 45|IS_GATE|IS_DATA_POINT;
+/*		m_cfg.m_step[0] = 45|IS_GATE|IS_DATA_POINT;
 		m_cfg.m_step[1] = 45|IS_GATE|IS_DATA_POINT;
 		m_cfg.m_step[4] = 46|IS_GATE|IS_DATA_POINT;
 		m_cfg.m_step[5] = 48|IS_GATE|IS_DATA_POINT;
 		m_cfg.m_step[8] = 50|IS_GATE|IS_DATA_POINT;
 		m_cfg.m_step[9] = 50|IS_GATE|IS_DATA_POINT;
-		m_cfg.m_step[12] = 52|IS_GATE|IS_DATA_POINT;
+		m_cfg.m_step[12] = 52|IS_GATE|IS_DATA_POINT;*/
 	}
 
 };

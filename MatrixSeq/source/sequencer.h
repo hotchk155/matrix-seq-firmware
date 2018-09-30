@@ -199,8 +199,8 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	void step_info(CSequenceLayer::STEP_TYPE step, CSequenceLayer& layer) {
-		byte value = STEP_VALUE(step);
+	void step_info(CStep step, CSequenceLayer& layer) {
+		byte value = step.m_value;
 		switch(layer.m_cfg.m_mode) {
 		case V_SQL_SEQ_MODE_SCALE:
 			if(layer.m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
@@ -240,8 +240,8 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	void set_scroll_for(CSequenceLayer::STEP_TYPE step, CSequenceLayer& layer) {
-		int v = STEP_VALUE(step);
+	void set_scroll_for(CStep step, CSequenceLayer& layer) {
+		int v = step.m_value;
 		if(v<layer.m_state.m_scroll_ofs) {
 			layer.m_state.m_scroll_ofs = v;
 		}
@@ -288,13 +288,13 @@ typedef enum:byte {
 
 	///////////////////////////////////////////////////////////////////////////////
 	// change step value based on encode event
-	void value_action(CSequenceLayer& layer, CSequenceLayer::STEP_TYPE *value, ACTION what, byte fine) {
+	void value_action(CSequenceLayer& layer, CStep& step, ACTION what, byte fine) {
 		switch(what) {
 		case ACTION_ENC_LEFT:
-			layer.inc_step_value(value, -1, fine);
+			layer.inc_step_value(step, -1, fine);
 			break;
 		case ACTION_ENC_RIGHT:
-			layer.inc_step_value(value, +1, fine);
+			layer.inc_step_value(step, +1, fine);
 			break;
 		default:
 			break;
@@ -323,11 +323,11 @@ typedef enum:byte {
 	///////////////////////////////////////////////////////////////////////////////
 	// STUFF WHAT THE EDIT BUTTON DOES...
 	byte edit_action(CSequenceLayer& layer, ACTION what) {
-		CSequenceLayer::STEP_TYPE step = layer.get_step(m_cursor);
+		CStep step = layer.get_step(m_cursor);
 		switch(what) {
 		////////////////////////////////////////////////
 		case ACTION_BEGIN:
-			if(!layer.is_note_mode() || (step & CSequenceLayer::IS_DATA_POINT)) {
+			if(!layer.is_note_mode() || step.m_is_data_point) {
 				// there is a valid note in this column so we copy it to our
 				// paste buffer, scroll it into view and show note name on screen
 				layer.m_state.m_copy_step = step;
@@ -350,7 +350,7 @@ typedef enum:byte {
 				// fine edit in mod mode
 			case KEY_EDIT|KEY_CLEAR:
 				if(layer.is_mod_mode()) {
-					value_action(layer, &layer.m_state.m_copy_step, what, 1);
+					value_action(layer, layer.m_state.m_copy_step, what, 1);
 					layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 					step_info(layer.m_state.m_copy_step, layer);
 				}
@@ -387,16 +387,16 @@ typedef enum:byte {
 				break;
 			default:
 				// encoder moved while the button is held
-				if(!layer.is_note_mode() || (step & CSequenceLayer::IS_DATA_POINT)) {
+				if(!layer.is_note_mode() || step.m_is_data_point) {
 					// we are dragging a note around
-					value_action(layer, &layer.m_state.m_copy_step, what, 0);
+					value_action(layer, layer.m_state.m_copy_step, what, 0);
 
 				}
 				else {
 					// no note in copy buffer so we invent one based on scroll offset
 					// and insert it into the pattern
-					if(!(layer.m_state.m_copy_step)) {
-						layer.m_state.m_copy_step = layer.m_state.m_scroll_ofs|CSequenceLayer::IS_TRIG|CSequenceLayer::IS_GATE;
+					if(!layer.m_state.m_copy_step.m_is_data_point) {
+						layer.default_data_point(layer.m_state.m_copy_step);
 					}
 				}
 				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
@@ -412,7 +412,7 @@ typedef enum:byte {
 			switch(m_edit_keys) {
 			case KEY_EDIT|KEY_PASTE:
 				// EDIT + PASTE - advance cursor and copy the current step
-				if(layer.m_state.m_copy_step) {
+				if(layer.m_state.m_copy_step.m_is_data_point) {
 					if(++m_cursor >= CSequenceLayer::MAX_STEPS-1) {
 						m_cursor = 0;
 					}
@@ -454,7 +454,7 @@ typedef enum:byte {
 		////////////////////////////////////////////////
 		case ACTION_CLICK:
 			// a click pastes note to new step
-			if(layer.m_state.m_copy_step) {
+			if(layer.m_state.m_copy_step.m_is_data_point) {
 				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 			}
 			break;
@@ -462,7 +462,7 @@ typedef enum:byte {
 		case ACTION_ENC_LEFT:
 		case ACTION_ENC_RIGHT:
 			// hold-turn pastes multiple notes
-			if(!layer.is_note_mode() || (layer.m_state.m_copy_step & CSequenceLayer::IS_DATA_POINT)) {
+			if(!layer.is_note_mode() || (layer.m_state.m_copy_step.m_is_data_point)) {
 				layer.paste_step_value(m_cursor, layer.m_state.m_copy_step);
 			}
 			cursor_action(what);
@@ -732,19 +732,19 @@ typedef enum:byte {
 				++c;
 			}
 
-			CSequenceLayer::STEP_TYPE step = layer->get_step(i);
+			CStep step = layer->get_step(i);
 
 			// Display the sequencer steps
 			byte show_step = 1;
 			switch(layer->m_cfg.m_mode) {
 			case V_SQL_SEQ_MODE_CHROMATIC:
 			case V_SQL_SEQ_MODE_SCALE:
-				show_step = !!(step & CSequenceLayer::IS_DATA_POINT);
+				show_step = step.m_is_data_point;
 				// fall thru
 			case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
 			case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
 				if(show_step) {
-					n = STEP_VALUE(step);
+					n = step.m_value;
 					n = 12 - n + layer->m_state.m_scroll_ofs;
 					if(n >= 0 && n <= 12) {
 						if(i == layer->m_state.m_play_pos && m_is_running) {
@@ -759,7 +759,7 @@ typedef enum:byte {
 				}
 				break;
 			case V_SQL_SEQ_MODE_MOD:
-				n = 12 - STEP_VALUE(step)/10;
+				n = 12 - step.m_value/10;
 				if(n<0) {
 					n=0;
 				}
@@ -767,7 +767,7 @@ typedef enum:byte {
 					g_ui.raster(n) |= mask;
 					g_ui.hilite(n) |= mask;
 				}
-				else if(step & CSequenceLayer::IS_DATA_POINT) {
+				else if(step.m_is_data_point) {
 					g_ui.raster(n) |= mask;
 					g_ui.hilite(n) &= ~mask;
 
@@ -784,14 +784,14 @@ typedef enum:byte {
 
 
 			// DISPLAY THE GATE INFO
-			if(step & CSequenceLayer::IS_ACCENT) {
+			if(step.m_is_accent) {
 				g_ui.raster(14) |= mask;
 				g_ui.hilite(14) |= mask;
 			}
-			else if(step & CSequenceLayer::IS_TRIG) {
+			else if(step.m_is_trigger) {
 				g_ui.raster(14) |= mask;
 			}
-			else if(step & CSequenceLayer::IS_GATE) {
+			else if(step.m_is_gate_open) {
 				g_ui.hilite(14) |= mask;
 			}
 
@@ -801,6 +801,7 @@ typedef enum:byte {
 
 	/////////////////////////////////////////////////////////////////////////////////////////////
 	void tick(uint32_t ticks, byte parts_tick) {
+
 
 		// ensure the sequencer is running
 		if(m_is_running) {
@@ -835,7 +836,7 @@ typedef enum:byte {
 						case V_SQL_SEQ_MODE_SCALE:
 							layer.action_step_note(
 									i,
-									0,
+									CStep(),
 									m_cfg.m_midi_vel_accent,
 									m_cfg.m_midi_vel,
 									1
