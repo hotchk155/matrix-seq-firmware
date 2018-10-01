@@ -77,10 +77,10 @@ public:
 			}*/
 
 
-		case EV_KEY_PRESS: g_ui.print_text("PR", 0, 3, CUI::RASTER); break;
-		case EV_KEY_RELEASE: g_ui.print_text("RE", 0, 3, CUI::RASTER); break;
-		case EV_KEY_CLICK: g_ui.print_text("CK", 0, 3, CUI::RASTER); break;
-		case EV_KEY_HOLD: g_ui.print_text("HL", 0, 3, CUI::RASTER); break;
+		case EV_KEY_PRESS: g_ui.print_text("PR", 0, 3, CUiDriver::RASTER); break;
+		case EV_KEY_RELEASE: g_ui.print_text("RE", 0, 3, CUiDriver::RASTER); break;
+		case EV_KEY_CLICK: g_ui.print_text("CK", 0, 3, CUiDriver::RASTER); break;
+		case EV_KEY_HOLD: g_ui.print_text("HL", 0, 3, CUiDriver::RASTER); break;
 
 		}
 

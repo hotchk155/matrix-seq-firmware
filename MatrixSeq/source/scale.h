@@ -1,9 +1,18 @@
-/*
- * scale.h
- *
- *  Created on: 23 Mar 2018
- *      Author: jason
- */
+///////////////////////////////////////////////////////////////////////////////////
+//
+//                                  ~~  ~~             ~~
+//  ~~~~~~    ~~~~~    ~~~~~    ~~~~~~  ~~     ~~~~~   ~~~~~~    ~~~~~   ~~    ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~   ~~  ~~   ~~  ~~   ~~   ~~  ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~~~~~~  ~~   ~~  ~~   ~~     ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~       ~~   ~~  ~~   ~~   ~~  ~~
+//  ~~   ~~   ~~~~~    ~~~~~    ~~~~~~   ~~~   ~~~~~   ~~~~~~    ~~~~~   ~~    ~~
+//
+//  Serendipity Sequencer                                   CC-NC-BY-SA
+//  hotchk155/2018                                          Sixty-four pixels ltd
+//
+//  SCALE HANDLING
+//
+///////////////////////////////////////////////////////////////////////////////////
 
 #ifndef SCALE_H_
 #define SCALE_H_
@@ -13,28 +22,23 @@
 // MIDI note range 0-127
 class CScale {
 
-
-public:
 	typedef struct {
 		V_SQL_SCALE_TYPE scale_type;
 		V_SQL_SCALE_ROOT scale_root;
 	} CONFIG;
 	CONFIG m_cfg;
 
+	byte m_index_to_note[8];
+	byte m_note_to_index[12];
+	byte m_max_index;
 
 	void init_config() {
 		m_cfg.scale_type = V_SQL_SCALE_TYPE_IONIAN;
 		m_cfg.scale_root = V_SQL_SCALE_ROOT_C;
 	}
 
-	CScale() {
-		init_config();
-		build();
-	}
-	byte m_index_to_note[8];
-	byte m_note_to_index[12];
-	byte m_max_index;
 	///////////////////////////////////////////////////////////////////////////////
+	// build the note mapping tables for the selected scale type and root
 	void build() {
 		byte interval[7] = {
 			1, 1, 0, 1, 1, 1, 0
@@ -56,27 +60,20 @@ public:
 
 		m_max_index = note_to_index(127);
 	}
+
+public:
+
+	///////////////////////////////////////////////////////////////////////////////
+	// constructor
+	CScale() {
+		init_config();
+		build();
+	}
+
 	/////////////////////////////////////////////////////////////////
+	// return highest index in scale
 	inline byte max_index() {
 		return m_max_index;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	void set(PARAM_ID param, int value) {
-		switch(param) {
-		case P_SQL_SCALE_TYPE: m_cfg.scale_type = (V_SQL_SCALE_TYPE)value; build(); break;
-		case P_SQL_SCALE_ROOT: m_cfg.scale_root = (V_SQL_SCALE_ROOT)value; build(); break;
-		default: break;
-		}
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	int get(PARAM_ID param) {
-		switch(param) {
-		case P_SQL_SCALE_TYPE: return m_cfg.scale_type;
-		case P_SQL_SCALE_ROOT: return m_cfg.scale_root;
-		default: return 0;
-		}
 	}
 
 	/////////////////////////////////////////////////////////////////
@@ -119,7 +116,30 @@ public:
 		return result;
 	}
 
-};
+	//
+	// CONFIG ACCESSORS
+	//
 
+	///////////////////////////////////////////////////////////////////////////////
+	void set(PARAM_ID param, int value) {
+		switch(param) {
+		case P_SQL_SCALE_TYPE: m_cfg.scale_type = (V_SQL_SCALE_TYPE)value; build(); break;
+		case P_SQL_SCALE_ROOT: m_cfg.scale_root = (V_SQL_SCALE_ROOT)value; build(); break;
+		default: break;
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	int get(PARAM_ID param) {
+		switch(param) {
+		case P_SQL_SCALE_TYPE: return m_cfg.scale_type;
+		case P_SQL_SCALE_ROOT: return m_cfg.scale_root;
+		default: return 0;
+		}
+	}
+
+
+};
 CScale g_scale;
+
 #endif /* SCALE_H_ */

@@ -1,14 +1,22 @@
-//////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////
 //
-// MATRIX SEQUENCER
-// 2018/Sixty Four Pixels
+//                                  ~~  ~~             ~~
+//  ~~~~~~    ~~~~~    ~~~~~    ~~~~~~  ~~     ~~~~~   ~~~~~~    ~~~~~   ~~    ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~   ~~  ~~   ~~  ~~   ~~   ~~  ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~~~~~~  ~~   ~~  ~~   ~~     ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~       ~~   ~~  ~~   ~~   ~~  ~~
+//  ~~   ~~   ~~~~~    ~~~~~    ~~~~~~   ~~~   ~~~~~   ~~~~~~    ~~~~~   ~~    ~~
 //
-// Display and keyboard driver
+//  Serendipity Sequencer                                   CC-NC-BY-SA
+//  hotchk155/2018                                          Sixty-four pixels ltd
 //
-//////////////////////////////////////////////////////////////////////////////
+//  SEQUENCER
+//
+///////////////////////////////////////////////////////////////////////////////////
 
-#ifndef UI_H_
-#define UI_H_
+
+#ifndef UI_DRIVER_H_
+#define UI_DRIVER_H_
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -121,7 +129,7 @@ extern volatile byte g_disp_update;
 //////////////////////////////////////////////////////////////////////////////
 
 // This class wraps up the driver for the UI
-class CUI {
+class CUiDriver {
 
 	typedef enum:byte {
 		PHASE_NORMAL,		// layer 1 only
@@ -168,7 +176,7 @@ public:
 	};
 
 	//////////////////////////////////////////////////////////////////////////////////
-	CUI() {
+	CUiDriver() {
 		m_periodShort = (uint32_t) USEC_TO_COUNT(50, CLOCK_GetBusClkFreq());
 		m_periodMedium = (uint32_t) USEC_TO_COUNT(300, CLOCK_GetBusClkFreq());
 		m_periodLong = (uint32_t) USEC_TO_COUNT(400, CLOCK_GetBusClkFreq());
@@ -568,7 +576,7 @@ public:
 
 //////////////////////////////////////////////////////////////////////////////////
 // define a single instance of the UI class
-CUI g_ui;
+CUiDriver g_ui;
 
 //////////////////////////////////////////////////////////////////////////////////
 // The timer interrupt handler which refreshes the screen
@@ -576,4 +584,4 @@ extern "C" void PIT_CH1_IRQHandler(void) {
 	g_ui.isr();
 }
 
-#endif /* UI_H_ */
+#endif /* UI_DRIVER_H_ */

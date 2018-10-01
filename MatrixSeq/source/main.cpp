@@ -33,8 +33,9 @@
  * @brief   Application entry point.
  */
 
-#include <digital_out.h>
-#include <stdio.h>
+//
+// API INCLUDES
+//
 #include "board.h"
 #include "peripherals.h"
 #include "pin_mux.h"
@@ -50,11 +51,14 @@
 #include "fsl_uart.h"
 
 
+//
+// APPLICATION INCLUDES
+//
 #include "defs.h"
 #include "digital_out.h"
-#include "leds.h"
 #include "chars.h"
-#include "ui.h"
+#include "ui_driver.h"
+#include "leds.h"
 #include "clock.h"
 #include "i2c_bus.h"
 #include "storage.h"
@@ -72,7 +76,7 @@
 
 
 
-/* TODO: insert other definitions and declarations here. */
+
 
 
  CDigitalOut<kGPIO_PORTE, 2> PowerControl;

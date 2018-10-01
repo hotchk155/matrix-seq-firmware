@@ -1,9 +1,18 @@
-/*
- * cv.h
- *
- *  Created on: 14 Feb 2018
- *      Author: jason
- */
+///////////////////////////////////////////////////////////////////////////////////
+//
+//                                  ~~  ~~             ~~
+//  ~~~~~~    ~~~~~    ~~~~~    ~~~~~~  ~~     ~~~~~   ~~~~~~    ~~~~~   ~~    ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~   ~~  ~~   ~~  ~~   ~~   ~~  ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~~~~~~  ~~   ~~  ~~   ~~     ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~       ~~   ~~  ~~   ~~   ~~  ~~
+//  ~~   ~~   ~~~~~    ~~~~~    ~~~~~~   ~~~   ~~~~~   ~~~~~~    ~~~~~   ~~    ~~
+//
+//  Serendipity Sequencer                                   CC-NC-BY-SA
+//  hotchk155/2018                                          Sixty-four pixels ltd
+//
+//  CV / GATE DRIVER
+//
+///////////////////////////////////////////////////////////////////////////////////
 
 #ifndef CV_GATE_H_
 #define CV_GATE_H_
@@ -46,7 +55,6 @@ public:
 
 
 
-public:
 	CV_STATE m_cv[MAX_CV];
 	uint16_t m_dac[MAX_CV];
 	GATE_STATE m_gate[MAX_GATE];
@@ -73,7 +81,7 @@ public:
 		}
 	}
 
-	void impl_set_cv(int which, int dac)
+	void impl_set_cv(int which, uint16_t dac)
 	{
 		// get the appropriate offset into the DAC structure
 		// for the target CV output
@@ -93,8 +101,6 @@ public:
 		}
 	}
 
-public:
-
 	// pitch is defined a 256 * midi note number + fractional part
 	typedef uint16_t PITCH_TYPE;
 
@@ -105,6 +111,9 @@ public:
 	typedef uint16_t CV_TYPE;
 
 	typedef uint16_t DAC_TYPE;
+
+
+public:
 
 
 	/////////////////////////////////////////////////////////////////////////////////
@@ -152,7 +161,16 @@ public:
 	void pitch_cv(int which, int note, V_SQL_CVSCALE scaling, int glide_time) {
 		// convert the note to DAC value
 		// TODO support other note/cv mappings
-		int dac = (500 * (int)note)/12;
+		// Ensure enough headroom from psu!
+
+		while(note > 96) {
+			note -= 12;
+		}
+		while(note < 0) {
+			note += 12;
+		}
+
+		uint16_t dac = (500 * (int)note)/12;
 
 		if(glide_time) {
 			m_cv[which].target = dac<<16;
@@ -177,7 +195,7 @@ public:
 			m_cv[which].glide_rate = 0;
 		}
 
-		int dac = m_cv[which].pitch>>16;
+		uint16_t dac = m_cv[which].pitch>>16;
 		impl_set_cv(which, dac);
 	}
 
@@ -232,6 +250,5 @@ public:
 
 // define global instance of the CV/Gate controller
 CCVGate g_cv_gate;
-
 
 #endif /* CV_GATE_H_ */

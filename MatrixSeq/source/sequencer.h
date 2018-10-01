@@ -1,24 +1,29 @@
-///////////////////////////////////////////////////////////////////////////////
-// MATRIX SEQUENCER
-// Sixty four pixels Ltd	March 2018
+///////////////////////////////////////////////////////////////////////////////////
 //
-// SEQUENCER
+//                                  ~~  ~~             ~~
+//  ~~~~~~    ~~~~~    ~~~~~    ~~~~~~  ~~     ~~~~~   ~~~~~~    ~~~~~   ~~    ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~   ~~  ~~   ~~  ~~   ~~   ~~  ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~~~~~~  ~~   ~~  ~~   ~~     ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~       ~~   ~~  ~~   ~~   ~~  ~~
+//  ~~   ~~   ~~~~~    ~~~~~    ~~~~~~   ~~~   ~~~~~   ~~~~~~    ~~~~~   ~~    ~~
+//
+//  Serendipity Sequencer                                   CC-NC-BY-SA
+//  hotchk155/2018                                          Sixty-four pixels ltd
+//
+//  SEQUENCER
+//
+///////////////////////////////////////////////////////////////////////////////////
 
 #ifndef SEQUENCER_H_
 #define SEQUENCER_H_
 
-
-
-
 ///////////////////////////////////////////////////////////////////////////////
 // SEQUENCER CLASS
 class CSequencer {
-	byte m_is_running;
-public:
-
 	enum {
 		NUM_LAYERS = 4,	// number of layers in the sequence
 	};
+
 
 	// Config info that forms part of the patch
 	typedef struct {
@@ -29,33 +34,22 @@ public:
 	} CONFIG;
 	CONFIG m_cfg;
 
+	byte m_is_running;
 	int m_cur_layer;			// this is the current layer being viewed/edited
 	CSequenceLayer m_layers[NUM_LAYERS];
 
+public:
 
+	///////////////////////////////////////////////////////////////////////////////
+	// constructor
 	CSequencer() {
 		init_config();
-		init_state();
-	}
-
-
-	///////////////////////////////////////////////////////////////////////////////
-	inline CSequenceLayer& cur_layer() {
-		return m_layers[m_cur_layer];
+		m_is_running = 0;
+		m_cur_layer = 0;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	inline int get_cur_layer() {
-		return m_cur_layer;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	void set_cur_layer(int layer) {
-		m_cur_layer = layer;
-	}
-
-
-	///////////////////////////////////////////////////////////////////////////////
+	// initialise the saved configuration
 	void init_config() {
 		m_cfg.scale_type = V_SQL_SCALE_TYPE_IONIAN;
 		m_cfg.scale_root = V_SQL_SCALE_ROOT_C;
@@ -64,11 +58,25 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	void init_state() {
-		m_is_running = 0;
+	// get a reference to the current layer object
+	inline CSequenceLayer& cur_layer() {
+		return m_layers[m_cur_layer];
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
+	// return current layer index 0-3
+	inline int get_cur_layer() {
+		return m_cur_layer;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	// change current layer
+	void set_cur_layer(int layer) {
+		m_cur_layer = layer;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	// config setter
 	void set(PARAM_ID param, int value) {
 		switch(param) {
 		case P_SQL_SCALE_TYPE: m_cfg.scale_type = (V_SQL_SCALE_TYPE)value; break;
@@ -80,6 +88,7 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
+	// config getter
 	int get(PARAM_ID param) {
 		switch(param) {
 		case P_SQL_SCALE_TYPE: return m_cfg.scale_type;
@@ -91,6 +100,7 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
+	// config validator
 	int is_valid_param(PARAM_ID param) {
 		switch(param) {
 		case P_SQL_SCALE_TYPE:
@@ -132,39 +142,43 @@ public:
 		return cur_layer().is_valid_param(param);
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
 	void start() {
 		m_is_running = 1;
 		for(int i=0; i<NUM_LAYERS; ++i) {
 			m_layers[i].start(g_clock.get_ticks(), g_clock.get_part_ticks());
 		}
 	}
+
+	///////////////////////////////////////////////////////////////////////////////
 	void stop() {
 		m_is_running = 0;
 		for(int i=0; i<NUM_LAYERS; ++i) {
 			m_layers[i].stop_all_notes();
 		}
 	}
+
+	///////////////////////////////////////////////////////////////////////////////
 	void reset() {
 		for(int i=0; i<NUM_LAYERS; ++i) {
 			m_layers[i].reset();
 		}
 	}
+
+	///////////////////////////////////////////////////////////////////////////////
 	byte is_running() {
 		return m_is_running;
 	}
 
-	/*
-	byte is_layer_enabled(byte layer) {
-		return m_layers[layer].m_cfg.m_enabled;
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	void ms_tick() {
+		for(int i=0; i<NUM_LAYERS; ++i) {
+			m_layers[i].ms_tick(i);
+		}
 	}
-	void enable_layer(byte layer, byte enable) {
-		m_layers[layer].m_cfg.m_enabled = enable;
-	}
-*/
 
 	/////////////////////////////////////////////////////////////////////////////////////////////
 	void tick(uint32_t ticks, byte parts_tick) {
-
 
 		// ensure the sequencer is running
 		if(m_is_running) {
@@ -238,29 +252,9 @@ public:
 							break;
 					}
 				}
-				layer.manage(i, ticks);
 			}
-	/*
-			for(int i=0; i<NUM_LAYERS; ++i) {
-				CSequenceLayer& layer = m_layers[i];
-				if(layer.m_stepped) {
-					CSequenceLayer::STEP_TYPE step = layer.get_step(i);
-					switch(layer.m_cfg.m_mode)
-					{
-					////////////////////////////////////////////////////////////////////
-					case V_SQL_SEQ_MODE_CHROMATIC:
-						if(step & CSequenceLayer::IS_ACTIVE) {
-							layer.
-						}
-						break;
-					}
-				}
-			}*/
-
 		}
 	}
-
-
 };
 
 CSequencer g_sequencer;

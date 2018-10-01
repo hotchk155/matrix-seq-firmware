@@ -1,19 +1,87 @@
-///////////////////////////////////////////////////////////////////////////////
-// MATRIX SEQUENCER
-// Sixty four pixels Ltd	March 2018
+///////////////////////////////////////////////////////////////////////////////////
 //
-// SEQUENCER LAYER
+//                                  ~~  ~~             ~~
+//  ~~~~~~    ~~~~~    ~~~~~    ~~~~~~  ~~     ~~~~~   ~~~~~~    ~~~~~   ~~    ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~   ~~  ~~   ~~  ~~   ~~   ~~  ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~~~~~~  ~~   ~~  ~~   ~~     ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~       ~~   ~~  ~~   ~~   ~~  ~~
+//  ~~   ~~   ~~~~~    ~~~~~    ~~~~~~   ~~~   ~~~~~   ~~~~~~    ~~~~~   ~~    ~~
+//
+//  Serendipity Sequencer                                   CC-NC-BY-SA
+//  hotchk155/2018                                          Sixty-four pixels ltd
+//
+//  SEQUENCER LAYER
+//
+///////////////////////////////////////////////////////////////////////////////////
 #ifndef SEQUENCE_LAYER_H_
 #define SEQUENCE_LAYER_H_
 
-
-//class CSequencer;
 ///////////////////////////////////////////////////////////////////////////////
-// This class defines a single layer of a sequence
+// This class holds all the info for a single layer/part
 class CSequenceLayer {
-//friend class CSequencer;
+	enum {
+		MAX_STEPS = 32,					// number of steps in the layer
+		MAX_PLAYING_NOTES = 8,
+		DEFAULT_NOTE = 36,
+		DEFAULT_SCROLL_OFS = 24
+	};
+
+	// look up table of tick rates
+	static const byte c_tick_rates[V_SQL_STEP_RATE_MAX];
+	static const byte c_step_duration[V_SQL_STEP_DUR_MAX];
+
+	// This structure holds the layer information that gets saved with the patch
+	typedef struct {
+		V_SQL_SEQ_MODE 	m_mode;				// the mode for this layer (note, mod etc)
+		V_SQL_FORCE_SCALE	m_force_scale;	// force to scale
+		CSequenceStep		m_step[MAX_STEPS];	// data value and gate for each step
+		V_SQL_STEP_RATE m_step_rate;		// step rate setting
+		byte 			m_loop_from;		// loop start point
+		byte 			m_loop_to;			// loop end point
+		char			m_transpose;		// manual transpose amount for the layer
+		V_SQL_STEP_DUR	m_note_dur;
+		byte 			m_enabled;
+		V_SQL_MIDI_CHAN m_midi_channel;		// MIDI channel
+		byte 			m_midi_cc;			// MIDI CC
+		V_SQL_CVSCALE	m_cv_scale;
+		byte 			m_cv_range;
+		V_SQL_CVGLIDE	m_cv_glide;
+	} CONFIG;
+
+
+	//typedef struct {
+		//byte note;
+		//byte count;
+	//} PLAYING_NOTE;
+
+
+
+	typedef struct {
+		byte m_scroll_ofs;			// lowest step value shown on grid
+		CSequenceStep m_step_value;			// the last value output by sequencer
+		byte m_stepped;				// stepped flag
+		int m_play_pos;
+		byte m_last_note; // last midi note played on channel - and output to CV
+		byte m_last_velocity;
+		uint32_t m_next_tick;
+		byte m_last_tick_lsb;
+//		PLAYING_NOTE m_playing[MAX_PLAYING_NOTES];
+		CSequenceStep m_paste_step;
+
+		uint32_t 	m_gate_timeout;
+
+	} STATE;
+
+	CONFIG m_cfg;				// instance of config
+	STATE m_state;
+
+	//
+	// PRIVATE METHODS
+	//
+
 	///////////////////////////////////////////////////////////////////////////////
-	void impl_shift_left(byte with_gates) {
+	// shift pattern to the left
+	void shift_left(byte with_gates) {
 		CSequenceStep step = m_cfg.m_step[0];
 		for(int i = 0; i<MAX_STEPS-1; ++i) {
 			if(with_gates) {
@@ -32,7 +100,8 @@ class CSequenceLayer {
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	void impl_shift_right(byte with_gates) {
+	// shift pattern to the right
+	void shift_right(byte with_gates) {
 
 		CSequenceStep step = m_cfg.m_step[MAX_STEPS-1];
 		for(int i = 0; i<MAX_STEPS-1; ++i) {
@@ -78,6 +147,7 @@ class CSequenceLayer {
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
+	// create interpolated points between all user data points in pattern
 	void impl_interpolate()
 	{
 		int i;
@@ -115,6 +185,9 @@ class CSequenceLayer {
 		}
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
+	// look up the index of the step that would play following the index provided
+	// as a parameter
 	int next_step_index(int index) {
 		++index;
 		if(index > m_cfg.m_loop_to) {
@@ -127,78 +200,15 @@ class CSequenceLayer {
 	}
 
 
-public:
 
-	enum {
-		NO_POS = -1,
-		MAX_STEPS = 32,					// number of steps in the layer
+	///////////////////////////////////////////////////////////////////////////////
+	// called when there is a change to a data point
+	void recalc_data_points() {
+		if(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD) {
+			impl_interpolate();
+		}
+	}
 
-
-
-		MAX_PLAYING_NOTES = 8,
-		REFERENCE_NOTE = 48,
-		DEFAULT_NOTE = 36,
-		//MAX_MOD_VALUE = 127
-	};
-
-private:
-	// look up table of tick rates
-	static const byte c_tick_rates[V_SQL_STEP_RATE_MAX];
-	static const byte c_step_duration[V_SQL_STEP_DUR_MAX];
-
-	// step word contains both gate and CV info
-	// CV info is 1 byte. Interpretation depends on mode. Always 1 unit per grid cell
-	//
-	// V_SQL_SEQ_MODE_NOTE 			- 0-127 MIDI note
-	// V_SQL_SEQ_MODE_NOTE_SCALE	- 0-127 scale increment
-	// V_SQL_SEQ_MODE_MOD 			- 0-13 coarse CC value
-	// V_SQL_SEQ_MODE_MOD_FINE		- 0-127 CC value
-
-
-
-	// This structure holds the layer information that gets saved with the patch
-	typedef struct {
-		V_SQL_SEQ_MODE 	m_mode;				// the mode for this layer (note, mod etc)
-		V_SQL_FORCE_SCALE	m_force_scale;	// force to scale
-		CSequenceStep		m_step[MAX_STEPS];	// data value and gate for each step
-		V_SQL_STEP_RATE m_step_rate;		// step rate setting
-		byte 			m_loop_from;		// loop start point
-		byte 			m_loop_to;			// loop end point
-		char			m_transpose;		// manual transpose amount for the layer
-		V_SQL_STEP_DUR	m_note_dur;
-		byte 			m_enabled;
-		V_SQL_MIDI_CHAN m_midi_channel;		// MIDI channel
-		byte 			m_midi_cc;			// MIDI CC
-		V_SQL_CVSCALE	m_cv_scale;
-		byte 			m_cv_range;
-		V_SQL_CVGLIDE	m_cv_glide;
-	} CONFIG;
-
-
-	typedef struct {
-		byte note;
-		byte count;
-	} PLAYING_NOTE;
-
-
-
-	typedef struct {
-		byte m_scroll_ofs;			// lowest step value shown on grid
-		CSequenceStep m_step_value;			// the last value output by sequencer
-		byte m_stepped;				// stepped flag
-		int m_play_pos;
-		byte m_last_note; // last midi note played on channel - and output to CV
-		byte m_last_velocity;
-		uint32_t m_next_tick;
-		byte m_last_tick_lsb;
-		PLAYING_NOTE m_playing[MAX_PLAYING_NOTES];
-		CSequenceStep m_paste_step;
-		//byte m_gate;
-//		byte m_reference;
-	} STATE;
-
-	CONFIG m_cfg;				// instance of config
-	STATE m_state;
 public:
 	///////////////////////////////////////////////////////////////////////////////
 	CSequenceLayer() {
@@ -218,7 +228,6 @@ public:
 		m_cfg.m_loop_from	= 0;
 		m_cfg.m_loop_to		= 15;
 		m_cfg.m_transpose	= 0;
-		//m_cfg.m_transpose_mod = V_SQL_TRANSPOSE_MOD_OFF;
 		m_cfg.m_midi_channel 	= V_SQL_MIDI_CHAN_NONE;
 		m_cfg.m_midi_cc = 1;
 		m_cfg.m_enabled = 1;
@@ -229,69 +238,15 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	void init_state() {
-		m_state.m_scroll_ofs = 48;
+		m_state.m_scroll_ofs = DEFAULT_SCROLL_OFS;
 		m_state.m_last_tick_lsb = 0;
 		m_state.m_last_note = 0;
 		m_state.m_last_velocity = 0;
 		m_state.m_paste_step.reset_all();
-		memset(m_state.m_playing,0,sizeof(m_state.m_playing));
+		//memset(m_state.m_playing,0,sizeof(m_state.m_playing));
 		reset();
 	}
 
-	///////////////////////////////////////////////////////////////////////////////
-	inline V_SQL_SEQ_MODE get_mode() {
-		return m_cfg.m_mode;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	byte get_enabled() {
-		return m_cfg.m_enabled;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	byte set_enabled(byte e) {
-		m_cfg.m_enabled = e;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	int get_scroll_ofs() {
-		return m_state.m_scroll_ofs;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	void set_scroll_ofs(int scroll_ofs) {
-		m_state.m_scroll_ofs = scroll_ofs;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	void set_loop_from(int loop_from) {
-		m_cfg.m_loop_from = loop_from;
-	}
-	///////////////////////////////////////////////////////////////////////////////
-	int get_loop_from() {
-		return m_cfg.m_loop_from;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	void set_loop_to(int loop_to) {
-		m_cfg.m_loop_to = loop_to;
-	}
-	///////////////////////////////////////////////////////////////////////////////
-	int get_loop_to() {
-		return m_cfg.m_loop_to;
-	}
-
-	byte is_stepped() {
-		return m_state.m_stepped;
-	}
-
-	CSequenceStep& get_current_step() {
-		return m_state.m_step_value;
-	}
-
-	int get_last_velocity() {
-		return m_state.m_last_velocity;
-	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void reset() {
@@ -299,6 +254,7 @@ public:
 		m_state.m_stepped = 0;
 		m_state.m_play_pos = 0;
 		m_state.m_next_tick = 0;
+		m_state.m_gate_timeout = 0;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -312,8 +268,12 @@ public:
 
 		m_state = layer.m_state;
 		m_state.m_last_note = 0;
-		memset(m_state.m_playing,0,sizeof(m_state.m_playing));
+//		memset(m_state.m_playing,0,sizeof(m_state.m_playing));
 	}
+
+	//
+	// CONFIG ACCESSORS
+	//
 
 	///////////////////////////////////////////////////////////////////////////////
 	void set(PARAM_ID param, int value) {
@@ -359,6 +319,10 @@ public:
 		}
 	}
 
+	//
+	// EDIT FUNCTIONS
+	//
+
 	///////////////////////////////////////////////////////////////////////////////
 	// preserve trigs but clear all data
 	void reset_data_points(byte value) {
@@ -387,24 +351,19 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	void set_paste_buffer(CSequenceStep step) {
-		m_state.m_paste_step = step;
-		m_state.m_paste_step.m_is_data_point = 1;
-	}
+	//void set_paste_buffer(CSequenceStep step) {
+	//	m_state.m_paste_step = step;
+	//	m_state.m_paste_step.m_is_data_point = 1;
+	//}
 
 	///////////////////////////////////////////////////////////////////////////////
-	byte is_paste_buffer_empty() {
-		return !!m_state.m_paste_step.m_is_data_point;
+	CSequenceStep &paste_buffer() {
+		return m_state.m_paste_step;
 	}
 
-	///////////////////////////////////////////////////////////////////////////////
-	void clear_paste_buffer() {
-		m_state.m_paste_step.reset_all();
-	}
 	///////////////////////////////////////////////////////////////////////////////
 	// paste data from the "clipboard" into selected stop
 	void paste_step(byte index) {
-		// check if we have anything on "clipboard" to paste
 		if(m_state.m_paste_step.m_is_data_point) {
 			switch(m_cfg.m_mode) {
 			case V_SQL_SEQ_MODE_SCALE:
@@ -423,6 +382,7 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	// change the mode
+// TODO preserve data between pitch and mod modes?
 	void set_mode(V_SQL_SEQ_MODE value) {
 		switch (value) {
 		case V_SQL_SEQ_MODE_CHROMATIC:
@@ -476,143 +436,7 @@ public:
 		m_cfg.m_mode = value;
 
 		// clear the paste buffer, since the data type has changed
-		clear_paste_buffer();
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-//	void set_loop_start(int pos) {
-//		if(pos <= m_cfg.m_loop_to) {
-//			m_cfg.m_loop_from = pos;
-//			m_state.m_play_pos = pos;
-//		}
-	//}
-
-	///////////////////////////////////////////////////////////////////////////////
-//	void set_loop_end(int pos) {
-//		if(pos >= m_cfg.m_loop_from) {
-//			m_cfg.m_loop_to = pos;
-//		}
-	//}
-
-	///////////////////////////////////////////////////////////////////////////////
-	void set_pos(int pos) {
-		m_state.m_play_pos = pos;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	int get_pos() {
-		return m_state.m_play_pos;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	void start(uint32_t ticks, byte parts_tick) {
-		m_state.m_next_tick = ticks;
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	void tick(uint32_t ticks, byte parts_tick) {
-		if(ticks >= m_state.m_next_tick) {
-			m_state.m_next_tick += c_tick_rates[m_cfg.m_step_rate];
-			if(m_state.m_play_pos == m_cfg.m_loop_to) {
-				m_state.m_play_pos = m_cfg.m_loop_from;
-			}
-			else {
-				if(++m_state.m_play_pos > MAX_STEPS-1) {
-					m_state.m_play_pos = 0;
-				}
-			}
-
-			/*
-			if(m_state.m_play_pos < m_cfg.m_loop_from) {
-				m_state.m_play_pos = m_cfg.m_loop_from;
-			}
-			else if(m_state.m_play_pos > m_cfg.m_loop_to) {
-				m_state.m_play_pos = m_cfg.m_loop_from;
-			}*/
-			m_state.m_step_value = m_cfg.m_step[m_state.m_play_pos];
-			m_state.m_stepped = 1;
-		}
-		else {
-			m_state.m_stepped = 0;
-		}
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	void manage(byte index, uint32_t ticks) {
-		// has a tick expired?
-		if(m_state.m_last_tick_lsb != (byte)ticks) {
-			m_state.m_last_tick_lsb = (byte)ticks;
-			for(int i=0; i<MAX_PLAYING_NOTES;++i) {
-				if(m_state.m_playing[i].count) {
-					if(!--m_state.m_playing[i].count) {
-						if(m_state.m_playing[i].note == m_state.m_last_note) {
-							// close the gate
-							g_cv_gate.gate(index, CCVGate::GATE_CLOSED);
-						}
-						send_midi_note(m_state.m_playing[i].note, 0);
-						m_state.m_playing[i].note = 0;
-					}
-				}
-			}
-		}
-	}
-
-
-	///////////////////////////////////////////////////////////////////////////////
-	void send_midi_note(byte note, byte velocity) {
-		if(m_cfg.m_midi_channel > V_SQL_MIDI_CHAN_NONE) {
-			g_midi.send_note(m_cfg.m_midi_channel-V_SQL_MIDI_CHAN_1, note, velocity);
-		}
-	}
-
-
-	///////////////////////////////////////////////////////////////////////////////
-	void stop_all_notes() {
-		for(int i=0; i<MAX_PLAYING_NOTES;++i) {
-			if(m_state.m_playing[i].count) {
-				send_midi_note(m_state.m_playing[i].note, 0);
-				m_state.m_playing[i].note = 0;
-				m_state.m_playing[i].count = 0;
-			}
-		}
-	}
-
-
-	///////////////////////////////////////////////////////////////////////////////
-	void inc_gate(int index) {
-		if(!m_cfg.m_step[index].m_is_gate_open) {
-			m_cfg.m_step[index].m_is_gate_open = 1;
-		}
-		else if(!m_cfg.m_step[index].m_is_trigger) {
-			m_cfg.m_step[index].m_is_trigger = 1;
-		}
-		else if(!m_cfg.m_step[index].m_is_accent) {
-			m_cfg.m_step[index].m_is_accent = 1;
-		}
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	void dec_gate(int index) {
-		if(m_cfg.m_step[index].m_is_accent) {
-			m_cfg.m_step[index].m_is_accent = 0;
-		}
-		else if(m_cfg.m_step[index].m_is_trigger) {
-			m_cfg.m_step[index].m_is_trigger = 0;
-		}
-		else if(m_cfg.m_step[index].m_is_gate_open) {
-			m_cfg.m_step[index].m_is_gate_open = 0;
-		}
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	void toggle_gate(int index) {
-		if(m_cfg.m_step[index].m_is_gate_open) {
-			m_cfg.m_step[index].reset_gate();
-		}
-		else {
-			m_cfg.m_step[index].m_is_gate_open = 1;
-			m_cfg.m_step[index].m_is_trigger = 1;
-		}
+		paste_buffer().reset_all();
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -650,21 +474,6 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	inline byte is_mod_mode() {
-		return(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	inline byte is_note_mode() {
-		return(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC || m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE);
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	inline CSequenceStep get_step(int index) {
-		return m_cfg.m_step[index];
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
 	// shift pattern vertically up or down by one space
 	byte shift_vertical(int dir) {
 		// first make sure that the shift will not exceed the bounds at
@@ -697,26 +506,185 @@ public:
 	// shift pattern horizontally by one step
 	void shift_horizontal(int dir) {
 		if(dir<0) {
-			impl_shift_left(is_note_mode());
+			shift_left(is_note_mode());
 		}
 		else {
-			impl_shift_right(is_note_mode());
+			shift_right(is_note_mode());
 		}
 		recalc_data_points();
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
+	inline V_SQL_SEQ_MODE get_mode() {
+		return m_cfg.m_mode;
+	}
+	///////////////////////////////////////////////////////////////////////////////
+	byte get_enabled() {
+		return m_cfg.m_enabled;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	byte set_enabled(byte e) {
+		m_cfg.m_enabled = e;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	int get_scroll_ofs() {
+		return m_state.m_scroll_ofs;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	void set_scroll_ofs(int scroll_ofs) {
+		m_state.m_scroll_ofs = scroll_ofs;
+	}
+	///////////////////////////////////////////////////////////////////////////////
+	void set_loop_from(int loop_from) {
+		m_cfg.m_loop_from = loop_from;
+	}
+	///////////////////////////////////////////////////////////////////////////////
+	int get_loop_from() {
+		return m_cfg.m_loop_from;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	void set_loop_to(int loop_to) {
+		m_cfg.m_loop_to = loop_to;
+	}
+	///////////////////////////////////////////////////////////////////////////////
+	int get_loop_to() {
+		return m_cfg.m_loop_to;
+	}
+	///////////////////////////////////////////////////////////////////////////////
+	byte is_stepped() {
+		return m_state.m_stepped;
+	}
+	///////////////////////////////////////////////////////////////////////////////
+	CSequenceStep& get_current_step() {
+		return m_state.m_step_value;
+	}
+	///////////////////////////////////////////////////////////////////////////////
+	int get_last_velocity() {
+		return m_state.m_last_velocity;
+	}
+	///////////////////////////////////////////////////////////////////////////////
+	void set_pos(int pos) {
+		m_state.m_play_pos = pos;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	int get_pos() {
+		return m_state.m_play_pos;
+	}
+	///////////////////////////////////////////////////////////////////////////////
+	inline byte is_mod_mode() {
+		return(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	inline byte is_note_mode() {
+		return(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC || m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE);
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	inline CSequenceStep& get_step(int index) {
+		return m_cfg.m_step[index];
+	}
 
 
 	///////////////////////////////////////////////////////////////////////////////
-	// Interpolate all points
-	void recalc_data_points() {
-		if(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD) {
-			impl_interpolate();
+	///////////////////////////////////////////////////////////////////////////////
+	///////////////////////////////////////////////////////////////////////////////
+	//
+	// SEQUENCER FUNCTIONS
+	//
+	///////////////////////////////////////////////////////////////////////////////
+	///////////////////////////////////////////////////////////////////////////////
+	///////////////////////////////////////////////////////////////////////////////
+
+
+	///////////////////////////////////////////////////////////////////////////////
+	void send_midi_note(byte note, byte velocity) {
+		if(m_cfg.m_midi_channel > V_SQL_MIDI_CHAN_NONE) {
+			g_midi.send_note(m_cfg.m_midi_channel-V_SQL_MIDI_CHAN_1, note, velocity);
+		}
+	}
+
+
+	///////////////////////////////////////////////////////////////////////////////
+	void start(uint32_t ticks, byte parts_tick) {
+		m_state.m_next_tick = ticks;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	void stop_all_notes() {
+/*		for(int i=0; i<MAX_PLAYING_NOTES;++i) {
+			if(m_state.m_playing[i].count) {
+				send_midi_note(m_state.m_playing[i].note, 0);
+				m_state.m_playing[i].note = 0;
+				m_state.m_playing[i].count = 0;
+			}
+		}*/
+	}
+
+
+	///////////////////////////////////////////////////////////////////////////////
+	void tick(uint32_t ticks, byte parts_tick) {
+		if(ticks >= m_state.m_next_tick) {
+			m_state.m_next_tick += c_tick_rates[m_cfg.m_step_rate];
+			if(m_state.m_play_pos == m_cfg.m_loop_to) {
+				m_state.m_play_pos = m_cfg.m_loop_from;
+			}
+			else {
+				if(++m_state.m_play_pos > MAX_STEPS-1) {
+					m_state.m_play_pos = 0;
+				}
+			}
+
+			m_state.m_step_value = m_cfg.m_step[m_state.m_play_pos];
+			m_state.m_stepped = 1;
+		}
+		else {
+			m_state.m_stepped = 0;
 		}
 	}
 
 
 
+
+
+	///////////////////////////////////////////////////////////////////////////////
+	// called once per ms
+	void ms_tick(int which) {
+		if(m_state.m_gate_timeout) {
+			if(!--m_state.m_gate_timeout) {
+				g_cv_gate.gate(which, CCVGate::GATE_CLOSED);
+			}
+		}
+	}
+
+	/*
+	///////////////////////////////////////////////////////////////////////////////
+	void service(byte index, uint32_t ticks) {
+		// has a tick expired?
+		if(m_state.m_last_tick_lsb != (byte)ticks) {
+			m_state.m_last_tick_lsb = (byte)ticks;
+			for(int i=0; i<MAX_PLAYING_NOTES;++i) {
+				if(m_state.m_playing[i].count) {
+					if(!--m_state.m_playing[i].count) {
+						if(m_state.m_playing[i].note == m_state.m_last_note) {
+							// close the gate
+							g_cv_gate.gate(index, CCVGate::GATE_CLOSED);
+						}
+						send_midi_note(m_state.m_playing[i].note, 0);
+						m_state.m_playing[i].note = 0;
+					}
+				}
+			}
+		}
+	}
+*/
+
+	/*
 	///////////////////////////////////////////////////////////////////////////////
 	// Play a step for a note mode
 	void action_step_note(byte which, CSequenceStep step_for_transpose, byte midi_vel_accent, byte midi_vel, byte action_gate) {
@@ -896,7 +864,95 @@ public:
 			}
 		}
 	}
+*/
 
+	///////////////////////////////////////////////////////////////////////////////
+	// Play a step for a note mode
+//TODO - MIDI
+	void action_step_note(byte which, CSequenceStep step_for_transpose, byte midi_vel_accent, byte midi_vel, byte action_gate) {
+
+		//////////////////////////////
+		// handle transposition
+		CSequenceStep step;
+		step.reset_all();
+		int transposed;
+		switch(m_cfg.m_mode) {
+		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
+			transposed = (int)step_for_transpose.m_value + m_state.m_step_value.m_value - 64;
+			if(transposed >= 0 && transposed < 128) {
+				step = step_for_transpose;
+				step.m_value = transposed;
+			}
+			break;
+		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+			 if(step_for_transpose.is_accent()) {
+				 transposed = (int)step_for_transpose.m_value + m_state.m_step_value.m_value - 64;
+				 if(transposed >= 0 && transposed < 128) {
+					step = step_for_transpose;
+					step.m_value = transposed;
+				 }
+			 }
+			 else {
+				step = step_for_transpose;
+				step.clear_accent();
+			 }
+			 break;
+		default:
+			step = m_state.m_step_value;
+		}
+
+		//////////////////////////////
+		// is there any step to process?
+		if(step.m_is_data_point) {
+
+			// get the note we need to play, taking into account being
+			// forced into a scale
+			byte note = step.m_value;
+			if(m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
+				note = g_scale.index_to_note(note);
+			}
+			else if(m_cfg.m_force_scale == V_SQL_FORCE_SCALE_ON) {
+				note = g_scale.force_to_scale(note);
+			}
+
+			// set up the pitch CV, handling the case where we need to "glide"
+			// to the new pitch
+			if(!step.is_trigger() && m_cfg.m_cv_glide == V_SQL_CVGLIDE_ON) {
+				int glide_time = g_clock.get_ms_for_measure(m_cfg.m_step_rate);
+				g_cv_gate.pitch_cv(which, note, m_cfg.m_cv_scale, glide_time);
+			}
+			else {
+				g_cv_gate.pitch_cv(which, note, m_cfg.m_cv_scale, 0);
+			}
+
+			// peek at the following step
+			CSequenceStep next_step = get_step(next_step_index(m_state.m_play_pos));
+			if(next_step.is_gate_open() && !next_step.is_trigger()) {
+				// the next step will extend the current one
+				m_state.m_gate_timeout = 0;
+			}
+			else {
+//TODO note duration
+				m_state.m_gate_timeout = g_clock.get_ms_for_measure(m_cfg.m_step_rate);
+			}
+
+			// perform the appropriate gate action
+			if(step.is_trigger()) {
+				g_cv_gate.gate(which, CCVGate::GATE_RETRIG);
+			}
+			else if(step.is_gate_open()) {
+				g_cv_gate.gate(which, CCVGate::GATE_OPEN);
+			}
+			else {
+				g_cv_gate.gate(which, CCVGate::GATE_CLOSED);
+			}
+		}
+		else {
+			// no step - ensure the gate is closed at this step
+			g_cv_gate.gate(which, CCVGate::GATE_CLOSED);
+			m_state.m_gate_timeout = 0;
+		}
+	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void action_step_mod(byte which) {
@@ -916,10 +972,10 @@ public:
 	// Play the gate for a step
 	void action_step_gate(byte which) {
 		CSequenceStep step = m_state.m_step_value;
-		if(step.m_is_trigger) {
+		if(step.is_trigger()) {
 			g_cv_gate.gate(which, CCVGate::GATE_RETRIG);
 		}
-		else if(step.m_is_gate_open) {
+		else if(step.is_gate_open()) {
 			g_cv_gate.gate(which, CCVGate::GATE_OPEN);
 		}
 		else {
@@ -927,16 +983,7 @@ public:
 		}
 	}
 
-	///////////////////////////////////////////////////////////////////////////////
-	void test() {
-/*		m_cfg.m_step[0] = 45|IS_GATE|IS_DATA_POINT;
-		m_cfg.m_step[1] = 45|IS_GATE|IS_DATA_POINT;
-		m_cfg.m_step[4] = 46|IS_GATE|IS_DATA_POINT;
-		m_cfg.m_step[5] = 48|IS_GATE|IS_DATA_POINT;
-		m_cfg.m_step[8] = 50|IS_GATE|IS_DATA_POINT;
-		m_cfg.m_step[9] = 50|IS_GATE|IS_DATA_POINT;
-		m_cfg.m_step[12] = 52|IS_GATE|IS_DATA_POINT;*/
-	}
+
 
 };
 

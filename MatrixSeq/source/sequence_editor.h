@@ -1,59 +1,75 @@
-/*
- * sequence_editor.h
- *
- *  Created on: 30 Sep 2018
- *      Author: jason
- */
+///////////////////////////////////////////////////////////////////////////////////
+//
+//                                  ~~  ~~             ~~
+//  ~~~~~~    ~~~~~    ~~~~~    ~~~~~~  ~~     ~~~~~   ~~~~~~    ~~~~~   ~~    ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~   ~~  ~~   ~~  ~~   ~~   ~~  ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~~~~~~  ~~   ~~  ~~   ~~     ~~
+//  ~~   ~~  ~~   ~~  ~~   ~~  ~~   ~~  ~~    ~~       ~~   ~~  ~~   ~~   ~~  ~~
+//  ~~   ~~   ~~~~~    ~~~~~    ~~~~~~   ~~~   ~~~~~   ~~~~~~    ~~~~~   ~~    ~~
+//
+//  Serendipity Sequencer                                   CC-NC-BY-SA
+//  hotchk155/2018                                          Sixty-four pixels ltd
+//
+//  SEQUENCE EDITOR
+//
+///////////////////////////////////////////////////////////////////////////////////
 
 #ifndef SEQUENCE_EDITOR_H_
 #define SEQUENCE_EDITOR_H_
 
-
+// This class provides the user interface for editing one layer of the sequence
 class CSequenceEditor {
-public:
 
+	// misc constants
 	enum {
-		GRID_WIDTH = 32,
-		MAX_CURSOR = 31,
-		POPUP_MS = 2000
-	};
-	enum {
-		ACTION_NONE,
-		ACTION_CREATE_STEP,
-		ACTION_EDIT_STEP,
-		ACTION_ERASE_STEP,
-		ACTION_CLONE_STEP,
-		ACTION_SET_LOOP,
-		ACTION_DRAG_LOOP,
-		ACTION_MOVE_VERT,
-		ACTION_MOVE_HORZ
+		GRID_WIDTH = 32,	// number of columns in the grid
+		GRID_HEIGHT = 16,	// number of rows in the grid
+		POPUP_MS = 2000		// how long popup window is to be displayed
 	};
 
+	// enumeration of the "gestures" or actions that the user can perform
+	typedef enum:byte {
+		ACTION_NONE,		// no action in progress
+		ACTION_BEGIN,		// start of an action, when a button is first pressed
+		ACTION_ENC_LEFT,	// encoder is turned anticlockwise
+		ACTION_ENC_RIGHT,   // encoder is turned clockwise
+		ACTION_HOLD,		// button has been held down for a certain period with no encoder turn
+		ACTION_CLICK,		// button pressed and release without encoder turn
+		ACTION_EDIT_KEYS,	// button is pressed with EDIT key used as shift
+		ACTION_END			// end of an action, when button is released
+	} ACTION;
 
-	CSequenceEditor() {
-		init_state();
-	}
+	//
+	// MEMBER VARIABLES
+	//
+	ACTION m_action;			// the action being performed by the user
+	uint32_t m_action_key;		// the key to which the action applies
+	uint32_t m_edit_keys;		// keys pressed in conjunction with edit shift
+	byte m_encoder_moved;		// whether encoder has been moved since action was in progress
+	int m_cursor;				// position of the vertical cursor bar
+	int m_edit_value;			// the value being edited (e.g. shift offset)
+	int m_sel_from;				// start of selection range
+	int m_sel_to;				// end of selection range
 
-private:
-	static const uint32_t c_ruler = 0x88888888U;
-
-	int m_cursor;			// this is the position of the edit cursor
-	int m_value;			// value ebign edited in drag mode
-	int m_action;
-
-	int m_sel_from;
-	int m_sel_to;
+	//
+	// PRIVATE METHODS
+	//
 
 	///////////////////////////////////////////////////////////////////////////////
+	// initialise everything
 	void init_state() {
-		m_cursor = 0;
 		m_action = ACTION_NONE;
-		m_value = 0;
+		m_action_key = 0;
+		m_edit_keys = 0;
+		m_encoder_moved = 0;
+		m_cursor = 0;
+		m_edit_value = 0;
 		m_sel_from = -1;
 		m_sel_to = -1;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
+	// display a popup window with info about the current step
 	void step_info(CSequenceLayer& layer, CSequenceStep step) {
 		byte value = step.m_value;
 		switch(layer.get_mode()) {
@@ -80,6 +96,7 @@ private:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
+	// scroll display up or down
 	void scroll(CSequenceLayer& layer, int dir) {
 		if(!layer.is_mod_mode()) {
 			int scroll_ofs = layer.get_scroll_ofs();
@@ -95,6 +112,7 @@ private:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
+	// scroll display so that a specific step is visible
 	void set_scroll_for(CSequenceLayer& layer, CSequenceStep step) {
 		int v = step.m_value;
 		if(v<layer.get_scroll_ofs()) {
@@ -105,8 +123,8 @@ private:
 		}
 	}
 
-
 	///////////////////////////////////////////////////////////////////////////////
+	// get info for the graticule/grid for display
 	byte get_graticule(CSequenceLayer& layer, int *baseline, int *spacing) {
 		int n;
 		switch (layer.get_mode()) {
@@ -135,23 +153,8 @@ private:
 		return 0;
 	}
 
-typedef enum:byte {
-	ACTION_BEGIN,
-	ACTION_ENC_LEFT,
-	ACTION_ENC_RIGHT,
-	ACTION_HOLD,
-	ACTION_CLICK,
-	ACTION_EDIT_KEYS,
-	ACTION_END
-} ACTION;
-
-	uint32_t m_action_context = 0;
-	byte m_encoder_moved = 0;
-	uint32_t m_edit_keys = 0;
-
-
 	///////////////////////////////////////////////////////////////////////////////
-	// change step value based on encode event
+	// change step value based on encoder event
 	void value_action(CSequenceLayer& layer, CSequenceStep& step, ACTION what, byte fine) {
 		switch(what) {
 		case ACTION_ENC_LEFT:
@@ -170,7 +173,7 @@ typedef enum:byte {
 	void cursor_action(CSequenceLayer& layer, ACTION what) {
 		switch(what) {
 		case ACTION_ENC_RIGHT:
-			if(m_cursor < CSequenceLayer::MAX_STEPS-1) {
+			if(m_cursor < GRID_WIDTH-1) {
 				++m_cursor;
 			}
 			break;
@@ -191,14 +194,19 @@ typedef enum:byte {
 		switch(what) {
 		////////////////////////////////////////////////
 		case ACTION_BEGIN:
-			if(!layer.is_note_mode() || step.m_is_data_point) {
-				// there is a valid note in this column so we copy it to our
-				// paste buffer, scroll it into view and show note name on screen
+			if(layer.is_note_mode() && !step.m_is_data_point) {
+				// note mode with no note in the column. in this case there is
+				// no action on button down
+			}
+			else {
+				// copy the current step to the paste buffer, bring it
+				// into view and show info
+				step.m_is_data_point = 1;
+				layer.paste_buffer() = step;
 				set_scroll_for(layer, step);
 				if(!layer.is_mod_mode()) {
 					step_info(layer, step);
 				}
-				layer.set_paste_buffer(step);
 			}
 			break;
 		////////////////////////////////////////////////
@@ -217,58 +225,68 @@ typedef enum:byte {
 					// fine adjustment of value. show the new value and copy
 					// it to the paste buffer
 					value_action(layer, step, what, 1);
+					set_scroll_for(layer, step);
+					step.m_is_data_point = 1;
+					layer.paste_buffer() = step;
+					layer.paste_step(m_cursor);
 					step_info(layer, step);
-					layer.set_paste_buffer(step);
 				}
 				break;
 			case KEY_EDIT|KEY_GATE:
 				// action to shift all points up or down
 				if(what == ACTION_ENC_LEFT) {
 					if(layer.shift_vertical(-1)) {
-						--m_value;
+						--m_edit_value;
 					}
 				}
 				else {
 					if(layer.shift_vertical(+1)) {
-						++m_value;
+						++m_edit_value;
 					}
 				}
-				g_popup.show_offset(m_value);
+				g_popup.show_offset(m_edit_value);
 				break;
 			case KEY_EDIT|KEY_LOOP:
 				// action to shift all points left or right
 				if(what == ACTION_ENC_LEFT) {
-					if(--m_value <= -31) {
-						m_value = 0;
+					if(--m_edit_value <= -(GRID_WIDTH-1)) {
+						m_edit_value = 0;
 					}
 					layer.shift_horizontal(-1);
 				}
 				else {
-					if(++m_value >= 31) {
-						m_value = 0;
+					if(++m_edit_value >= GRID_WIDTH-1) {
+						m_edit_value = 0;
 					}
 					layer.shift_horizontal(+1);
 				}
-				g_popup.show_offset(m_value);
+				g_popup.show_offset(m_edit_value);
 				break;
 			default:
-				// encoder moved while the button is held
-				if(!layer.is_note_mode() || step.m_is_data_point) {
-					// we are dragging a note around
-					value_action(layer, step, what, 0);
-					layer.set_paste_buffer(step);
-				}
-				else {
-					// in note mode with no note at current position. we invent one
-					// based on scroll offset and insert it into the pattern
-					if(layer.is_paste_buffer_empty()) {
+				// turning encoder with edit button held
+				if(layer.is_note_mode() && !step.m_is_data_point) {
+					// start turning encoder in an empty column in note mode means we use paste buffer value
+					if(!layer.paste_buffer().m_is_data_point) {
+						// if there is no value in paste buffer then create a default one
 						step.reset_all(layer.get_scroll_ofs());
-						step.m_is_gate_open = 1;
-						step.m_is_trigger = 1;
-						layer.set_paste_buffer(step);
+						step.set_gate(CSequenceStep::GATE_RETRIG);
+						step.m_is_data_point = 1;
+						layer.paste_buffer() = step;
+						layer.paste_step(m_cursor);
+					}
+					else {
+						// otherwise set it as a trigger and paste it in
+						layer.paste_buffer().set_gate(CSequenceStep::GATE_RETRIG);
+						layer.paste_step(m_cursor);
 					}
 				}
-				layer.paste_step(m_cursor);
+				else {
+					// editing an existing step
+					value_action(layer, step, what, 0);
+					step.m_is_data_point = 1;
+					layer.paste_buffer() = step;
+					layer.paste_step(m_cursor);
+				}
 				set_scroll_for(layer, step);
 				if(!layer.is_mod_mode()) {
 					step_info(layer, step);
@@ -281,8 +299,8 @@ typedef enum:byte {
 			switch(m_edit_keys) {
 			case KEY_EDIT|KEY_PASTE:
 				// EDIT + PASTE - advance cursor and copy the current step
-				if(!layer.is_paste_buffer_empty()) {
-					if(++m_cursor >= CSequenceLayer::MAX_STEPS-1) {
+				if(layer.paste_buffer().m_is_data_point) {
+					if(++m_cursor >= GRID_WIDTH-1) {
 						m_cursor = 0;
 					}
 					layer.paste_step(m_cursor);
@@ -292,18 +310,18 @@ typedef enum:byte {
 				if(layer.is_note_mode()) {
 					// EDIT + CLEAR - insert rest and advance cursor
 					layer.clear_step_value(m_cursor);
-					if(++m_cursor >= CSequenceLayer::MAX_STEPS-1) {
+					if(++m_cursor >= GRID_WIDTH-1) {
 						m_cursor = 0;
 					}
 				}
 				break;
 			case KEY_EDIT|KEY_GATE:
-				m_value = 0;
+				m_edit_value = 0;
 				g_popup.text("VERT", 4);
 				g_popup.align(CPopup::ALIGN_RIGHT);
 				break;
 			case KEY_EDIT|KEY_LOOP:
-				m_value = 0;
+				m_edit_value = 0;
 				g_popup.text("HORZ", 4);
 				g_popup.align(CPopup::ALIGN_RIGHT);
 				break;
@@ -321,15 +339,19 @@ typedef enum:byte {
 		switch(what) {
 		////////////////////////////////////////////////
 		case ACTION_CLICK:
-			// a click pastes note to new step
+			// a single click pastes a copy of the last edited note
 			layer.paste_step(m_cursor);
 			break;
 			////////////////////////////////////////////////
 		case ACTION_ENC_LEFT:
 		case ACTION_ENC_RIGHT:
-			// hold-turn pastes multiple notes
-			layer.paste_step(m_cursor);
+			// hold-turn copies the current step into the paste buffer
+			// then pastes it over multiple steps
+			if(!m_encoder_moved) {
+				layer.paste_buffer() = layer.get_step(m_cursor);
+			}
 			cursor_action(layer, what);
+			layer.paste_step(m_cursor);
 			break;
 		default:
 			break;
@@ -343,7 +365,8 @@ typedef enum:byte {
 		////////////////////////////////////////////////
 		case ACTION_CLICK:
 			// a click erases a step, copying it to paste buffer
-			layer.set_paste_buffer(layer.get_step(m_cursor));
+			layer.paste_buffer() = layer.get_step(m_cursor);
+			layer.paste_buffer().m_is_data_point = 1;
 			layer.clear_step_value(m_cursor);
 			break;
 			////////////////////////////////////////////////
@@ -365,15 +388,15 @@ typedef enum:byte {
 		switch(what) {
 		////////////////////////////////////////////////
 		case ACTION_ENC_LEFT:
-			layer.dec_gate(m_cursor);
+			layer.get_step(m_cursor).dec_gate();
 			break;
 		////////////////////////////////////////////////
 		case ACTION_ENC_RIGHT:
-			layer.inc_gate(m_cursor);
+			layer.get_step(m_cursor).inc_gate();
 			break;
 		////////////////////////////////////////////////
 		case ACTION_CLICK:
-			layer.toggle_gate(m_cursor);
+			layer.get_step(m_cursor).toggle_gate();
 			break;
 		default:
 			break;
@@ -423,10 +446,10 @@ typedef enum:byte {
 		switch(what) {
 			////////////////////////////////////////////////
 		case ACTION_ENC_LEFT:
-			scroll(layer, +1);
+			scroll(layer, -1);
 			break;
 		case ACTION_ENC_RIGHT:
-			scroll(layer, -1);
+			scroll(layer, +1);
 			break;
 		default:
 			break;
@@ -434,8 +457,11 @@ typedef enum:byte {
 	}
 
 
+	///////////////////////////////////////////////////////////////////////////////
+	// function to dispatch an action to the correct handler based on which
+	// key has been pressed
 	void action(CSequenceLayer& layer, ACTION what) {
-		switch(m_action_context) {
+		switch(m_action_key) {
 		case KEY_EDIT: edit_action(layer, what); break;
 		case KEY_PASTE: paste_action(layer, what); break;
 		case KEY_CLEAR: clear_action(layer, what); break;
@@ -447,7 +473,88 @@ typedef enum:byte {
 
 public:
 
+	//
+	// PUBLIC METHODS
+	//
+
+	///////////////////////////////////////////////////////////////////////////////
+	// constructor
+	CSequenceEditor() {
+		init_state();
+	}
+
 	/////////////////////////////////////////////////////////////////////////////////////////////
+	// handle an event
+	void event(int evt, uint32_t param) {
+		CSequenceLayer& layer = g_sequencer.cur_layer();
+		switch(evt) {
+		case EV_KEY_PRESS:
+			if(!m_action_key) {
+				switch(param) {
+				case KEY_EDIT:
+				case KEY_PASTE:
+				case KEY_CLEAR:
+				case KEY_GATE:
+				case KEY_LOOP:
+				case KEY_MENU:
+					m_action_key = param;
+					m_encoder_moved = 0;
+					action(layer, ACTION_BEGIN);
+				}
+			}
+			else if(m_action_key == KEY_EDIT) {
+				m_edit_keys = param;
+				action(layer, ACTION_EDIT_KEYS);
+			}
+			break;
+		case EV_KEY_RELEASE:
+			if(param & m_edit_keys) {
+				m_edit_keys = 0;
+			}
+			if(param == m_action_key) {
+				action(layer, ACTION_END);
+				m_action_key = 0;
+			}
+			break;
+		case EV_KEY_HOLD:
+			if(param == m_action_key) {
+				action(layer, ACTION_HOLD);
+			}
+			break;
+		case EV_KEY_CLICK:
+			if(param == m_action_key) {
+				action(layer, ACTION_CLICK);
+			}
+			break;
+		case EV_ENCODER:
+			if(m_action_key) {
+				if((int)param<0) {
+					action(layer, ACTION_ENC_LEFT);
+				}
+				else {
+					action(layer, ACTION_ENC_RIGHT);
+				}
+				m_encoder_moved = 1;
+			}
+			else {
+				if((int)param < 0) {
+					if(m_cursor > 0) {
+						--m_cursor;
+					}
+				}
+				else {
+					if(++m_cursor >=  GRID_WIDTH-1) {
+						m_cursor = GRID_WIDTH-1;
+					}
+				}
+				g_popup.avoid(m_cursor);
+			}
+			break;
+		}
+	}
+
+	/////////////////////////////////////////////////////////////////////////////////////////////
+	// draw the display
 	void repaint() {
 		CSequenceLayer& layer = g_sequencer.cur_layer();
 		int i;
@@ -456,6 +563,7 @@ public:
 		// Clear the display
 		g_ui.clear();
 
+//TODO move all logic to graticule function
 		// insert the "graticule", which provides the grid lines to in the background
 		// of note based modes
 		int graticule_row = 0;
@@ -580,89 +688,20 @@ public:
 
 
 			// DISPLAY THE GATE INFO
-			if(step.m_is_accent) {
+			if(step.is_accent()) {
 				g_ui.raster(14) |= mask;
 				g_ui.hilite(14) |= mask;
 			}
-			else if(step.m_is_trigger) {
+			else if(step.is_trigger()) {
 				g_ui.raster(14) |= mask;
 			}
-			else if(step.m_is_gate_open) {
+			else if(step.is_gate_open()) {
 				g_ui.hilite(14) |= mask;
 			}
 
 			mask>>=1;
 		}
 	}
-
-	void event(int evt, uint32_t param) {
-		CSequenceLayer& layer = g_sequencer.cur_layer();
-		switch(evt) {
-		case EV_KEY_PRESS:
-			if(!m_action_context) {
-				switch(param) {
-				case KEY_EDIT:
-				case KEY_PASTE:
-				case KEY_CLEAR:
-				case KEY_GATE:
-				case KEY_LOOP:
-				case KEY_MENU:
-					m_action_context = param;
-					m_encoder_moved = 0;
-					action(layer, ACTION_BEGIN);
-				}
-			}
-			else if(m_action_context == KEY_EDIT) {
-				m_edit_keys = param;
-				action(layer, ACTION_EDIT_KEYS);
-			}
-			break;
-		case EV_KEY_RELEASE:
-			if(param & m_edit_keys) {
-				m_edit_keys = 0;
-			}
-			if(param == m_action_context) {
-				action(layer, ACTION_END);
-				m_action_context = 0;
-			}
-			break;
-		case EV_KEY_HOLD:
-			if(param == m_action_context) {
-				action(layer, ACTION_HOLD);
-			}
-			break;
-		case EV_KEY_CLICK:
-			if(param == m_action_context) {
-				action(layer, ACTION_CLICK);
-			}
-			break;
-		case EV_ENCODER:
-			if(m_action_context) {
-				if((int)param<0) {
-					action(layer, ACTION_ENC_LEFT);
-				}
-				else {
-					action(layer, ACTION_ENC_RIGHT);
-				}
-				m_encoder_moved = 1;
-			}
-			else {
-				if((int)param < 0) {
-					if(m_cursor > 0) {
-						--m_cursor;
-					}
-				}
-				else {
-					if(++m_cursor >=  MAX_CURSOR) {
-						m_cursor = MAX_CURSOR;
-					}
-				}
-				g_popup.avoid(m_cursor);
-			}
-			break;
-		}
-	}
-
 };
 CSequenceEditor g_sequence_editor;
 
