@@ -643,11 +643,7 @@ public:
 			switch(layer.get_mode()) {
 			case V_SQL_SEQ_MODE_CHROMATIC:
 			case V_SQL_SEQ_MODE_SCALE:
-				show_step = step.m_is_data_point;
-				// fall thru
-			case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
-			case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
-				if(show_step) {
+				if(step.m_is_data_point) {
 					n = step.m_value;
 					n = 12 - n + layer.get_scroll_ofs();
 					if(n >= 0 && n <= 12) {
@@ -655,10 +651,29 @@ public:
 							g_ui.hilite(n) |= mask;
 							g_ui.raster(n) |= mask;
 						}
-						else {
+						else  {
 							g_ui.raster(n) |= mask;
 							g_ui.hilite(n) &= ~mask;
 						}
+					}
+				}
+				break;
+			case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
+			case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+				n = step.m_value;
+				n = 12 - n + layer.get_scroll_ofs();
+				if(n >= 0 && n <= 12) {
+					if(i == layer.get_pos() && g_sequencer.is_running()) {
+						g_ui.hilite(n) |= mask;
+						g_ui.raster(n) |= mask;
+					}
+					else if(step.m_is_data_point) {
+						g_ui.raster(n) |= mask;
+						g_ui.hilite(n) &= ~mask;
+					}
+					else {
+						g_ui.hilite(n) |= mask;
+						g_ui.raster(n) &= ~mask;
 					}
 				}
 				break;

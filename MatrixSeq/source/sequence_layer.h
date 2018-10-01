@@ -153,7 +153,7 @@ class CSequenceLayer {
 		int i;
 		int first_waypoint = -1;
 		int prev_waypoint = -1;
-		for(i=0; i<32; ++i) {
+		for(i=0; i<MAX_STEPS; ++i) {
 			if(m_cfg.m_step[i].m_is_data_point) {
 				if(prev_waypoint < 0) {
 					first_waypoint = i;
@@ -167,13 +167,13 @@ class CSequenceLayer {
 
 		if(first_waypoint < 0) {
 			// no waypoints defined
-			for(i=0; i<32; ++i) {
+			for(i=0; i<MAX_STEPS; ++i) {
 				m_cfg.m_step[i].m_value = 0;
 			}
 		}
 		else if(prev_waypoint == first_waypoint) {
 			// only one waypoint defined
-			for(i=0; i<32; ++i) {
+			for(i=0; i<MAX_STEPS; ++i) {
 				if(i!=prev_waypoint) {
 					m_cfg.m_step[i].m_value = m_cfg.m_step[first_waypoint].m_value;
 				}
@@ -182,6 +182,43 @@ class CSequenceLayer {
 		else {
 			// multiple waypoints defined
 			impl_interpolate_section(prev_waypoint, first_waypoint);
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	void fill_data_points(byte value)
+	{
+		int i;
+		int first_data_point = -1;
+		for(i=0; i<MAX_STEPS; ++i) {
+			if(m_cfg.m_step[i].m_is_data_point) {
+				if(first_data_point < 0) {
+					first_data_point = i;
+				}
+				value = m_cfg.m_step[i].m_value;
+			}
+			else {
+				m_cfg.m_step[i].m_value = value;
+			}
+		}
+		if(first_data_point >= 0) {
+			for(i=0; i<first_data_point; ++i) {
+				m_cfg.m_step[i].m_value = value;
+			}
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	// called when there is a change to a data point
+	void recalc_data_points() {
+		switch(m_cfg.m_mode) {
+			case V_SQL_SEQ_MODE_MOD:
+				impl_interpolate();
+				break;
+			case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
+			case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+				fill_data_points(64);
+				break;
 		}
 	}
 
@@ -201,13 +238,6 @@ class CSequenceLayer {
 
 
 
-	///////////////////////////////////////////////////////////////////////////////
-	// called when there is a change to a data point
-	void recalc_data_points() {
-		if(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD) {
-			impl_interpolate();
-		}
-	}
 
 public:
 	///////////////////////////////////////////////////////////////////////////////
