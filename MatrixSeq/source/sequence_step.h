@@ -9,7 +9,7 @@
 #define SEQUENCE_STEP_H_
 
 
-class CStep {
+class CSequenceStep {
 public:
 	byte m_is_data_point:1; // is this a "user" data point rather than an automatic one?
 	byte m_is_accent:1;
@@ -17,7 +17,7 @@ public:
 	byte m_is_trigger:1;
 	byte m_value;
 
-	void copy_data_point(CStep &other) {
+	void copy_data_point(CSequenceStep &other) {
 		m_value = other.m_value;
 		m_is_data_point = other.m_is_data_point;
 	}

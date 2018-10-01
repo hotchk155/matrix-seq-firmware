@@ -8,7 +8,7 @@
 #ifndef DEFS_H_
 #define DEFS_H_
 
-		enum {
+enum {
 	EV_NONE,
 	EV_ENCODER,
 	EV_KEY_PRESS,

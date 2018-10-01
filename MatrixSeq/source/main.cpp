@@ -65,6 +65,7 @@
 #include "sequence_layer.h"
 #include "popup.h"
 #include "sequencer.h"
+#include "sequence_editor.h"
 #include "params.h"
 #include "menu.h"
 #include "selector.h"
@@ -92,7 +93,7 @@ VIEW_TYPE g_view = VIEW_SEQUENCER;
 void dispatch_event(int event, uint32_t param) {
 	switch(g_view) {
 	case VIEW_SEQUENCER:
-		g_sequencer.event(event, param);
+		g_sequence_editor.event(event, param);
 		break;
 	case VIEW_MENU:
 		g_menu.event(event, param);
@@ -104,8 +105,8 @@ void dispatch_event(int event, uint32_t param) {
 }
 
 void select_layer(byte layer) {
-	g_popup.layer(layer, g_sequencer.is_layer_enabled(layer));
-	g_sequencer.set_active_layer(layer);
+	g_sequencer.set_cur_layer(layer);
+	g_popup.layer(layer, g_sequencer.cur_layer().get_enabled());
 	force_full_repaint();
 }
 
@@ -138,8 +139,8 @@ void fire_event(int event, uint32_t param) {
 			select_layer(3);
 			break;
 		case KEY_MENU|KEY2_LAYER_MUTE:
-			g_sequencer.enable_layer(g_sequencer.m_layer,!g_sequencer.is_layer_enabled(g_sequencer.m_layer));
-			g_popup.layer(g_sequencer.m_layer, g_sequencer.is_layer_enabled(g_sequencer.m_layer));
+			g_sequencer.cur_layer().set_enabled(!g_sequencer.cur_layer().get_enabled());
+			g_popup.layer(g_sequencer.get_cur_layer(), g_sequencer.cur_layer().get_enabled());
 			force_full_repaint();
 			g_popup.align(CPopup::ALIGN_RIGHT);
 			break;
@@ -191,7 +192,6 @@ void fire_note(byte midi_note, byte midi_vel) {
 
 void force_full_repaint() {
 	g_popup.force_repaint();
-	g_sequencer.force_repaint();
 	g_menu.force_repaint();
 	g_selector.force_repaint();
 }
@@ -220,7 +220,7 @@ int main(void) {
     /* Enter an infinite loop, just incrementing a counter.
      * */
     g_ui.init();
-    g_sequencer.m_layers[0].test();
+    //g_sequencer.m_layers[0].test();
 
 
     while(1) {
@@ -238,7 +238,7 @@ int main(void) {
     		g_ui.lock_for_update();
     		switch(g_view) {
     		case VIEW_SEQUENCER:
-    			g_sequencer.repaint();
+    			g_sequence_editor.repaint();
     			break;
     		case VIEW_MENU:
     			g_menu.repaint();
