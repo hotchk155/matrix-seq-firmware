@@ -107,8 +107,7 @@ public:
 		case P_SQL_SCALE_ROOT:
 			switch(cur_layer().get_mode()) {
 			case V_SQL_SEQ_MODE_CHROMATIC:
-			case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
-			case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+			case V_SQL_SEQ_MODE_TRANSPOSE:
 				return cur_layer().get(P_SQL_FORCE_SCALE) == V_SQL_FORCE_SCALE_ON;
 			case V_SQL_SEQ_MODE_SCALE:
 				return 1;
@@ -124,8 +123,7 @@ public:
 		case P_SQL_MIDI_VEL_ACCENT:
 			switch(cur_layer().get_mode()) {
 			case V_SQL_SEQ_MODE_CHROMATIC:
-			case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
-			case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+			case V_SQL_SEQ_MODE_TRANSPOSE:
 			case V_SQL_SEQ_MODE_SCALE:
 				return 1;
 			case V_SQL_SEQ_MODE_MOD:
@@ -202,8 +200,7 @@ public:
 							break;
 
 						//////////////////////////////////////////////////
-						case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
-						case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+						case V_SQL_SEQ_MODE_TRANSPOSE:
 						case V_SQL_SEQ_MODE_VELOCITY:
 							layer.action_step_gate(i);
 							break;
@@ -228,8 +225,7 @@ public:
 									// info to further layers
 									break;
 								}
-								else if(other_layer.get_mode() == V_SQL_SEQ_MODE_TRANSPOSE_ALL ||
-										other_layer.get_mode() == V_SQL_SEQ_MODE_TRANSPOSE_LOCK) {
+								else if(other_layer.get_mode() == V_SQL_SEQ_MODE_TRANSPOSE) {
 									// transpose layer, action as a note layer passing in the
 									// note from the active layer to be transposed
 									other_layer.action_step_note(

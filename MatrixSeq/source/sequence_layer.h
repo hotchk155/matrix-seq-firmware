@@ -46,6 +46,8 @@ class CSequenceLayer {
 		V_SQL_CVSCALE	m_cv_scale;
 		byte 			m_cv_range;
 		V_SQL_CVGLIDE	m_cv_glide;
+		V_SQL_TRAN_TRIG	m_tran_trig;
+		V_SQL_TRAN_ACC	m_tran_acc;
 	} CONFIG;
 
 
@@ -215,8 +217,7 @@ class CSequenceLayer {
 			case V_SQL_SEQ_MODE_MOD:
 				impl_interpolate();
 				break;
-			case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
-			case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+			case V_SQL_SEQ_MODE_TRANSPOSE:
 				fill_data_points(64);
 				break;
 		}
@@ -264,6 +265,8 @@ public:
 		m_cfg.m_cv_scale = V_SQL_CVSCALE_1VOCT;
 		m_cfg.m_cv_range = 5;
 		m_cfg.m_cv_glide = V_SQL_CVGLIDE_OFF;
+		m_cfg.m_tran_trig = V_SQL_TRAN_TRIG_THIS;
+		m_cfg.m_tran_acc = V_SQL_TRAN_ACC_ACCENT;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -317,6 +320,8 @@ public:
 		case P_SQL_CVSCALE: m_cfg.m_cv_scale = (V_SQL_CVSCALE)value; break;
 		case P_SQL_CVRANGE: m_cfg.m_cv_range = value; break;
 		case P_SQL_CVGLIDE: m_cfg.m_cv_glide = (V_SQL_CVGLIDE)value; break;
+		case P_SQL_TRAN_TRIG: m_cfg.m_tran_trig = (V_SQL_TRAN_TRIG)value; break;
+		case P_SQL_TRAN_ACC: m_cfg.m_tran_acc = (V_SQL_TRAN_ACC)value; break;
 		default: break;
 		}
 	}
@@ -333,6 +338,8 @@ public:
 		case P_SQL_CVSCALE: return m_cfg.m_cv_scale;
 		case P_SQL_CVRANGE: return m_cfg.m_cv_range;
 		case P_SQL_CVGLIDE: return m_cfg.m_cv_glide;
+		case P_SQL_TRAN_TRIG: return m_cfg.m_tran_trig;
+		case P_SQL_TRAN_ACC: return m_cfg.m_tran_acc;
 		default:return 0;
 		}
 	}
@@ -341,10 +348,12 @@ public:
 	int is_valid_param(PARAM_ID param) {
 		switch(param) {
 		case P_SQL_MIDI_CHAN: return !(m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY);
-		case P_SQL_FORCE_SCALE: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC||m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE_ALL || m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE_LOCK);
+		case P_SQL_FORCE_SCALE: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC||m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE);
 		case P_SQL_MIDI_CC:	return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
 		case P_SQL_CVRANGE: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD || m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY);
 		case P_SQL_CVSCALE: return !(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD || m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY);
+		case P_SQL_TRAN_TRIG:
+		case P_SQL_TRAN_ACC: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE);
 		default: return 1;
 		}
 	}
@@ -369,8 +378,7 @@ public:
 		case V_SQL_SEQ_MODE_CHROMATIC:
 			m_cfg.m_step[index].reset_all(); // clear gate and note
 			break;
-		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
-		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+		case V_SQL_SEQ_MODE_TRANSPOSE:
 			m_cfg.m_step[index].reset_data_point(64); // preserve gate into, set data to midpoint
 			break;
 		case V_SQL_SEQ_MODE_MOD:
@@ -400,8 +408,7 @@ public:
 			case V_SQL_SEQ_MODE_CHROMATIC:
 				m_cfg.m_step[index] = m_state.m_paste_step;	// paste all data
 				break;
-			case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
-			case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+			case V_SQL_SEQ_MODE_TRANSPOSE:
 			case V_SQL_SEQ_MODE_MOD:
 				m_cfg.m_step[index].copy_data_point(m_state.m_paste_step);	// paste data point, leave gates unaffected
 				break;
@@ -448,13 +455,9 @@ public:
 			}
 			break;
 
-		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
-		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
-			if(m_cfg.m_mode != V_SQL_SEQ_MODE_TRANSPOSE_ALL &&
-				m_cfg.m_mode != V_SQL_SEQ_MODE_TRANSPOSE_LOCK) {
-				reset_data_points(64);
-				m_state.m_scroll_ofs = 60;
-			}
+		case V_SQL_SEQ_MODE_TRANSPOSE:
+			reset_data_points(64);
+			m_state.m_scroll_ofs = 60;
 			break;
 
 		case V_SQL_SEQ_MODE_MOD:
@@ -487,8 +490,7 @@ public:
 			max_value = g_scale.max_index();
 			break;
 		case V_SQL_SEQ_MODE_CHROMATIC:
-		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
-		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+		case V_SQL_SEQ_MODE_TRANSPOSE:
 		default:
 			value += delta;
 			break;
@@ -554,7 +556,7 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	byte set_enabled(byte e) {
+	void set_enabled(byte e) {
 		m_cfg.m_enabled = e;
 	}
 
@@ -907,26 +909,28 @@ public:
 		step.reset_all();
 		int transposed;
 		switch(m_cfg.m_mode) {
-		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
-			transposed = (int)step_for_transpose.m_value + m_state.m_step_value.m_value - 64;
-			if(transposed >= 0 && transposed < 128) {
-				step = step_for_transpose;
-				step.m_value = transposed;
+		case V_SQL_SEQ_MODE_TRANSPOSE:
+			if(m_cfg.m_tran_acc == V_SQL_TRAN_ACC_LOCK) {
+				 if(step_for_transpose.is_accent()) {
+					 transposed = (int)step_for_transpose.m_value + m_state.m_step_value.m_value - 64;
+					 if(transposed >= 0 && transposed < 128) {
+						step = step_for_transpose;
+						step.m_value = transposed;
+					 }
+				 }
+				 else {
+					step = step_for_transpose;
+					step.clear_accent();
+				 }
 			}
-			break;
-		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
-			 if(step_for_transpose.is_accent()) {
-				 transposed = (int)step_for_transpose.m_value + m_state.m_step_value.m_value - 64;
-				 if(transposed >= 0 && transposed < 128) {
+			else {
+				transposed = (int)step_for_transpose.m_value + m_state.m_step_value.m_value - 64;
+				if(transposed >= 0 && transposed < 128) {
 					step = step_for_transpose;
 					step.m_value = transposed;
-				 }
-			 }
-			 else {
-				step = step_for_transpose;
-				step.clear_accent();
-			 }
-			 break;
+				}
+			}
+			break;
 		default:
 			step = m_state.m_step_value;
 		}
@@ -966,11 +970,51 @@ public:
 				m_state.m_gate_timeout = g_clock.get_ms_for_measure(m_cfg.m_step_rate);
 			}
 
+			CSequenceStep gates = step;
+			if(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
+				switch(m_cfg.m_tran_trig) {
+				case V_SQL_TRAN_TRIG_AND:
+					if(step.is_gate_open() && step_for_transpose.is_gate_open()) {
+						if(step.is_trigger() && step_for_transpose.is_trigger()) {
+							gates.set_gate(CSequenceStep::GATE_RETRIG);
+						}
+						else {
+							gates.set_gate(CSequenceStep::GATE_OPEN);
+						}
+					}
+					break;
+				case V_SQL_TRAN_TRIG_OR:
+					if(step.is_gate_open() || step_for_transpose.is_gate_open()) {
+						if(step.is_trigger() || step_for_transpose.is_trigger()) {
+							gates.set_gate(CSequenceStep::GATE_RETRIG);
+						}
+						else {
+							gates.set_gate(CSequenceStep::GATE_OPEN);
+						}
+					}
+					break;
+				case V_SQL_TRAN_TRIG_XOR:
+					if(step.is_gate_open() ^ step_for_transpose.is_gate_open()) {
+						if(step.is_trigger() ^ step_for_transpose.is_trigger()) {
+							gates.set_gate(CSequenceStep::GATE_RETRIG);
+						}
+						else {
+							gates.set_gate(CSequenceStep::GATE_OPEN);
+						}
+					}
+					break;
+				case V_SQL_TRAN_TRIG_THAT:
+					gates = step_for_transpose;
+					break;
+				}
+			}
+
+
 			// perform the appropriate gate action
-			if(step.is_trigger()) {
+			if(gates.is_trigger()) {
 				g_cv_gate.gate(which, CCVGate::GATE_RETRIG);
 			}
-			else if(step.is_gate_open()) {
+			else if(gates.is_gate_open()) {
 				g_cv_gate.gate(which, CCVGate::GATE_OPEN);
 			}
 			else {

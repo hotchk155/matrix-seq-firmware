@@ -81,8 +81,7 @@ class CSequenceEditor {
 		case V_SQL_SEQ_MODE_CHROMATIC:
 			g_popup.note_name(value);
 			break;
-		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
-		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+		case V_SQL_SEQ_MODE_TRANSPOSE:
 			g_popup.show_offset(((int)value)-64);
 			break;
 		case V_SQL_SEQ_MODE_MOD:
@@ -140,8 +139,7 @@ class CSequenceEditor {
 			*baseline = 12 - n + layer.get_scroll_ofs(); // now take scroll offset into account
 			*spacing = 7;
 			return 1;
-		case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
-		case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+		case V_SQL_SEQ_MODE_TRANSPOSE:
 			*baseline = 64;
 			*spacing = 0;
 			return 1;
@@ -639,7 +637,6 @@ public:
 			CSequenceStep step = layer.get_step(i);
 
 			// Display the sequencer steps
-			byte show_step = 1;
 			switch(layer.get_mode()) {
 			case V_SQL_SEQ_MODE_CHROMATIC:
 			case V_SQL_SEQ_MODE_SCALE:
@@ -658,8 +655,7 @@ public:
 					}
 				}
 				break;
-			case V_SQL_SEQ_MODE_TRANSPOSE_ALL:
-			case V_SQL_SEQ_MODE_TRANSPOSE_LOCK:
+			case V_SQL_SEQ_MODE_TRANSPOSE:
 				n = step.m_value;
 				n = 12 - n + layer.get_scroll_ofs();
 				if(n >= 0 && n <= 12) {
