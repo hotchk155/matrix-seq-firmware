@@ -248,7 +248,7 @@ class CSequenceEditor {
 				// action to shift all points left or right
 				if(what == ACTION_ENC_LEFT) {
 					if(--m_edit_value <= -(GRID_WIDTH-1)) {
-						m_edit_value = 0;
+						m_edit_value = -(GRID_WIDTH-1);
 					}
 					layer.shift_horizontal(-1);
 				}

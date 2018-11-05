@@ -106,7 +106,7 @@ class CSequenceLayer {
 	void shift_right(byte with_gates) {
 
 		CSequenceStep step = m_cfg.m_step[MAX_STEPS-1];
-		for(int i = 0; i<MAX_STEPS-1; ++i) {
+		for(int i = MAX_STEPS-1; i>0; --i) {
 			if(with_gates) {
 				m_cfg.m_step[i] = m_cfg.m_step[i-1];
 			}
@@ -265,7 +265,7 @@ public:
 		m_cfg.m_cv_scale = V_SQL_CVSCALE_1VOCT;
 		m_cfg.m_cv_range = 5;
 		m_cfg.m_cv_glide = V_SQL_CVGLIDE_OFF;
-		m_cfg.m_tran_trig = V_SQL_TRAN_TRIG_THIS;
+		m_cfg.m_tran_trig = V_SQL_TRAN_TRIG_ORIG;
 		m_cfg.m_tran_acc = V_SQL_TRAN_ACC_ACCENT;
 	}
 
@@ -903,40 +903,56 @@ public:
 //TODO - MIDI
 	void action_step_note(byte which, CSequenceStep step_for_transpose, byte midi_vel_accent, byte midi_vel, byte action_gate) {
 
-		//////////////////////////////
-		// handle transposition
 		CSequenceStep step;
 		step.reset_all();
-		int transposed;
-		switch(m_cfg.m_mode) {
-		case V_SQL_SEQ_MODE_TRANSPOSE:
+
+		if(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
+			// handle transposition
+			step = step_for_transpose;
+			byte do_transpose = 1;
 			if(m_cfg.m_tran_acc == V_SQL_TRAN_ACC_LOCK) {
-				 if(step_for_transpose.is_accent()) {
-					 transposed = (int)step_for_transpose.m_value + m_state.m_step_value.m_value - 64;
-					 if(transposed >= 0 && transposed < 128) {
-						step = step_for_transpose;
-						step.m_value = transposed;
-					 }
-				 }
-				 else {
-					step = step_for_transpose;
+				if(step.is_accent()) {
+					// this this mode the accent flag is used to mean that this
+					// step should not be transposed. It should not be treated
+					// as an accent
+					do_transpose = 0;
 					step.clear_accent();
-				 }
+				}
 			}
-			else {
-				transposed = (int)step_for_transpose.m_value + m_state.m_step_value.m_value - 64;
+			if(do_transpose) {
+				int transposed = (int)step_for_transpose.m_value + m_state.m_step_value.m_value - 64;
 				if(transposed >= 0 && transposed < 128) {
-					step = step_for_transpose;
 					step.m_value = transposed;
 				}
 			}
-			break;
-		default:
+
+			// handle special trigger modes
+			switch(m_cfg.m_tran_trig) {
+			case V_SQL_TRAN_TRIG_AND:
+				step.set_gate(step_for_transpose.get_gate() & m_state.m_step_value.get_gate());
+				break;
+			case V_SQL_TRAN_TRIG_OR:
+				step.set_gate(step_for_transpose.get_gate() | m_state.m_step_value.get_gate());
+				break;
+			case V_SQL_TRAN_TRIG_XOR:
+				step.set_gate(step_for_transpose.get_gate() ^ m_state.m_step_value.get_gate());
+				break;
+			case V_SQL_TRAN_TRIG_ORIG:
+				step.set_gate(step_for_transpose.get_gate());
+				break;
+			case V_SQL_TRAN_TRIG_THIS:
+			default:
+				step.set_gate(m_state.m_step_value.get_gate());
+				break;
+			}
+
+			step.m_is_data_point |= m_state.m_step_value.m_is_data_point;
+		}
+		else {
 			step = m_state.m_step_value;
 		}
 
-		//////////////////////////////
-		// is there any step to process?
+		// is there a change to the CV output?
 		if(step.m_is_data_point) {
 
 			// get the note we need to play, taking into account being
@@ -958,71 +974,29 @@ public:
 			else {
 				g_cv_gate.pitch_cv(which, note, m_cfg.m_cv_scale, 0);
 			}
+		}
 
-			// peek at the following step
-			CSequenceStep next_step = get_step(next_step_index(m_state.m_play_pos));
-			if(next_step.is_gate_open() && !next_step.is_trigger()) {
-				// the next step will extend the current one
-				m_state.m_gate_timeout = 0;
-			}
-			else {
-//TODO note duration
-				m_state.m_gate_timeout = g_clock.get_ms_for_measure(m_cfg.m_step_rate);
-			}
-
-			CSequenceStep gates = step;
-			if(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
-				switch(m_cfg.m_tran_trig) {
-				case V_SQL_TRAN_TRIG_AND:
-					if(step.is_gate_open() && step_for_transpose.is_gate_open()) {
-						if(step.is_trigger() && step_for_transpose.is_trigger()) {
-							gates.set_gate(CSequenceStep::GATE_RETRIG);
-						}
-						else {
-							gates.set_gate(CSequenceStep::GATE_OPEN);
-						}
-					}
-					break;
-				case V_SQL_TRAN_TRIG_OR:
-					if(step.is_gate_open() || step_for_transpose.is_gate_open()) {
-						if(step.is_trigger() || step_for_transpose.is_trigger()) {
-							gates.set_gate(CSequenceStep::GATE_RETRIG);
-						}
-						else {
-							gates.set_gate(CSequenceStep::GATE_OPEN);
-						}
-					}
-					break;
-				case V_SQL_TRAN_TRIG_XOR:
-					if(step.is_gate_open() ^ step_for_transpose.is_gate_open()) {
-						if(step.is_trigger() ^ step_for_transpose.is_trigger()) {
-							gates.set_gate(CSequenceStep::GATE_RETRIG);
-						}
-						else {
-							gates.set_gate(CSequenceStep::GATE_OPEN);
-						}
-					}
-					break;
-				case V_SQL_TRAN_TRIG_THAT:
-					gates = step_for_transpose;
-					break;
-				}
-			}
-
-
-			// perform the appropriate gate action
-			if(gates.is_trigger()) {
-				g_cv_gate.gate(which, CCVGate::GATE_RETRIG);
-			}
-			else if(gates.is_gate_open()) {
-				g_cv_gate.gate(which, CCVGate::GATE_OPEN);
-			}
-			else {
-				g_cv_gate.gate(which, CCVGate::GATE_CLOSED);
-			}
+		// peek at the following step
+		int gate_timeout = 0;
+		CSequenceStep next_step = get_step(next_step_index(m_state.m_play_pos));
+		if(next_step.is_gate_open() && next_step.is_trigger()) {
+			// leave as zero
 		}
 		else {
-			// no step - ensure the gate is closed at this step
+//TODO note duration
+			gate_timeout = g_clock.get_ms_for_measure(m_cfg.m_step_rate);
+		}
+
+		// perform the appropriate gate action
+		if(step.is_trigger()) {
+			g_cv_gate.gate(which, CCVGate::GATE_RETRIG);
+			m_state.m_gate_timeout = gate_timeout;
+		}
+		else if(step.is_gate_open()) {
+			g_cv_gate.gate(which, CCVGate::GATE_OPEN);
+			m_state.m_gate_timeout = gate_timeout;
+		}
+		else {
 			g_cv_gate.gate(which, CCVGate::GATE_CLOSED);
 			m_state.m_gate_timeout = 0;
 		}

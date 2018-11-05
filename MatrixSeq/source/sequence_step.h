@@ -23,19 +23,22 @@
 //
 class CSequenceStep {
 public:
-	typedef enum {
+	enum {
 		GATE_NONE = 0,
 		GATE_OPEN = 0x01,
 		GATE_RETRIG = 0x03,
 		GATE_ACCENT = 0x07
-	} GATE_TYPE;
+	};
 
 	byte m_is_data_point:1; // is this a "user" data point rather than an automatic one?
 	byte m_gate_type:3;
 	byte m_value;
 
-	void set_gate(GATE_TYPE gate) {
+	void set_gate(int gate) {
 		m_gate_type = gate;
+	}
+	int get_gate() {
+		return m_gate_type;
 	}
 	inline int is_gate_open() {
 		return (m_gate_type & 0x01);
