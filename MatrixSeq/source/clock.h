@@ -13,6 +13,7 @@
 //  BEAT CLOCK HANDLING
 //
 ///////////////////////////////////////////////////////////////////////////////////
+#pragma GCC diagnostic ignored "-Wswitch"
 
 #ifndef CLOCK_H_
 #define CLOCK_H_
@@ -28,43 +29,108 @@ CPulseOut<kGPIO_PORTC, 5> g_clock_out;
 // generated based on a once-per-millisecond interrupt
 class CClock {
 
+	enum {
+		CLOCK_OUT_WIDTH = 15, //ms
+		CLOCK_OUT_WIDTH_24PPQN = 5 //ms
+	};
+	/////////////////////////////////////////////////////////////////
+	// called on a 24ppqn tick
+	inline void private_on_tick() {
+		static const byte c_out_clock_rate[V_CLOCK_OUT_RATE_MAX] = {
+				  RATE_1,	RATE_2D,	RATE_2,		RATE_4D,	RATE_2T,
+				  RATE_4,	RATE_8D,	RATE_4T,	RATE_8,		RATE_16D,
+				  RATE_8T,  RATE_16,	RATE_16T,	RATE_32,   RATE_24PPQN
+		};
+		if(!m_beat_count) {
+			g_tempo_led.blink(g_tempo_led.MEDIUM_BLINK);
+		}
+		if(++m_beat_count >= RATE_4) {
+			m_beat_count = 0;
+		}
+
+		byte out_clock_div = c_out_clock_rate[m_cfg.m_clock_out_rate];
+		if(!m_pulse_clock_count) {
+			if(m_cfg.m_clock_out_rate == V_CLOCK_OUT_RATE_24PPQN) {
+				g_clock_out.blink(CLOCK_OUT_WIDTH_24PPQN);
+			}
+			else {
+				g_clock_out.blink(CLOCK_OUT_WIDTH);
+			}
+		}
+		if(++m_pulse_clock_count >= out_clock_div) {
+			m_pulse_clock_count = 0;
+		}
+	}
+
 
 public:
+	///////////////////////////////////////////////////////////////////////////////
+	// called when external clock tick received
+	void on_clock_in(int rate) {
+		// use the time since the last tick to adjust the internal
+		// clock speed
+		if(m_clock_in_ms_last && m_ms > m_clock_in_ms_last) {
+			m_ticks_per_ms = (double)rate / (m_ms - m_clock_in_ms_last);
+		}
+		m_clock_in_ms_last = m_ms;
+
+		// update the tick counter
+		m_clock_in_ticks_now = m_clock_in_ticks_next;
+		m_clock_in_ticks_next += rate;
+	}
+
 
 	// Define different musical beat intervals based on
 	// number of 24ppqn ticks
 	enum
 	{
-	  RATE_1    = 96,
-	  RATE_2D   = 72,
-	  RATE_2    = 48,
-	  RATE_4D   = 36,
-	  RATE_2T   = 32,
-	  RATE_4    = 24,
-	  RATE_8D   = 18,
-	  RATE_4T   = 16,
-	  RATE_8    = 12,
-	  RATE_16D  = 9,
-	  RATE_8T   = 8,
-	  RATE_16   = 6,
-	  RATE_16T  = 4,
-	  RATE_32   = 3
+	  RATE_1    	= 96,
+	  RATE_2D   	= 72,
+	  RATE_2    	= 48,
+	  RATE_4D   	= 36,
+	  RATE_2T   	= 32,
+	  RATE_4    	= 24,
+	  RATE_8D   	= 18,
+	  RATE_4T   	= 16,
+	  RATE_8    	= 12,
+	  RATE_16D  	= 9,
+	  RATE_8T   	= 8,
+	  RATE_16   	= 6,
+	  RATE_16T  	= 4,
+	  RATE_32   	= 3,
+	  RATE_24PPQN	= 1
 	};
 
+	// the actual tick counter, based on a 24ppqn tick and floating point part ticks
+	volatile uint32_t m_ticks;
+	volatile double m_part_tick;
+
+	//int m_ext_clock_rate;		// the number of 24ppqn ticks represented by external clock event
+	volatile uint32_t m_next_ext_tick;	// the number of ticks that have passed when next external clock event received
 
 	float m_bpm;
 	volatile double m_ticks_per_ms;
-	volatile double m_part_tick;
 	volatile byte m_ms_tick;
-	volatile uint32_t m_ticks;
 	//uint32_t m_midi_ticks;
 	volatile byte m_beat_count;
 	volatile byte m_pulse_clock_count;
-	byte m_pulse_clock_div;
+	//byte m_pulse_clock_div;
+	volatile unsigned int m_ms;
+	volatile uint32_t m_clock_in_ms_last;
+	volatile uint32_t m_clock_in_ticks_now;
+	volatile uint32_t m_clock_in_ticks_next;
 
+	//volatile uint32_t m_ticks_at_next_ext_event;
+	//volatile uint32_t m_ticks_absolute;
+
+	//volatile uint32_t m_ticks_at_next_ext_event;
+
+	///////////////////////////////////////////////////////////////////////////////
+	// Config structure that defines info to store at power off
 	typedef struct {
 		V_CLOCK_SRC m_source;
-		byte m_pulse_clock_div;
+		V_CLOCK_IN_RATE m_clock_in_rate;
+		V_CLOCK_OUT_RATE m_clock_out_rate;
 	} CONFIG;
 	CONFIG m_cfg;
 
@@ -86,6 +152,7 @@ public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	void init_state() {
+		m_ms = 0;
 		m_ms_tick = 0;
 		set_bpm(120);
 		on_restart();
@@ -94,7 +161,8 @@ public:
 	///////////////////////////////////////////////////////////////////////////////
 	void init_config() {
 		m_cfg.m_source = V_CLOCK_SRC_INTERNAL;
-		m_cfg.m_pulse_clock_div = RATE_8;
+		m_cfg.m_clock_in_rate = V_CLOCK_IN_RATE_8;
+		m_cfg.m_clock_out_rate = V_CLOCK_OUT_RATE_8;
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -118,27 +186,24 @@ public:
 		KBI_Init(KBI0, &kbiConfig);
 	}
 
-	inline void private_on_tick() {
-		if(!m_beat_count) {
-			g_tempo_led.blink(g_tempo_led.MEDIUM_BLINK);
-		}
-		if(++m_beat_count >= 24) {
-			m_beat_count = 0;
-		}
-
-		if(!m_pulse_clock_count) {
-			g_clock_out.blink(15);
-		}
-		if(++m_pulse_clock_count >= m_cfg.m_pulse_clock_div) {
-			m_pulse_clock_count = 0;
-		}
-	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	void set(PARAM_ID param, int value) {
 		switch(param) {
-			case P_CLOCK_BPM: set_bpm(value); break;
-			case P_CLOCK_SRC: m_cfg.m_source = (V_CLOCK_SRC)value; break;
+			case P_CLOCK_BPM:
+				set_bpm(value);
+				break;
+			case P_CLOCK_SRC:
+				m_cfg.m_source = (V_CLOCK_SRC)value;
+				fire_event(EV_CLOCK_RESET, 0);
+				break;
+			case P_CLOCK_IN_RATE:
+				m_cfg.m_clock_in_rate = (V_CLOCK_IN_RATE)value;
+				fire_event(EV_CLOCK_RESET, 0);
+				break;
+			case P_CLOCK_OUT_RATE:
+				m_cfg.m_clock_out_rate = (V_CLOCK_OUT_RATE)value;
+				break;
 		default:
 			break;
 		}
@@ -149,6 +214,8 @@ public:
 		switch(param) {
 		case P_CLOCK_BPM: return m_bpm;
 		case P_CLOCK_SRC: return m_cfg.m_source;
+		case P_CLOCK_IN_RATE: return m_cfg.m_clock_in_rate;
+		case P_CLOCK_OUT_RATE: return m_cfg.m_clock_out_rate;
 		default: return 0;
 		}
 	}
@@ -157,6 +224,7 @@ public:
 	int is_valid_param(PARAM_ID param) {
 		switch(param) {
 		case P_CLOCK_BPM: return !!(m_cfg.m_source == V_CLOCK_SRC_INTERNAL);
+		case P_CLOCK_IN_RATE: return !!(m_cfg.m_source == V_CLOCK_SRC_EXTERNAL);
 		default: return 1;
 		}
 	}
@@ -189,8 +257,7 @@ public:
 	///////////////////////////////////////////////////////////////////////////////
 	void on_midi_tick() {
 		if(m_cfg.m_source == V_CLOCK_SRC_MIDI) {
-			++m_ticks;
-			private_on_tick();
+			on_clock_in(RATE_24PPQN);
 		}
 	}
 
@@ -200,17 +267,37 @@ public:
 		m_part_tick = 0.0;
 		m_beat_count = 0;
 		m_pulse_clock_count = 0;
+		m_clock_in_ticks_now = 0;
+		m_clock_in_ticks_next = 0;
+		m_clock_in_ms_last = 0;
+
+
 	}
+
+
 
 	///////////////////////////////////////////////////////////////////////////////
 	// Interrupt service routine called once per millisecond
-	inline void tick_isr() {
+	void tick_isr() {
 
+		++m_ms;
 		// set flag to indicate that a milliecond has elapsed
 		// this is used for general timing purposes
 		m_ms_tick = 1;
 
-		if(m_cfg.m_source == V_CLOCK_SRC_INTERNAL) {
+		if(m_clock_in_ticks_next && m_ticks >= m_clock_in_ticks_next) {
+			// hold the clock back until there is another
+			// external tick event
+		}
+		else if(m_ticks < m_clock_in_ticks_now) {
+			// catch the clock up
+			while(m_ticks < m_clock_in_ticks_now) {
+				private_on_tick();
+				++m_ticks;
+				m_part_tick = 0;
+			}
+		}
+		else {
 			// add the fractional number of ticks per millisecond to
 			// the tick counter and see whether we now have at least
 			// one complete tick
@@ -221,6 +308,15 @@ public:
 				m_part_tick -= whole_tick;
 				private_on_tick();
 			}
+		}
+	}
+
+	inline void ext_clock_isr() {
+		static const byte c_in_clock_rate[V_CLOCK_IN_RATE_MAX] = {
+			RATE_16, RATE_8, RATE_4, RATE_24PPQN
+		};
+		if(m_cfg.m_source == V_CLOCK_SRC_EXTERNAL) {
+			on_clock_in(c_in_clock_rate[m_cfg.m_clock_in_rate]);
 		}
 	}
 };
@@ -245,8 +341,8 @@ extern "C" void PIT_CH0_IRQHandler(void) {
 extern "C" void KBI0_IRQHandler(void)
 {
     if (KBI_IsInterruptRequestDetected(KBI0)) {
-//TODO - clock based on interpolated pulse in
         KBI_ClearInterruptFlag(KBI0);
+        g_clock.ext_clock_isr();
     }
 }
 

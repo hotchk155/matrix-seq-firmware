@@ -31,7 +31,7 @@ public:
 		ACTION_VALUE_SELECTED,
 		ACTION_VALUE_CHANGED,
 
-		NUM_MENU_OPTS = 20,
+		NUM_MENU_OPTS = 22,
 
 	};
 	const OPTION m_opts[NUM_MENU_OPTS] = {
@@ -53,8 +53,10 @@ public:
 			{"TRG", P_SQL_TRAN_TRIG, PT_ENUMERATED, "ORIG|THIS|AND|OR|XOR"},
 			{"ACC", P_SQL_TRAN_ACC,  PT_ENUMERATED, "NORM|LOCK"},
 			{0},
-			{"CLK", P_CLOCK_SRC, PT_ENUMERATED, "INT|MIDI"},
-			{"BPM", P_CLOCK_BPM, PT_BPM}
+			{"CLK", P_CLOCK_SRC, PT_ENUMERATED, "INT|MIDI|EXT"},
+			{"BPM", P_CLOCK_BPM, PT_BPM},
+			{"IN", P_CLOCK_IN_RATE, PT_ENUMERATED, "16|8|4|24PP"},
+			{"OUT", P_CLOCK_OUT_RATE, PT_ENUMERATED, "1|2D|2|4D|2T|4|8D|4T|8|16D|8T|16|16T|32|24PP"}
 	};
 
 
@@ -62,8 +64,9 @@ public:
 	//const OPTION *m_opts;
 
 	byte m_item;
-	byte m_value;
+	int m_value;
 	byte m_repaint;
+
 	byte m_action;
 
 	/////////////////////////////////////////////////////////////////////////////////////////////////

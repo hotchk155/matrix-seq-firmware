@@ -173,16 +173,22 @@ void fire_event(int event, uint32_t param) {
 		break;
 	///////////////////////////////////
 	case EV_SEQ_RESTART:
-		g_sequencer.reset();
-		g_sequencer.start();
 		g_popup.text("RST", 3);
 		g_popup.align(CPopup::ALIGN_RIGHT);
+		g_clock.on_restart();
+		g_sequencer.reset();
+		g_sequencer.start();
 		break;
 	///////////////////////////////////
 	case EV_SEQ_START:
 		g_sequencer.start();
 		g_popup.text("RUN", 3);
 		g_popup.align(CPopup::ALIGN_RIGHT);
+		break;
+	///////////////////////////////////
+	case EV_CLOCK_RESET:
+		g_clock.on_restart();
+		g_sequencer.reset();
 		break;
 	default:
 		dispatch_event(event, param);
