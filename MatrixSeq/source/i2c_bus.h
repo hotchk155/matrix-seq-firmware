@@ -21,53 +21,109 @@
 void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle, status_t status, void *userData);
 
 class CI2CBus{
-	enum {
-		BUFFER_SIZE = 100,
-		DAC_ADDRESS = 0b1100000,
-		EEPROM_ADDRESS = 0b1010000
-	};
+
+public:
+	typedef struct {
+		byte addr;				// i2c address of device
+		uint16_t location;		// "subaddress" (e.g. EEPROM address)
+		byte location_size;		// size of sub address
+		byte *data;				// pointer to data buffer
+		int data_len;			// amount of data in the buffer
+		status_t status;		// status of the transaction
+		byte pending;
+	} TRANSACTION;
+private:
+//	enum {
+	//	BUFFER_SIZE = 100
+		//DAC_ADDRESS = 0b1100000,
+		//EEPROM_ADDRESS = 0b1010000
+	//};
 	i2c_master_handle_t m_handle;
 	i2c_master_transfer_t m_xfer;
-	byte m_buf[BUFFER_SIZE];
-	size_t m_len;
+	//volatile byte m_busy;
+	volatile TRANSACTION *m_txn;
+	//volatile status_t m_status;
+	//byte m_buf[BUFFER_SIZE];
+	//size_t m_len;
 public:
 
-	static volatile byte s_busy;
-	static volatile byte m_transaction;
 
+	CI2CBus() :
+		m_txn(NULL)
+	{
+	}
 	void init() {
 		i2c_master_config_t masterConfig;
 		I2C_MasterGetDefaultConfig(&masterConfig);
 		I2C_MasterInit(I2C0, &masterConfig, CLOCK_GetFreq(kCLOCK_BusClk));
 		I2C_Enable(I2C0, true);
+
 	}
 
 	inline byte busy() {
-		return s_busy;
-	}
-	inline byte transaction() {
-		return m_transaction;
-	}
-	void wait() {
-		while(s_busy);
+		return !!m_txn;
 	}
 
-	byte write(byte addr, int len) {
-		m_len = len;
-		m_xfer.slaveAddress = addr;
-		m_xfer.direction = kI2C_Write;
-		m_xfer.subaddress = 0;
-		m_xfer.subaddressSize = 0;
-		m_xfer.data = m_buf;
-		m_xfer.dataSize = m_len;
-		m_xfer.flags = kI2C_TransferDefaultFlag;
-		byte txn = m_transaction;
-		I2C_MasterTransferCreateHandle(I2C0, &m_handle, i2c_master_callback, NULL);
-		s_busy = 1;
-		I2C_MasterTransferNonBlocking(I2C0, &m_handle, &m_xfer);
-		return txn;
+	//inline byte transaction() {
+		//return m_transaction;
+	//}
+	//void wait() {
+		//while(s_busy);
+	//}
+
+	//	void transmit(byte addr, uint16_t subaddress, byte subaddressSize, byte *buf, int len) {
+	byte transmit(volatile TRANSACTION *txn) {
+		if(!m_txn) {
+			m_xfer.slaveAddress = txn->addr;
+			m_xfer.direction = kI2C_Write;
+			m_xfer.subaddress = txn->location;
+			m_xfer.subaddressSize = txn->location_size;
+			m_xfer.data = txn->data;
+			m_xfer.dataSize = txn->data_len;
+			m_xfer.flags = kI2C_TransferDefaultFlag;
+			I2C_MasterTransferCreateHandle(I2C0, &m_handle, i2c_master_callback, NULL);
+			m_txn = txn;
+			m_txn->pending = 1;
+			I2C_MasterTransferNonBlocking(I2C0, &m_handle, &m_xfer);
+			return 1;
+		}
+		else {
+			return 0;
+		}
 	}
 
+
+	byte receive(volatile TRANSACTION *txn) {
+//	void receive(byte addr, uint16_t subaddress, byte subaddressSize, byte *data, int size) {
+		if(!m_txn) {
+			m_xfer.slaveAddress = txn->addr;
+			m_xfer.direction = kI2C_Read;
+			m_xfer.subaddress = txn->location;
+			m_xfer.subaddressSize = txn->location_size;
+			m_xfer.data = txn->data;
+			m_xfer.dataSize = txn->data_len;
+			m_xfer.flags = kI2C_TransferDefaultFlag;
+			I2C_MasterTransferCreateHandle(I2C0, &m_handle, i2c_master_callback, NULL);
+			m_txn = txn;
+			m_txn->pending = 1;
+			I2C_MasterTransferNonBlocking(I2C0, &m_handle, &m_xfer);
+			return 1;
+		}
+		else {
+			return 0;
+		}
+	}
+
+	inline void on_txn_complete(I2C_Type *base, i2c_master_handle_t *handle, status_t status, void *userData) {
+		if(m_txn) {
+			m_txn->status = status;
+			m_txn->data_len = m_xfer.dataSize;
+			m_txn->pending = 0;
+			m_txn = NULL;
+		}
+	}
+
+/*
 	//M24256 EEPROM
 	status_t write_eeprom(uint16_t eeprom_addr, byte *data, int size) {
 		status_t result = kStatus_Fail;
@@ -125,7 +181,8 @@ public:
 	void write_blocking(byte addr, int len) {
 		write(addr, len);
 		wait();
-	}
+	}*/
+	/*
 	void dac_init() {
 		m_buf[0] = 0b10001111; // set each channel to use internal vref
 		write_blocking(DAC_ADDRESS, 1);
@@ -142,16 +199,13 @@ public:
 		m_buf[6] = ((dac[3]>>8) & 0xF);
 		m_buf[7] = (byte)dac[3];
 		write(DAC_ADDRESS, 8);
-	}
+	}*/
 };
 
 CI2CBus g_i2c_bus;
 void i2c_master_callback(I2C_Type *base, i2c_master_handle_t *handle, status_t status, void *userData)
 {
-	CI2CBus::s_busy = 0;
-	CI2CBus::m_transaction++;
+	g_i2c_bus.on_txn_complete(base, handle, status, userData);
 }
-volatile byte CI2CBus::s_busy = 0;
-volatile byte CI2CBus::m_transaction = 0;
 
 #endif /* I2C_BUS_H_ */

@@ -17,6 +17,9 @@
 #ifndef CV_GATE_H_
 #define CV_GATE_H_
 
+//
+// MACRO DEFS
+//
 #define PORTD_BIT_GATE4 4
 #define PORTD_BIT_GATE2 3
 #define PORTD_BIT_GATE3 2
@@ -27,13 +30,20 @@
 #define BIT_GATE3		MK_GPIOA_BIT(PORTD_BASE, PORTD_BIT_GATE3)
 #define BIT_GATE1		MK_GPIOA_BIT(PORTA_BASE, PORTA_BIT_GATE1)
 
+//
+// GLOBAL DATA
+//
+
 // These definitions are used to initialise the port
 CDigitalOut<kGPIO_PORTA, PORTA_BIT_GATE1> g_gate_1;
 CDigitalOut<kGPIO_PORTD, PORTD_BIT_GATE2> g_gate_2;
 CDigitalOut<kGPIO_PORTD, PORTD_BIT_GATE3> g_gate_3;
 CDigitalOut<kGPIO_PORTD, PORTD_BIT_GATE4> g_gate_4;
 
-
+/////////////////////////////////////////////////////////////////////////////////
+//
+// CLASS WRAPS UP CV AND GATE FUNCTIONS
+//
 /////////////////////////////////////////////////////////////////////////////////
 class CCVGate {
 public:
@@ -44,22 +54,31 @@ public:
 	} GATE_STATE;
 	enum {
 		MAX_CV = 4,
-		MAX_GATE = 4
+		MAX_GATE = 4,
+		I2C_BUF_SIZE = 100
 	};
 
 	typedef struct {
 		int pitch;			// 32-bit current pitch value (dac << 16)
 		int target;  		// 32-bit current target value (dac << 16)
 		int glide_rate;  	// glide rate applied per ms to the pitch
+		uint16_t dac;		// raw 12-bit DAC value
 	} CV_STATE;
 
 
+	enum {
+		DAC_INIT_PENDING_1,
+		DAC_INIT_PENDING_2,
+		DAC_DATA_PENDING,
+		DAC_IDLE
+	};
 
 	CV_STATE m_cv[MAX_CV];
-	uint16_t m_dac[MAX_CV];
 	GATE_STATE m_gate[MAX_GATE];
-	byte m_cv_pending;
+	byte m_dac_state;
 	byte m_gate_pending;
+	byte m_i2c_buf[I2C_BUF_SIZE];
+	volatile CI2CBus::TRANSACTION m_txn;
 
 	/////////////////////////////////////////////////////////////////////////////////
 	void gate_on(byte which) {
@@ -85,19 +104,20 @@ public:
 	{
 		// get the appropriate offset into the DAC structure
 		// for the target CV output
-		int ofs;
+/*		int ofs;
 		switch(which) {
 		case 1: ofs = 1; break;
 		case 2: ofs = 2; break;
 		case 3: ofs = 0; break;
 		default: ofs = 3; break;
-		}
+		}*/
 
-		// if the output has changed then load the new one
-		if(m_dac[ofs] != dac) {
-			g_cv_led.blink(g_cv_led.MEDIUM_BLINK);
-			m_dac[ofs] = dac;
-			m_cv_pending = 1;
+		if(m_dac_state >= DAC_DATA_PENDING) {
+			// if the output has changed then load the new one
+			if(m_cv[which].dac != dac) {
+				m_cv[which].dac = dac;
+				m_dac_state = DAC_DATA_PENDING;
+			}
 		}
 	}
 
@@ -117,12 +137,20 @@ public:
 
 
 	/////////////////////////////////////////////////////////////////////////////////
-	CCVGate() {
+	CCVGate()
+	{
 		memset((byte*)m_cv,0,sizeof m_cv);
-		memset((byte*)m_dac,0,sizeof m_dac);
 		memset((byte*)m_gate,0,sizeof m_gate);
-		m_cv_pending = 0;
 		m_gate_pending = 0;
+		m_dac_state = DAC_INIT_PENDING_1;
+
+		m_txn.addr = I2C_ADDR_DAC;
+		m_txn.location = 0;
+		m_txn.location_size = 0;
+		m_txn.data = m_i2c_buf;
+		m_txn.data_len = I2C_BUF_SIZE;
+		m_txn.status  = kStatus_Success;
+		m_txn.pending = 0;
 	}
 
 
@@ -141,6 +169,8 @@ public:
 					g_gate_led.blink(g_gate_led.MEDIUM_BLINK);
 					break;
 				case GATE_OPEN:
+					gate_on(which);
+//TODO - gate sync with CV change on pitch channel
 					m_gate[which] = GATE_OPEN;
 					m_gate_pending = 1;
 					g_gate_led.blink(g_gate_led.MEDIUM_BLINK);
@@ -199,28 +229,45 @@ public:
 		impl_set_cv(which, dac);
 	}
 
+
 	/////////////////////////////////////////////////////////////////////////////////
-	void service() {
-
-		// if we have CV data to send and the bus is clear
-		// then send out the CV data to DAC
-		if(!g_i2c_bus.busy()) {
-			if(m_cv_pending) {
-				g_i2c_bus.dac_write(m_dac);
-				m_cv_pending = 0;
-			}
+	// get block of data to send to i2c
+	void run_i2c() {
+		if(g_i2c_bus.busy()) {
+			return;
 		}
-		if(m_gate_pending) { // rising edge pending?
-			for(int i=0; i<4; ++i) {
-				if(m_gate[i] == GATE_OPEN) {
-					gate_on(i);
-				}
-			}
-			m_gate_pending = 0;
+		switch(m_dac_state) {
+		case DAC_INIT_PENDING_1:
+			m_i2c_buf[0] = 0b10001111; // set each channel to use internal vref
+			m_txn.data_len = 1;
+			g_i2c_bus.transmit(&m_txn);
+			m_dac_state = DAC_INIT_PENDING_2;
+			break;
+		case DAC_INIT_PENDING_2:
+			m_i2c_buf[0] = 0b11001111; // set x2 gain on each channel
+			m_txn.data_len = 1;
+			g_i2c_bus.transmit(&m_txn);
+			m_dac_state = DAC_IDLE;
+			break;
+		case DAC_DATA_PENDING:
+			m_i2c_buf[0] = ((m_cv[3].dac>>8) & 0xF);
+			m_i2c_buf[1] = (byte)m_cv[3].dac;
+			m_i2c_buf[2] = ((m_cv[2].dac>>8) & 0xF);
+			m_i2c_buf[3] = (byte)m_cv[2].dac;
+			m_i2c_buf[4] = ((m_cv[1].dac>>8) & 0xF);
+			m_i2c_buf[5] = (byte)m_cv[1].dac;
+			m_i2c_buf[6] = ((m_cv[0].dac>>8) & 0xF);
+			m_i2c_buf[7] = (byte)m_cv[0].dac;
+			m_txn.data_len = 8;
+			g_i2c_bus.transmit(&m_txn);
+			g_cv_led.blink(g_cv_led.MEDIUM_BLINK);
+			m_dac_state = DAC_IDLE;
+			break;
+		case DAC_IDLE:
+		default:
+			break;
 		}
-	//TODO gate sync with CV in note mode
 	}
-
 
 	/////////////////////////////////////////////////////////////////////////////////
 	// called once per ms

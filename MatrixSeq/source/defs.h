@@ -30,6 +30,9 @@ enum {
 	EV_CLOCK_RESET
 };
 
+#define I2C_ADDR_DAC 	0b1100000
+#define I2C_ADDR_EEPROM	0b1010000
+
 
 typedef unsigned char byte;
 

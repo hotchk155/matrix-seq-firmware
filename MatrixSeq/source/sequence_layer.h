@@ -76,6 +76,7 @@ class CSequenceLayer {
 
 	CONFIG m_cfg;				// instance of config
 	STATE m_state;
+	CScale& m_scale;
 
 	//
 	// PRIVATE METHODS
@@ -242,11 +243,14 @@ class CSequenceLayer {
 
 public:
 	///////////////////////////////////////////////////////////////////////////////
-	CSequenceLayer() {
+	CSequenceLayer(CScale &scale) : m_scale(scale) {
 		init_config();
 		init_state();
 	}
-
+	///////////////////////////////////////////////////////////////////////////////
+	inline CScale& get_scale() {
+		return m_scale;
+	}
 	///////////////////////////////////////////////////////////////////////////////
 	void init_config() {
 		for(int i=0; i<MAX_STEPS; ++i) {
@@ -427,10 +431,10 @@ public:
 				// changing from short scale to chromatic mode...
 				for(int i=0; i<MAX_STEPS; ++i) {
 					if(m_cfg.m_step[i].m_is_data_point) {
-						m_cfg.m_step[i].m_value = g_scale.index_to_note(m_cfg.m_step[i].m_value);
+						m_cfg.m_step[i].m_value = m_scale.index_to_note(m_cfg.m_step[i].m_value);
 					}
 				}
-				m_state.m_scroll_ofs = g_scale.index_to_note(m_state.m_scroll_ofs);
+				m_state.m_scroll_ofs = m_scale.index_to_note(m_state.m_scroll_ofs);
 			}
 			else {
 				reset_data_points(DEFAULT_NOTE);
@@ -443,13 +447,13 @@ public:
 				// changing from chromatic to short scale mode...
 				for(int i=0; i<MAX_STEPS; ++i) {
 					if(m_cfg.m_step[i].m_is_data_point) {
-						m_cfg.m_step[i].m_value = g_scale.note_to_index(m_cfg.m_step[i].m_value);
+						m_cfg.m_step[i].m_value = m_scale.note_to_index(m_cfg.m_step[i].m_value);
 					}
 				}
-				m_state.m_scroll_ofs = g_scale.note_to_index(m_state.m_scroll_ofs);
+				m_state.m_scroll_ofs = m_scale.note_to_index(m_state.m_scroll_ofs);
 			}
 			else {
-				int default_index = g_scale.note_to_index(DEFAULT_NOTE);
+				int default_index = m_scale.note_to_index(DEFAULT_NOTE);
 				reset_data_points(default_index);
 				m_state.m_scroll_ofs = default_index - 5;
 			}
@@ -487,7 +491,7 @@ public:
 			break;
 		case V_SQL_SEQ_MODE_SCALE:
 			value += delta;
-			max_value = g_scale.max_index();
+			max_value = m_scale.max_index();
 			break;
 		case V_SQL_SEQ_MODE_CHROMATIC:
 		case V_SQL_SEQ_MODE_TRANSPOSE:
@@ -959,10 +963,10 @@ public:
 			// forced into a scale
 			byte note = step.m_value;
 			if(m_cfg.m_mode == V_SQL_SEQ_MODE_SCALE) {
-				note = g_scale.index_to_note(note);
+				note = m_scale.index_to_note(note);
 			}
 			else if(m_cfg.m_force_scale == V_SQL_FORCE_SCALE_ON) {
-				note = g_scale.force_to_scale(note);
+				note = m_scale.force_to_scale(note);
 			}
 
 			// set up the pitch CV, handling the case where we need to "glide"

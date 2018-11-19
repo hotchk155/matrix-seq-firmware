@@ -20,6 +20,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 // SEQUENCER CLASS
 class CSequencer {
+
 	enum {
 		NUM_LAYERS = 4,	// number of layers in the sequence
 	};
@@ -27,34 +28,37 @@ class CSequencer {
 
 	// Config info that forms part of the patch
 	typedef struct {
-		V_SQL_SCALE_TYPE scale_type;
-		V_SQL_SCALE_ROOT scale_root;
-		byte 			m_midi_vel_accent;
-		byte 			m_midi_vel;
+		V_SQL_SCALE_TYPE 	m_scale_type;
+		V_SQL_SCALE_ROOT 	m_scale_root;
+		byte 				m_midi_vel_accent;
+		byte 				m_midi_vel;
 	} CONFIG;
 	CONFIG m_cfg;
 
 	byte m_is_running;
 	int m_cur_layer;			// this is the current layer being viewed/edited
 	CSequenceLayer m_layers[NUM_LAYERS];
-
+	CScale m_scale;
 public:
 
 	///////////////////////////////////////////////////////////////////////////////
 	// constructor
-	CSequencer() {
+	CSequencer() : m_layers{m_scale,m_scale,m_scale,m_scale}
+	{
 		init_config();
 		m_is_running = 0;
 		m_cur_layer = 0;
 	}
 
+
 	///////////////////////////////////////////////////////////////////////////////
 	// initialise the saved configuration
 	void init_config() {
-		m_cfg.scale_type = V_SQL_SCALE_TYPE_IONIAN;
-		m_cfg.scale_root = V_SQL_SCALE_ROOT_C;
+		m_cfg.m_scale_type = V_SQL_SCALE_TYPE_IONIAN;
+		m_cfg.m_scale_root = V_SQL_SCALE_ROOT_C;
 		m_cfg.m_midi_vel_accent = 127;
 		m_cfg.m_midi_vel = 100;
+		m_scale.build(m_cfg.m_scale_type, m_cfg.m_scale_root);
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -79,8 +83,8 @@ public:
 	// config setter
 	void set(PARAM_ID param, int value) {
 		switch(param) {
-		case P_SQL_SCALE_TYPE: m_cfg.scale_type = (V_SQL_SCALE_TYPE)value; break;
-		case P_SQL_SCALE_ROOT: m_cfg.scale_root = (V_SQL_SCALE_ROOT)value; break;
+		case P_SQL_SCALE_TYPE: m_cfg.m_scale_type = (V_SQL_SCALE_TYPE)value; m_scale.build(m_cfg.m_scale_type, m_cfg.m_scale_root); break;
+		case P_SQL_SCALE_ROOT: m_cfg.m_scale_root = (V_SQL_SCALE_ROOT)value; m_scale.build(m_cfg.m_scale_type, m_cfg.m_scale_root); break;
 		case P_SQL_MIDI_VEL_ACCENT: m_cfg.m_midi_vel_accent = value; break;
 		case P_SQL_MIDI_VEL: m_cfg.m_midi_vel = value; break;
 		default: m_layers[m_cur_layer].set(param,value);
@@ -91,8 +95,8 @@ public:
 	// config getter
 	int get(PARAM_ID param) {
 		switch(param) {
-		case P_SQL_SCALE_TYPE: return m_cfg.scale_type;
-		case P_SQL_SCALE_ROOT: return m_cfg.scale_root;
+		case P_SQL_SCALE_TYPE: return m_cfg.m_scale_type;
+		case P_SQL_SCALE_ROOT: return m_cfg.m_scale_root;
 		case P_SQL_MIDI_VEL_ACCENT: return m_cfg.m_midi_vel_accent;
 		case P_SQL_MIDI_VEL: return m_cfg.m_midi_vel;
 		default: return m_layers[m_cur_layer].get(param);

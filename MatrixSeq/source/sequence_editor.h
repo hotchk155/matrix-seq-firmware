@@ -75,7 +75,7 @@ class CSequenceEditor {
 		switch(layer.get_mode()) {
 		case V_SQL_SEQ_MODE_SCALE:
 			if(layer.get_mode() == V_SQL_SEQ_MODE_SCALE) {
-				value = g_scale.index_to_note(value);
+				value = layer.get_scale().index_to_note(value);
 			}
 			// fall thru
 		case V_SQL_SEQ_MODE_CHROMATIC:

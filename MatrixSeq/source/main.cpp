@@ -61,7 +61,6 @@
 #include "leds.h"
 #include "clock.h"
 #include "i2c_bus.h"
-#include "storage.h"
 #include "midi.h"
 #include "cv_gate.h"
 #include "scale.h"
@@ -73,6 +72,7 @@
 #include "params.h"
 #include "menu.h"
 #include "selector.h"
+#include "storage.h"
 
 
 
@@ -170,6 +170,7 @@ void fire_event(int event, uint32_t param) {
 		g_cv_gate.close_all_gates();
 		g_popup.text("STOP", 4);
 		g_popup.align(CPopup::ALIGN_RIGHT);
+g_storage.load_patch(0);
 		break;
 	///////////////////////////////////
 	case EV_SEQ_RESTART:
@@ -184,6 +185,7 @@ void fire_event(int event, uint32_t param) {
 		g_sequencer.start();
 		g_popup.text("RUN", 3);
 		g_popup.align(CPopup::ALIGN_RIGHT);
+g_storage.save_patch(0);
 		break;
 	///////////////////////////////////
 	case EV_CLOCK_RESET:
@@ -221,7 +223,7 @@ int main(void) {
     PowerControl.set(1);
 
     g_i2c_bus.init();
-    g_i2c_bus.dac_init();
+//    g_i2c_bus.dac_init();
     g_midi.init();
 
     //g_storage.test();
@@ -232,7 +234,7 @@ int main(void) {
     g_ui.init();
     //g_sequencer.m_layers[0].test();
 
-
+    byte i2c_priority = 0;
     while(1) {
 
     	if(g_clock.m_ms_tick) {
@@ -271,8 +273,20 @@ int main(void) {
 
     	}
 
-    	g_cv_gate.service();
-
+    	// run the i2c bus. If the bus is currently idle then check if we need to send
+    	// out CV information to the DAC, or transfer data to/from EEPROM. We alternately
+    	// prioritize each to allow interleavng of data when both are busy
+    	if(!g_i2c_bus.busy()) {
+    		if(i2c_priority) {
+    			g_cv_gate.run_i2c();
+    			g_storage.run_i2c();
+    		}
+    		else {
+    			g_storage.run_i2c();
+    			g_cv_gate.run_i2c();
+    		}
+    		i2c_priority = !i2c_priority;
+    	}
     }
     return 0 ;
 }

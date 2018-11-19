@@ -22,29 +22,24 @@
 // MIDI note range 0-127
 class CScale {
 
-	typedef struct {
-		V_SQL_SCALE_TYPE scale_type;
-		V_SQL_SCALE_ROOT scale_root;
-	} CONFIG;
-	CONFIG m_cfg;
-
 	byte m_index_to_note[8];
 	byte m_note_to_index[12];
 	byte m_max_index;
+public:
 
-	void init_config() {
-		m_cfg.scale_type = V_SQL_SCALE_TYPE_IONIAN;
-		m_cfg.scale_root = V_SQL_SCALE_ROOT_C;
+	///////////////////////////////////////////////////////////////////////////////
+	// constructor
+	CScale() : m_max_index(0) {
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	// build the note mapping tables for the selected scale type and root
-	void build() {
+	void build(V_SQL_SCALE_TYPE scale_type, V_SQL_SCALE_ROOT scale_root) {
 		byte interval[7] = {
 			1, 1, 0, 1, 1, 1, 0
 		};
-		byte ofs = (int)m_cfg.scale_type; // 0 = ionian
-		byte i2n_value = m_cfg.scale_root;
+		byte ofs = (int)scale_type; // 0 = ionian
+		byte i2n_value = scale_root;
 		byte n2i_index = 0;
 		for(int i=0; i<8; ++i) {
 			m_index_to_note[i] = i2n_value++;
@@ -59,15 +54,6 @@ class CScale {
 		}
 
 		m_max_index = note_to_index(127);
-	}
-
-public:
-
-	///////////////////////////////////////////////////////////////////////////////
-	// constructor
-	CScale() {
-		init_config();
-		build();
 	}
 
 	/////////////////////////////////////////////////////////////////
@@ -115,31 +101,6 @@ public:
 		}
 		return result;
 	}
-
-	//
-	// CONFIG ACCESSORS
-	//
-
-	///////////////////////////////////////////////////////////////////////////////
-	void set(PARAM_ID param, int value) {
-		switch(param) {
-		case P_SQL_SCALE_TYPE: m_cfg.scale_type = (V_SQL_SCALE_TYPE)value; build(); break;
-		case P_SQL_SCALE_ROOT: m_cfg.scale_root = (V_SQL_SCALE_ROOT)value; build(); break;
-		default: break;
-		}
-	}
-
-	///////////////////////////////////////////////////////////////////////////////
-	int get(PARAM_ID param) {
-		switch(param) {
-		case P_SQL_SCALE_TYPE: return m_cfg.scale_type;
-		case P_SQL_SCALE_ROOT: return m_cfg.scale_root;
-		default: return 0;
-		}
-	}
-
-
 };
-CScale g_scale;
 
 #endif /* SCALE_H_ */
