@@ -146,10 +146,6 @@ public:
 		m_ticks_per_ms = ((double)bpm * RATE_4) / (60.0 * 1000.0);
 	}
 
-	int get_ms_for_measure(int measure) {
-		return measure/m_ticks_per_ms;
-	}
-
 	///////////////////////////////////////////////////////////////////////////////
 	void init_state() {
 		m_ms = 0;
@@ -274,7 +270,36 @@ public:
 
 	}
 
+	///////////////////////////////////////////////////////////////////////////////
+	inline int ticks_per_measure(V_SQL_STEP_RATE step_rate) {
+		const byte ticks[V_SQL_STEP_RATE_MAX] = {
+		  RATE_1,
+		  RATE_2D,
+		  RATE_2,
+		  RATE_4D,
+		  RATE_2T,
+		  RATE_4,
+		  RATE_8D,
+		  RATE_4T,
+		  RATE_8,
+		  RATE_16D,
+		  RATE_8T,
+		  RATE_16,
+		  RATE_16T,
+		  RATE_32
+		};
+		return ticks[step_rate];
+	}
 
+	///////////////////////////////////////////////////////////////////////////////
+	int get_ms_for_ticks(int ticks) {
+		return ticks/m_ticks_per_ms;
+	}
+
+	///////////////////////////////////////////////////////////////////////////////
+	int get_ms_per_measure(V_SQL_STEP_RATE step_rate) {
+		return ticks_per_measure(step_rate)/m_ticks_per_ms;
+	}
 
 	///////////////////////////////////////////////////////////////////////////////
 	// Interrupt service routine called once per millisecond

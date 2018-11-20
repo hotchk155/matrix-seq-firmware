@@ -170,7 +170,6 @@ void fire_event(int event, uint32_t param) {
 		g_cv_gate.close_all_gates();
 		g_popup.text("STOP", 4);
 		g_popup.align(CPopup::ALIGN_RIGHT);
-g_storage.load_patch(0);
 		break;
 	///////////////////////////////////
 	case EV_SEQ_RESTART:
@@ -185,7 +184,6 @@ g_storage.load_patch(0);
 		g_sequencer.start();
 		g_popup.text("RUN", 3);
 		g_popup.align(CPopup::ALIGN_RIGHT);
-g_storage.save_patch(0);
 		break;
 	///////////////////////////////////
 	case EV_CLOCK_RESET:
@@ -243,7 +241,7 @@ int main(void) {
     		g_popup.run();
         	g_cv_gate.run();
         	g_midi.run();
-       		g_sequencer.tick(g_clock.get_ticks(), g_clock.get_part_ticks());
+       		g_sequencer.run(g_clock.get_ticks(), g_clock.get_part_ticks());
         	g_ui.run();
 
 
@@ -276,7 +274,8 @@ int main(void) {
     	// run the i2c bus. If the bus is currently idle then check if we need to send
     	// out CV information to the DAC, or transfer data to/from EEPROM. We alternately
     	// prioritize each to allow interleavng of data when both are busy
-    	if(!g_i2c_bus.busy()) {
+g_cv_gate.run_i2c();
+/*    	if(!g_i2c_bus.busy()) {
     		if(i2c_priority) {
     			g_cv_gate.run_i2c();
     			g_storage.run_i2c();
@@ -286,7 +285,7 @@ int main(void) {
     			g_cv_gate.run_i2c();
     		}
     		i2c_priority = !i2c_priority;
-    	}
+    	}*/
     }
     return 0 ;
 }

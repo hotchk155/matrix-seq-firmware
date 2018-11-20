@@ -25,8 +25,10 @@ class CScale {
 	byte m_index_to_note[8];
 	byte m_note_to_index[12];
 	byte m_max_index;
+	enum {
+		DEFAULT_NOTE = 36
+	};
 public:
-
 	///////////////////////////////////////////////////////////////////////////////
 	// constructor
 	CScale() : m_max_index(0) {
@@ -60,6 +62,19 @@ public:
 	// return highest index in scale
 	inline byte max_index() {
 		return m_max_index;
+	}
+
+	/////////////////////////////////////////////////////////////////
+	// return default note value forced to scale
+	byte default_note_chromatic() {
+		return force_to_scale(DEFAULT_NOTE);
+	}
+
+	/////////////////////////////////////////////////////////////////
+	// return default note value forced to scale and converted
+	// to index within the current scale
+	byte default_note_scaled() {
+		return note_to_index(default_note_chromatic());
 	}
 
 	/////////////////////////////////////////////////////////////////

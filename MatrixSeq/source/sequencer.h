@@ -116,8 +116,6 @@ public:
 			case V_SQL_SEQ_MODE_SCALE:
 				return 1;
 			case V_SQL_SEQ_MODE_MOD:
-			case V_SQL_SEQ_MODE_VELOCITY:
-			case V_SQL_SEQ_MODE_MAX:
 				return 0;
 			default:
 				break;
@@ -131,8 +129,6 @@ public:
 			case V_SQL_SEQ_MODE_SCALE:
 				return 1;
 			case V_SQL_SEQ_MODE_MOD:
-			case V_SQL_SEQ_MODE_VELOCITY:
-			case V_SQL_SEQ_MODE_MAX:
 				return 0;
 			default:
 				break;
@@ -172,16 +168,13 @@ public:
 		return m_is_running;
 	}
 
+
 	/////////////////////////////////////////////////////////////////////////////////////////////
-	void ms_tick() {
+	void run(uint32_t ticks, byte parts_tick) {
+
 		for(int i=0; i<NUM_LAYERS; ++i) {
 			m_layers[i].ms_tick(i);
 		}
-	}
-
-	/////////////////////////////////////////////////////////////////////////////////////////////
-	void tick(uint32_t ticks, byte parts_tick) {
-
 		// ensure the sequencer is running
 		if(m_is_running) {
 
@@ -205,7 +198,6 @@ public:
 
 						//////////////////////////////////////////////////
 						case V_SQL_SEQ_MODE_TRANSPOSE:
-						case V_SQL_SEQ_MODE_VELOCITY:
 							layer.action_step_gate(i);
 							break;
 
@@ -240,9 +232,9 @@ public:
 											0
 									);
 								}
-								else if(other_layer.get_mode() == V_SQL_SEQ_MODE_VELOCITY) {
-									g_cv_gate.mod_cv(j, layer.get_last_velocity(), other_layer.get(P_SQL_CVRANGE),0,0);
-								}
+								//else if(other_layer.get_mode() == V_SQL_SEQ_MODE_VELOCITY) {
+								//	g_cv_gate.mod_cv(j, layer.get_last_velocity(), other_layer.get(P_SQL_CVRANGE),0,0);
+								//}
 							}
 
 							break;

@@ -28,7 +28,7 @@ class CSequenceLayer {
 
 	// look up table of tick rates
 	static const byte c_tick_rates[V_SQL_STEP_RATE_MAX];
-	static const byte c_step_duration[V_SQL_STEP_DUR_MAX];
+//	static const byte c_step_duration[V_SQL_STEP_DUR_MAX];
 
 	// This structure holds the layer information that gets saved with the patch
 	typedef struct {
@@ -39,7 +39,7 @@ class CSequenceLayer {
 		byte 			m_loop_from;		// loop start point
 		byte 			m_loop_to;			// loop end point
 		char			m_transpose;		// manual transpose amount for the layer
-		V_SQL_STEP_DUR	m_note_dur;
+		V_SQL_NOTE_DUR	m_note_dur;
 		byte 			m_enabled;
 		V_SQL_MIDI_CHAN m_midi_channel;		// MIDI channel
 		byte 			m_midi_cc;			// MIDI CC
@@ -59,20 +59,19 @@ class CSequenceLayer {
 
 
 	typedef struct {
-		byte m_scroll_ofs;			// lowest step value shown on grid
+		byte m_scroll_ofs;					// lowest step value shown on grid
 		CSequenceStep m_step_value;			// the last value output by sequencer
-		byte m_stepped;				// stepped flag
+		byte m_stepped;						// stepped flag
 		int m_play_pos;
-		byte m_last_note; // last midi note played on channel - and output to CV
-		byte m_last_velocity;
+		byte m_midi_note; 					// last midi note played on channel
+		//byte m_last_velocity;
 		uint32_t m_next_tick;
 		byte m_last_tick_lsb;
-//		PLAYING_NOTE m_playing[MAX_PLAYING_NOTES];
 		CSequenceStep m_paste_step;
-
-		uint32_t 	m_gate_timeout;
-
+		uint32_t m_gate_timeout;
 	} STATE;
+
+	const uint32_t INFINITE_GATE = (uint32_t)(-1);
 
 	CONFIG m_cfg;				// instance of config
 	STATE m_state;
@@ -221,6 +220,12 @@ class CSequenceLayer {
 			case V_SQL_SEQ_MODE_TRANSPOSE:
 				fill_data_points(64);
 				break;
+			case V_SQL_SEQ_MODE_SCALE:
+				fill_data_points(m_scale.default_note_scaled());
+				break;
+			case V_SQL_SEQ_MODE_CHROMATIC:
+				fill_data_points(m_scale.default_note_chromatic());
+				break;
 		}
 	}
 
@@ -259,7 +264,7 @@ public:
 		m_cfg.m_mode 		= V_SQL_SEQ_MODE_SCALE;
 		m_cfg.m_force_scale = V_SQL_FORCE_SCALE_OFF;
 		m_cfg.m_step_rate	= V_SQL_STEP_RATE_16;
-		m_cfg.m_note_dur	= V_SQL_STEP_DUR_16;
+		m_cfg.m_note_dur	= V_SQL_NOTE_DUR_100;
 		m_cfg.m_loop_from	= 0;
 		m_cfg.m_loop_to		= 15;
 		m_cfg.m_transpose	= 0;
@@ -277,8 +282,8 @@ public:
 	void init_state() {
 		m_state.m_scroll_ofs = DEFAULT_SCROLL_OFS;
 		m_state.m_last_tick_lsb = 0;
-		m_state.m_last_note = 0;
-		m_state.m_last_velocity = 0;
+		m_state.m_midi_note = 0;
+//		m_state.m_last_velocity = 0;
 		m_state.m_paste_step.reset_all();
 		//memset(m_state.m_playing,0,sizeof(m_state.m_playing));
 		reset();
@@ -304,7 +309,7 @@ public:
 		m_cfg.m_midi_cc = cfg.m_midi_cc;
 
 		m_state = layer.m_state;
-		m_state.m_last_note = 0;
+		m_state.m_midi_note = 0;
 //		memset(m_state.m_playing,0,sizeof(m_state.m_playing));
 	}
 
@@ -318,7 +323,7 @@ public:
 		case P_SQL_SEQ_MODE: set_mode((V_SQL_SEQ_MODE)value); break;
 		case P_SQL_FORCE_SCALE: m_cfg.m_force_scale = (V_SQL_FORCE_SCALE)value; break;
 		case P_SQL_STEP_RATE: m_cfg.m_step_rate = (V_SQL_STEP_RATE)value; break;
-		case P_SQL_STEP_DUR: m_cfg.m_note_dur = (V_SQL_STEP_DUR)value; break;
+		case P_SQL_NOTE_DUR: m_cfg.m_note_dur = (V_SQL_NOTE_DUR)value; break;
 		case P_SQL_MIDI_CHAN: m_cfg.m_midi_channel = (V_SQL_MIDI_CHAN)value; break;
 		case P_SQL_MIDI_CC: m_cfg.m_midi_cc = value; break;
 		case P_SQL_CVSCALE: m_cfg.m_cv_scale = (V_SQL_CVSCALE)value; break;
@@ -336,7 +341,7 @@ public:
 		case P_SQL_SEQ_MODE: return m_cfg.m_mode;
 		case P_SQL_FORCE_SCALE: return m_cfg.m_force_scale;
 		case P_SQL_STEP_RATE: return m_cfg.m_step_rate;
-		case P_SQL_STEP_DUR: return m_cfg.m_note_dur;
+		case P_SQL_NOTE_DUR: return m_cfg.m_note_dur;
 		case P_SQL_MIDI_CHAN: return m_cfg.m_midi_channel;
 		case P_SQL_MIDI_CC: return m_cfg.m_midi_cc;
 		case P_SQL_CVSCALE: return m_cfg.m_cv_scale;
@@ -351,11 +356,10 @@ public:
 	///////////////////////////////////////////////////////////////////////////////
 	int is_valid_param(PARAM_ID param) {
 		switch(param) {
-		case P_SQL_MIDI_CHAN: return !(m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY);
 		case P_SQL_FORCE_SCALE: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_CHROMATIC||m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE);
 		case P_SQL_MIDI_CC:	return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
-		case P_SQL_CVRANGE: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD || m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY);
-		case P_SQL_CVSCALE: return !(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD || m_cfg.m_mode == V_SQL_SEQ_MODE_VELOCITY);
+		case P_SQL_CVRANGE: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
+		case P_SQL_CVSCALE: return !(m_cfg.m_mode == V_SQL_SEQ_MODE_MOD);
 		case P_SQL_TRAN_TRIG:
 		case P_SQL_TRAN_ACC: return !!(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE);
 		default: return 1;
@@ -393,20 +397,23 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
-	//void set_paste_buffer(CSequenceStep step) {
-	//	m_state.m_paste_step = step;
-	//	m_state.m_paste_step.m_is_data_point = 1;
-	//}
-
-	///////////////////////////////////////////////////////////////////////////////
-	CSequenceStep &paste_buffer() {
-		return m_state.m_paste_step;
+	void set_paste_buffer(CSequenceStep step) {
+		m_state.m_paste_step = step;
+		m_state.m_paste_step.m_is_data_point = 1;
 	}
+	byte is_paste_step_available() {
+		return m_state.m_paste_step.m_is_data_point;
+	}
+	///////////////////////////////////////////////////////////////////////////////
+	//CSequenceStep &paste_buffer() {
+	//	m_state.m_paste_step
+	//	return m_state.m_paste_step;
+	//}
 
 	///////////////////////////////////////////////////////////////////////////////
 	// paste data from the "clipboard" into selected stop
 	void paste_step(byte index) {
-		if(m_state.m_paste_step.m_is_data_point) {
+		if(is_paste_step_available()) {	// make sure something is in the buffer
 			switch(m_cfg.m_mode) {
 			case V_SQL_SEQ_MODE_SCALE:
 			case V_SQL_SEQ_MODE_CHROMATIC:
@@ -473,7 +480,7 @@ public:
 		m_cfg.m_mode = value;
 
 		// clear the paste buffer, since the data type has changed
-		paste_buffer().reset_all();
+		m_state.m_paste_step.reset_all();
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -599,9 +606,9 @@ public:
 		return m_state.m_step_value;
 	}
 	///////////////////////////////////////////////////////////////////////////////
-	int get_last_velocity() {
-		return m_state.m_last_velocity;
-	}
+//	int get_last_velocity() {
+//		return m_state.m_last_velocity;
+//	}
 	///////////////////////////////////////////////////////////////////////////////
 	void set_pos(int pos) {
 		m_state.m_play_pos = pos;
@@ -694,9 +701,13 @@ public:
 		if(m_state.m_gate_timeout) {
 			if(!--m_state.m_gate_timeout) {
 				g_cv_gate.gate(which, CCVGate::GATE_CLOSED);
+//				send_midi_note(m_state.m_midi_note, 0);
+				m_state.m_midi_note = 0;
 			}
 		}
 	}
+
+
 
 	/*
 	///////////////////////////////////////////////////////////////////////////////
@@ -907,12 +918,15 @@ public:
 //TODO - MIDI
 	void action_step_note(byte which, CSequenceStep step_for_transpose, byte midi_vel_accent, byte midi_vel, byte action_gate) {
 
-		CSequenceStep step;
-		step.reset_all();
 
-		if(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) {
-			// handle transposition
+		CSequenceStep step;
+		if(m_cfg.m_mode == V_SQL_SEQ_MODE_TRANSPOSE) { // IS THIS A TRANSPOSE LAYER?
+
+			// the step to be transposed comes from a different layer and is passed
+			// in as a parameter
 			step = step_for_transpose;
+
+			// allow transposition to be "locked out" by selected steps
 			byte do_transpose = 1;
 			if(m_cfg.m_tran_acc == V_SQL_TRAN_ACC_LOCK) {
 				if(step.is_accent()) {
@@ -923,14 +937,17 @@ public:
 					step.clear_accent();
 				}
 			}
+
+			// actually perform the transposition if still needed. Do not transpose values that
+			// would be out of range of MIDI notes
 			if(do_transpose) {
 				int transposed = (int)step_for_transpose.m_value + m_state.m_step_value.m_value - 64;
-				if(transposed >= 0 && transposed < 128) {
+				if(transposed >= 0 && transposed <= 127) {
 					step.m_value = transposed;
 				}
 			}
 
-			// handle special trigger modes
+			// set the trigger information on the step
 			switch(m_cfg.m_tran_trig) {
 			case V_SQL_TRAN_TRIG_AND:
 				step.set_gate(step_for_transpose.get_gate() & m_state.m_step_value.get_gate());
@@ -949,15 +966,15 @@ public:
 				step.set_gate(m_state.m_step_value.get_gate());
 				break;
 			}
-
-			step.m_is_data_point |= m_state.m_step_value.m_is_data_point;
 		}
 		else {
+
+			// not a transpose layer, simply store the current step
 			step = m_state.m_step_value;
 		}
 
-		// is there a change to the CV output?
-		if(step.m_is_data_point) {
+		// the CV will only be applied if there is an open gate
+		if(step.is_gate_open()) {
 
 			// get the note we need to play, taking into account being
 			// forced into a scale
@@ -969,41 +986,69 @@ public:
 				note = m_scale.force_to_scale(note);
 			}
 
-			// set up the pitch CV, handling the case where we need to "glide"
-			// to the new pitch
-			if(!step.is_trigger() && m_cfg.m_cv_glide == V_SQL_CVGLIDE_ON) {
-				int glide_time = g_clock.get_ms_for_measure(m_cfg.m_step_rate);
-				g_cv_gate.pitch_cv(which, note, m_cfg.m_cv_scale, glide_time);
-			}
-			else {
+			// is there a trigger at this step?
+			if(step.is_trigger()) {
+
+				CSequenceStep next_step;
+
+				// set the note pitch
 				g_cv_gate.pitch_cv(which, note, m_cfg.m_cv_scale, 0);
+
+				// trigger the gate
+				g_cv_gate.gate(which, CCVGate::GATE_RETRIG);
+
+				// set the appropriate note duration
+				switch(m_cfg.m_note_dur) {
+				case V_SQL_NOTE_DUR_OPEN:
+				case V_SQL_NOTE_DUR_LEGA:
+					m_state.m_gate_timeout = INFINITE_GATE;	// stay open until the next note
+					break;
+				case V_SQL_NOTE_DUR_TRIG:
+					m_state.m_gate_timeout = CCVGate::TRIG_DURATION; // just a short trigger pulse
+					break;
+				case V_SQL_NOTE_DUR_100:
+					m_state.m_gate_timeout = 0; // until the next step
+					break;
+				default: // other enumerations have integer values 0-10
+					// check whether the next step is open gate without a trigger,
+					next_step = m_cfg.m_step[next_step_index(m_state.m_play_pos)];
+					if(next_step.is_gate_open() && !next_step.is_trigger()) {
+						// this will extend the current note to a full step
+						m_state.m_gate_timeout = 0;
+					}
+					else {
+						// otherwise use the set duration
+ 						m_state.m_gate_timeout = (g_clock.get_ms_per_measure(m_cfg.m_step_rate) * m_cfg.m_note_dur ) / 10;
+
+					}
+					break;
+				}
+
+			}
+			else
+			{
+				// check if we need to glide to the note
+				if(m_cfg.m_cv_glide == V_SQL_CVGLIDE_ON) {
+					int glide_time = g_clock.get_ms_per_measure(m_cfg.m_step_rate);
+					g_cv_gate.pitch_cv(which, note, m_cfg.m_cv_scale, glide_time);
+				}
+				else {
+					// no glide, set pitch directly
+					g_cv_gate.pitch_cv(which, note, m_cfg.m_cv_scale, 0);
+				}
+
+				// open the gate for one step
+				g_cv_gate.gate(which, CCVGate::GATE_OPEN);
+				m_state.m_gate_timeout = 0;
+			}
+		}
+		else {
+			if(!m_state.m_gate_timeout) {
+				// close the gate
+				g_cv_gate.gate(which, CCVGate::GATE_CLOSED);
 			}
 		}
 
-		// peek at the following step
-		int gate_timeout = 0;
-		CSequenceStep next_step = get_step(next_step_index(m_state.m_play_pos));
-		if(next_step.is_gate_open() && next_step.is_trigger()) {
-			// leave as zero
-		}
-		else {
-//TODO note duration
-			gate_timeout = g_clock.get_ms_for_measure(m_cfg.m_step_rate);
-		}
-
-		// perform the appropriate gate action
-		if(step.is_trigger()) {
-			g_cv_gate.gate(which, CCVGate::GATE_RETRIG);
-			m_state.m_gate_timeout = gate_timeout;
-		}
-		else if(step.is_gate_open()) {
-			g_cv_gate.gate(which, CCVGate::GATE_OPEN);
-			m_state.m_gate_timeout = gate_timeout;
-		}
-		else {
-			g_cv_gate.gate(which, CCVGate::GATE_CLOSED);
-			m_state.m_gate_timeout = 0;
-		}
 	}
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -1012,7 +1057,7 @@ public:
 		if(m_cfg.m_cv_glide == V_SQL_CVGLIDE_ON) {
 			int next = next_step_index(m_state.m_play_pos);
 			byte value2 = m_cfg.m_step[next].m_value;
-			int ms = g_clock.get_ms_for_measure(m_cfg.m_step_rate);
+			int ms = g_clock.get_ms_per_measure(m_cfg.m_step_rate);
 			g_cv_gate.mod_cv(which, value1, m_cfg.m_cv_range, value2, ms);
 		}
 		else {
@@ -1041,6 +1086,6 @@ public:
 
 //TODO
 const byte CSequenceLayer::c_tick_rates[V_SQL_STEP_RATE_MAX] = {96,72,48,36,32,24,18,16,12,9,8,6,4,3};
-const byte CSequenceLayer::c_step_duration[] = {3,4,6,8,9,12,16,18,24,32,36,48,72,96};
+//const byte CSequenceLayer::c_step_duration[] = {3,4,6,8,9,12,16,18,24,32,36,48,72,96};
 
 #endif /* SEQUENCE_LAYER_H_ */

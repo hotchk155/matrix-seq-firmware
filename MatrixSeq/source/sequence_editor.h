@@ -87,9 +87,6 @@ class CSequenceEditor {
 		case V_SQL_SEQ_MODE_MOD:
 			g_popup.num3digits(value);
 			break;
-		case V_SQL_SEQ_MODE_VELOCITY:
-		case V_SQL_SEQ_MODE_MAX:
-			break;
 		}
 		g_popup.avoid(m_cursor);
 	}
@@ -144,8 +141,6 @@ class CSequenceEditor {
 			*spacing = 0;
 			return 1;
 		case V_SQL_SEQ_MODE_MOD:
-		case V_SQL_SEQ_MODE_VELOCITY:
-		case V_SQL_SEQ_MODE_MAX:
 			break;
 		}
 		return 0;
@@ -199,8 +194,7 @@ class CSequenceEditor {
 			else {
 				// copy the current step to the paste buffer, bring it
 				// into view and show info
-				step.m_is_data_point = 1;
-				layer.paste_buffer() = step;
+				layer.set_paste_buffer(step);
 				set_scroll_for(layer, step);
 				if(!layer.is_mod_mode()) {
 					step_info(layer, step);
@@ -225,7 +219,7 @@ class CSequenceEditor {
 					value_action(layer, step, what, 1);
 					set_scroll_for(layer, step);
 					step.m_is_data_point = 1;
-					layer.paste_buffer() = step;
+					layer.set_paste_buffer(step);
 					layer.paste_step(m_cursor);
 					step_info(layer, step);
 				}
@@ -261,30 +255,11 @@ class CSequenceEditor {
 				g_popup.show_offset(m_edit_value);
 				break;
 			default:
-				// turning encoder with edit button held
-				if(layer.is_note_mode() && !step.m_is_data_point) {
-					// start turning encoder in an empty column in note mode means we use paste buffer value
-					if(!layer.paste_buffer().m_is_data_point) {
-						// if there is no value in paste buffer then create a default one
-						step.reset_all(layer.get_scroll_ofs());
-						step.set_gate(CSequenceStep::GATE_RETRIG);
-						step.m_is_data_point = 1;
-						layer.paste_buffer() = step;
-						layer.paste_step(m_cursor);
-					}
-					else {
-						// otherwise set it as a trigger and paste it in
-						layer.paste_buffer().set_gate(CSequenceStep::GATE_RETRIG);
-						layer.paste_step(m_cursor);
-					}
-				}
-				else {
-					// editing an existing step
-					value_action(layer, step, what, 0);
-					step.m_is_data_point = 1;
-					layer.paste_buffer() = step;
-					layer.paste_step(m_cursor);
-				}
+				// editing a step value
+				value_action(layer, step, what, 0);				// change the value
+				step.set_gate(CSequenceStep::GATE_RETRIG);
+				layer.set_paste_buffer(step);					// value is placed in paste buffer
+				layer.paste_step(m_cursor);
 				set_scroll_for(layer, step);
 				if(!layer.is_mod_mode()) {
 					step_info(layer, step);
@@ -297,7 +272,7 @@ class CSequenceEditor {
 			switch(m_edit_keys) {
 			case KEY_EDIT|KEY_PASTE:
 				// EDIT + PASTE - advance cursor and copy the current step
-				if(layer.paste_buffer().m_is_data_point) {
+				if(layer.is_paste_step_available()) {
 					if(++m_cursor >= GRID_WIDTH-1) {
 						m_cursor = 0;
 					}
@@ -346,7 +321,7 @@ class CSequenceEditor {
 			// hold-turn copies the current step into the paste buffer
 			// then pastes it over multiple steps
 			if(!m_encoder_moved) {
-				layer.paste_buffer() = layer.get_step(m_cursor);
+				layer.set_paste_buffer(layer.get_step(m_cursor));
 			}
 			cursor_action(layer, what);
 			layer.paste_step(m_cursor);
@@ -363,8 +338,7 @@ class CSequenceEditor {
 		////////////////////////////////////////////////
 		case ACTION_CLICK:
 			// a click erases a step, copying it to paste buffer
-			layer.paste_buffer() = layer.get_step(m_cursor);
-			layer.paste_buffer().m_is_data_point = 1;
+			layer.set_paste_buffer(layer.get_step(m_cursor));
 			layer.clear_step_value(m_cursor);
 			break;
 			////////////////////////////////////////////////
@@ -592,10 +566,6 @@ public:
 		g_ui.raster(15) |= mask;
 		g_ui.hilite(15) |= mask;
 
-		// if this is velocity mode then we simply show some text
-		if(layer.get_mode() == V_SQL_SEQ_MODE_VELOCITY) {
-			g_ui.print_text("VEL",5,2,g_ui.RASTER);
-		}
 
 		mask = g_ui.bit(0);
 		int c = 0;
@@ -640,7 +610,7 @@ public:
 			switch(layer.get_mode()) {
 			case V_SQL_SEQ_MODE_CHROMATIC:
 			case V_SQL_SEQ_MODE_SCALE:
-				if(step.m_is_data_point) {
+				if(step.is_gate_open()) {
 					n = step.m_value;
 					n = 12 - n + layer.get_scroll_ofs();
 					if(n >= 0 && n <= 12) {
@@ -691,9 +661,6 @@ public:
 					g_ui.hilite(n) |= mask;
 					g_ui.raster(n) &= ~mask;
 				}
-				break;
-			case V_SQL_SEQ_MODE_VELOCITY:
-			case V_SQL_SEQ_MODE_MAX:
 				break;
 			}
 

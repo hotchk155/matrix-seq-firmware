@@ -21,6 +21,9 @@
 // by the user) and any automatically generated points. It also stores the associated
 // gate information
 //
+// the user enters "data points" and other values are extrapolated depending on the
+// layer type
+//
 class CSequenceStep {
 public:
 	enum {

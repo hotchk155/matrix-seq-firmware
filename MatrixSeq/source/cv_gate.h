@@ -51,19 +51,24 @@ public:
 		GATE_CLOSED,
 		GATE_OPEN,
 		GATE_RETRIG,
-	} GATE_STATE;
+	} GATE_STATUS;
 	enum {
 		MAX_CV = 4,
 		MAX_GATE = 4,
-		I2C_BUF_SIZE = 100
+		I2C_BUF_SIZE = 100,
+		TRIG_DURATION = 15,
+		RETRIG_DELAY_MS = 2
 	};
 
 	typedef struct {
+		GATE_STATUS	gate_status;	// current state of the gate
+		byte retrig_delay;	// delay
+
 		int pitch;			// 32-bit current pitch value (dac << 16)
 		int target;  		// 32-bit current target value (dac << 16)
 		int glide_rate;  	// glide rate applied per ms to the pitch
 		uint16_t dac;		// raw 12-bit DAC value
-	} CV_STATE;
+	} CHAN_STATE;
 
 
 	enum {
@@ -73,15 +78,15 @@ public:
 		DAC_IDLE
 	};
 
-	CV_STATE m_cv[MAX_CV];
-	GATE_STATE m_gate[MAX_GATE];
+	CHAN_STATE m_chan[MAX_CV];
+	//GATE_STATUS m_gate[MAX_GATE];
 	byte m_dac_state;
-	byte m_gate_pending;
+	//byte m_gate_pending;
 	byte m_i2c_buf[I2C_BUF_SIZE];
 	volatile CI2CBus::TRANSACTION m_txn;
 
 	/////////////////////////////////////////////////////////////////////////////////
-	void gate_on(byte which) {
+	void impl_gate_on(byte which) {
 		switch(which) {
 		case 0: SET_GPIOA(BIT_GATE1); break;
 		case 1: SET_GPIOA(BIT_GATE2); break;
@@ -91,7 +96,7 @@ public:
 	}
 
 	/////////////////////////////////////////////////////////////////////////////////
-	void gate_off(byte which) {
+	void impl_gate_off(byte which) {
 		switch(which) {
 		case 0: CLR_GPIOA(BIT_GATE1); break;
 		case 1: CLR_GPIOA(BIT_GATE2); break;
@@ -102,21 +107,10 @@ public:
 
 	void impl_set_cv(int which, uint16_t dac)
 	{
-		// get the appropriate offset into the DAC structure
-		// for the target CV output
-/*		int ofs;
-		switch(which) {
-		case 1: ofs = 1; break;
-		case 2: ofs = 2; break;
-		case 3: ofs = 0; break;
-		default: ofs = 3; break;
-		}*/
-
-		if(m_dac_state >= DAC_DATA_PENDING) {
-			// if the output has changed then load the new one
-			if(m_cv[which].dac != dac) {
-				m_cv[which].dac = dac;
-				m_dac_state = DAC_DATA_PENDING;
+		if(m_dac_state >= DAC_DATA_PENDING) { // ensure DAC is initialised
+			if(m_chan[which].dac != dac) { // check output has changed
+				m_chan[which].dac = dac; // load new data
+				m_dac_state = DAC_DATA_PENDING; // flag to be sent
 			}
 		}
 	}
@@ -132,16 +126,14 @@ public:
 
 	typedef uint16_t DAC_TYPE;
 
-
 public:
 
 
 	/////////////////////////////////////////////////////////////////////////////////
 	CCVGate()
 	{
-		memset((byte*)m_cv,0,sizeof m_cv);
-		memset((byte*)m_gate,0,sizeof m_gate);
-		m_gate_pending = 0;
+		memset((byte*)m_chan,0,sizeof m_chan);
+		//m_gate_pending = 0;
 		m_dac_state = DAC_INIT_PENDING_1;
 
 		m_txn.addr = I2C_ADDR_DAC;
@@ -155,24 +147,26 @@ public:
 
 
 	/////////////////////////////////////////////////////////////////////////////////
-	void gate(byte which, GATE_STATE gate) {
-		if(m_gate[which] != gate) {
+	void gate(byte which, GATE_STATUS gate) {
+		if(m_chan[which].gate_status != gate) {
 			switch(gate) {
 				case GATE_CLOSED:
-					gate_off(which);
-					m_gate[which] = GATE_CLOSED;
+					impl_gate_off(which);
+					m_chan[which].gate_status = GATE_CLOSED;
 					break;
 				case GATE_RETRIG:
-					gate_off(which);
-					m_gate[which] = GATE_OPEN;
-					m_gate_pending = 1;
-					g_gate_led.blink(g_gate_led.MEDIUM_BLINK);
-					break;
+					if(m_chan[which].gate_status == GATE_OPEN) {
+						// gate is open so need to generate a new rising edge
+						impl_gate_off(which);
+						m_chan[which].gate_status = GATE_RETRIG;
+						m_chan[which].retrig_delay = RETRIG_DELAY_MS;
+						g_gate_led.blink(g_gate_led.MEDIUM_BLINK);
+						break;
+					}
+					// else fall thru
 				case GATE_OPEN:
-					gate_on(which);
-//TODO - gate sync with CV change on pitch channel
-					m_gate[which] = GATE_OPEN;
-					m_gate_pending = 1;
+					impl_gate_on(which);
+					m_chan[which].gate_status = GATE_OPEN;
 					g_gate_led.blink(g_gate_led.MEDIUM_BLINK);
 					break;
 			}
@@ -182,8 +176,8 @@ public:
 	/////////////////////////////////////////////////////////////////////////////////
 	void close_all_gates() {
 		for(int i=0; i<MAX_GATE; ++i) {
-			gate_off(i);
-			m_gate[i] = GATE_CLOSED;
+			impl_gate_off(i);
+			m_chan[i].gate_status = GATE_CLOSED;
 		}
 	}
 
@@ -203,12 +197,12 @@ public:
 		uint16_t dac = (500 * (int)note)/12;
 
 		if(glide_time) {
-			m_cv[which].target = dac<<16;
-			m_cv[which].glide_rate = (m_cv[which].target - m_cv[which].pitch)/glide_time;
+			m_chan[which].target = dac<<16;
+			m_chan[which].glide_rate = (m_chan[which].target - m_chan[which].pitch)/glide_time;
 		}
 		else {
-			m_cv[which].pitch = dac<<16;
-			m_cv[which].glide_rate = 0;
+			m_chan[which].pitch = dac<<16;
+			m_chan[which].glide_rate = 0;
 			impl_set_cv(which, dac);
 		}
 	}
@@ -216,16 +210,16 @@ public:
 
 	/////////////////////////////////////////////////////////////////////////////////
 	void mod_cv(int which, int value, int volt_range, int value2, int sweep_time) {
-		m_cv[which].pitch = (500*volt_range*value)<<9; // divide by 128 then left shift by 16
+		m_chan[which].pitch = (500*volt_range*value)<<9; // divide by 128 then left shift by 16
 		if(sweep_time) {
-			m_cv[which].target = (500*volt_range*value2)<<9;
-			m_cv[which].glide_rate = (m_cv[which].target - m_cv[which].pitch)/sweep_time;
+			m_chan[which].target = (500*volt_range*value2)<<9;
+			m_chan[which].glide_rate = (m_chan[which].target - m_chan[which].pitch)/sweep_time;
 		}
 		else {
-			m_cv[which].glide_rate = 0;
+			m_chan[which].glide_rate = 0;
 		}
 
-		uint16_t dac = m_cv[which].pitch>>16;
+		uint16_t dac = m_chan[which].pitch>>16;
 		impl_set_cv(which, dac);
 	}
 
@@ -250,14 +244,14 @@ public:
 			m_dac_state = DAC_IDLE;
 			break;
 		case DAC_DATA_PENDING:
-			m_i2c_buf[0] = ((m_cv[3].dac>>8) & 0xF);
-			m_i2c_buf[1] = (byte)m_cv[3].dac;
-			m_i2c_buf[2] = ((m_cv[2].dac>>8) & 0xF);
-			m_i2c_buf[3] = (byte)m_cv[2].dac;
-			m_i2c_buf[4] = ((m_cv[1].dac>>8) & 0xF);
-			m_i2c_buf[5] = (byte)m_cv[1].dac;
-			m_i2c_buf[6] = ((m_cv[0].dac>>8) & 0xF);
-			m_i2c_buf[7] = (byte)m_cv[0].dac;
+			m_i2c_buf[0] = ((m_chan[3].dac>>8) & 0xF);
+			m_i2c_buf[1] = (byte)m_chan[3].dac;
+			m_i2c_buf[2] = ((m_chan[2].dac>>8) & 0xF);
+			m_i2c_buf[3] = (byte)m_chan[2].dac;
+			m_i2c_buf[4] = ((m_chan[1].dac>>8) & 0xF);
+			m_i2c_buf[5] = (byte)m_chan[1].dac;
+			m_i2c_buf[6] = ((m_chan[0].dac>>8) & 0xF);
+			m_i2c_buf[7] = (byte)m_chan[0].dac;
 			m_txn.data_len = 8;
 			g_i2c_bus.transmit(&m_txn);
 			g_cv_led.blink(g_cv_led.MEDIUM_BLINK);
@@ -273,22 +267,31 @@ public:
 	// called once per ms
 	void run() {
 		for(int i=0; i<MAX_CV; ++i) {
-			if(m_cv[i].glide_rate) {
-				m_cv[i].pitch += m_cv[i].glide_rate;
-				if(m_cv[i].glide_rate < 0) {
-					if(m_cv[i].pitch <= m_cv[i].target) {
-						m_cv[i].pitch = m_cv[i].target;
-						m_cv[i].glide_rate = 0;
+			if(m_chan[i].glide_rate) {
+				m_chan[i].pitch += m_chan[i].glide_rate;
+				if(m_chan[i].glide_rate < 0) {
+					if(m_chan[i].pitch <= m_chan[i].target) {
+						m_chan[i].pitch = m_chan[i].target;
+						m_chan[i].glide_rate = 0;
 					}
 				}
 				else {
-					if(m_cv[i].pitch >= m_cv[i].target) {
-						m_cv[i].pitch = m_cv[i].target;
-						m_cv[i].glide_rate = 0;
+					if(m_chan[i].pitch >= m_chan[i].target) {
+						m_chan[i].pitch = m_chan[i].target;
+						m_chan[i].glide_rate = 0;
 					}
 				}
-				int dac = m_cv[i].pitch>>16;
+				int dac = m_chan[i].pitch>>16;
 				impl_set_cv(i, dac);
+			}
+			if(m_chan[i].gate_status == GATE_RETRIG) {
+				if(m_chan[i].retrig_delay) {
+					--m_chan[i].retrig_delay;
+				}
+				if(!m_chan[i].retrig_delay) {
+					m_chan[i].gate_status = GATE_OPEN;
+					impl_gate_on(i);
+				}
 			}
 		}
 	}
