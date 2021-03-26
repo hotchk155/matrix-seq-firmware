@@ -202,12 +202,15 @@
 								<option id="com.crt.advproject.link.cpp.nanofloat.scanf.84996822" name="Enable scanf float " superClass="com.crt.advproject.link.cpp.nanofloat.scanf"/>
 								<option id="com.crt.advproject.link.cpp.script.1906010256" name="Linker script" superClass="com.crt.advproject.link.cpp.script" value="MatrixSeq_Debug.ld" valueType="string"/>
 								<option id="com.crt.advproject.link.cpp.scriptdir.150453623" name="Script path" superClass="com.crt.advproject.link.cpp.scriptdir"/>
-								<option defaultValue="com.crt.advproject.heapAndStack.mcuXpressoStyle.cpp" id="com.crt.advproject.link.memory.heapAndStack.style.cpp.761795437" name="Heap and Stack placement" superClass="com.crt.advproject.link.memory.heapAndStack.style.cpp" valueType="enumerated"/>
+								<option defaultValue="com.crt.advproject.heapAndStack.mcuXpressoStyle.cpp" id="com.crt.advproject.link.memory.heapAndStack.style.cpp.761795437" name="Heap and Stack placement" superClass="com.crt.advproject.link.memory.heapAndStack.style.cpp" value="Default" valueType="enumerated"/>
 								<option id="com.crt.advproject.link.cpp.multicore.slave.1543749545" name="Multicore configuration" superClass="com.crt.advproject.link.cpp.multicore.slave"/>
 								<option id="com.crt.advproject.link.cpp.multicore.master.157994896" name="Multicore master" superClass="com.crt.advproject.link.cpp.multicore.master"/>
 								<option id="com.crt.advproject.link.cpp.multicore.empty.206392755" name="No Multicore options for this project" superClass="com.crt.advproject.link.cpp.multicore.empty"/>
 								<option id="com.crt.advproject.link.cpp.config.515056167" name="Obsolete (Config)" superClass="com.crt.advproject.link.cpp.config"/>
 								<option id="com.crt.advproject.link.cpp.store.1304642640" name="Obsolete (Store)" superClass="com.crt.advproject.link.cpp.store"/>
+								<option id="com.crt.advproject.link.memory.load.image.cpp.554792036" superClass="com.crt.advproject.link.memory.load.image.cpp" value="" valueType="string"/>
+								<option id="com.crt.advproject.link.memory.data.cpp.260520007" superClass="com.crt.advproject.link.memory.data.cpp" value="" valueType="string"/>
+								<option id="com.crt.advproject.link.memory.sections.cpp.981273464" superClass="com.crt.advproject.link.memory.sections.cpp" valueType="stringList"/>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.1017771837" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -260,6 +263,7 @@
 								<option id="com.crt.advproject.link.config.401088919" name="Obsolete (Config)" superClass="com.crt.advproject.link.config"/>
 								<option id="com.crt.advproject.link.store.434220083" name="Obsolete (Store)" superClass="com.crt.advproject.link.store"/>
 							</tool>
+							<tool id="com.crt.advproject.tool.debug.debug.34540492" name="MCU Debugger" superClass="com.crt.advproject.tool.debug.debug"/>
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
@@ -481,12 +485,15 @@
 								<option id="com.crt.advproject.link.cpp.nanofloat.scanf.1884983642" name="Enable scanf float " superClass="com.crt.advproject.link.cpp.nanofloat.scanf"/>
 								<option id="com.crt.advproject.link.cpp.script.1868308967" name="Linker script" superClass="com.crt.advproject.link.cpp.script" value="MatrixSeq_Release.ld" valueType="string"/>
 								<option id="com.crt.advproject.link.cpp.scriptdir.902702409" name="Script path" superClass="com.crt.advproject.link.cpp.scriptdir"/>
-								<option defaultValue="com.crt.advproject.heapAndStack.mcuXpressoStyle.cpp" id="com.crt.advproject.link.memory.heapAndStack.style.cpp.1862646966" name="Heap and Stack placement" superClass="com.crt.advproject.link.memory.heapAndStack.style.cpp" valueType="enumerated"/>
+								<option defaultValue="com.crt.advproject.heapAndStack.mcuXpressoStyle.cpp" id="com.crt.advproject.link.memory.heapAndStack.style.cpp.1862646966" name="Heap and Stack placement" superClass="com.crt.advproject.link.memory.heapAndStack.style.cpp" value="Default" valueType="enumerated"/>
 								<option id="com.crt.advproject.link.cpp.multicore.slave.1835880074" name="Multicore configuration" superClass="com.crt.advproject.link.cpp.multicore.slave"/>
 								<option id="com.crt.advproject.link.cpp.multicore.master.1030054951" name="Multicore master" superClass="com.crt.advproject.link.cpp.multicore.master"/>
 								<option id="com.crt.advproject.link.cpp.multicore.empty.469048900" name="No Multicore options for this project" superClass="com.crt.advproject.link.cpp.multicore.empty"/>
 								<option id="com.crt.advproject.link.cpp.config.39984238" name="Obsolete (Config)" superClass="com.crt.advproject.link.cpp.config"/>
 								<option id="com.crt.advproject.link.cpp.store.1350034677" name="Obsolete (Store)" superClass="com.crt.advproject.link.cpp.store"/>
+								<option id="com.crt.advproject.link.memory.load.image.cpp.2107171718" name="Plain load image" superClass="com.crt.advproject.link.memory.load.image.cpp" value="" valueType="string"/>
+								<option id="com.crt.advproject.link.memory.data.cpp.1560843471" name="Global data placement" superClass="com.crt.advproject.link.memory.data.cpp" value="" valueType="string"/>
+								<option id="com.crt.advproject.link.memory.sections.cpp.1961319043" name="Extra linker script input sections" superClass="com.crt.advproject.link.memory.sections.cpp" valueType="stringList"/>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.281963729" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -539,6 +546,7 @@
 								<option id="com.crt.advproject.link.config.579036880" name="Obsolete (Config)" superClass="com.crt.advproject.link.config"/>
 								<option id="com.crt.advproject.link.store.173687849" name="Obsolete (Store)" superClass="com.crt.advproject.link.store"/>
 							</tool>
+							<tool id="com.crt.advproject.tool.debug.release.1689757663" name="MCU Debugger" superClass="com.crt.advproject.tool.debug.release"/>
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
@@ -581,62 +589,67 @@
 	<storageModule moduleId="com.crt.config">
 		<projectStorage>&lt;?xml version="1.0" encoding="UTF-8"?&gt;&#13;
 &lt;TargetConfig&gt;&#13;
-&lt;Properties property_3="NXP" property_4="MKE02Z64xxx4" property_count="5" version="70200"/&gt;&#13;
-&lt;infoList vendor="NXP"&gt;&lt;info chip="MKE02Z64xxx4" name="MKE02Z64xxx4"&gt;&lt;chip&gt;&lt;name&gt;MKE02Z64xxx4&lt;/name&gt;&#13;
+&lt;Properties property_3="NXP" property_4="MKE04Z128xxx4" property_count="5" version="100300"/&gt;&#13;
+&lt;infoList vendor="NXP"&gt;&#13;
+&lt;info chip="MKE04Z128xxx4" name="MKE04Z128xxx4"&gt;&#13;
+&lt;chip&gt;&#13;
+&lt;name&gt;MKE04Z128xxx4&lt;/name&gt;&#13;
 &lt;family&gt;KE0x&lt;/family&gt;&#13;
 &lt;vendor&gt;NXP&lt;/vendor&gt;&#13;
-&lt;memory can_program="true" id="Flash" is_ro="true" size="64" type="Flash"/&gt;&#13;
-&lt;memory id="RAM" size="4" type="RAM"/&gt;&#13;
-&lt;memoryInstance derived_from="Flash" driver="FTFE_2K_KE.cfx" edited="true" id="PROGRAM_FLASH" location="0x0" size="0x10000"/&gt;&#13;
-&lt;memoryInstance derived_from="RAM" edited="true" id="SRAM" location="0x1ffffc00" size="0x1000"/&gt;&#13;
-&lt;peripheralInstance derived_from="FTMRH" id="FTMRH" location="0x40020000"/&gt;&#13;
-&lt;peripheralInstance derived_from="IRQ" id="IRQ" location="0x40031000"/&gt;&#13;
-&lt;peripheralInstance derived_from="CRC" id="CRC" location="0x40032000"/&gt;&#13;
-&lt;peripheralInstance derived_from="PIT" id="PIT" location="0x40037000"/&gt;&#13;
-&lt;peripheralInstance derived_from="FTM0" id="FTM0" location="0x40038000"/&gt;&#13;
-&lt;peripheralInstance derived_from="FTM1" id="FTM1" location="0x40039000"/&gt;&#13;
-&lt;peripheralInstance derived_from="FTM2" id="FTM2" location="0x4003A000"/&gt;&#13;
-&lt;peripheralInstance derived_from="ADC" id="ADC" location="0x4003B000"/&gt;&#13;
-&lt;peripheralInstance derived_from="RTC" id="RTC" location="0x4003D000"/&gt;&#13;
-&lt;peripheralInstance derived_from="SIM" id="SIM" location="0x40048000"/&gt;&#13;
-&lt;peripheralInstance derived_from="PORT" id="PORT" location="0x40049000"/&gt;&#13;
-&lt;peripheralInstance derived_from="WDOG" id="WDOG" location="0x40052000"/&gt;&#13;
-&lt;peripheralInstance derived_from="ICS" id="ICS" location="0x40064000"/&gt;&#13;
-&lt;peripheralInstance derived_from="OSC" id="OSC" location="0x40065000"/&gt;&#13;
-&lt;peripheralInstance derived_from="I2C0" id="I2C0" location="0x40066000"/&gt;&#13;
-&lt;peripheralInstance derived_from="UART0" id="UART0" location="0x4006A000"/&gt;&#13;
-&lt;peripheralInstance derived_from="UART1" id="UART1" location="0x4006B000"/&gt;&#13;
-&lt;peripheralInstance derived_from="UART2" id="UART2" location="0x4006C000"/&gt;&#13;
-&lt;peripheralInstance derived_from="ACMP0" id="ACMP0" location="0x40073000"/&gt;&#13;
-&lt;peripheralInstance derived_from="ACMP1" id="ACMP1" location="0x40074000"/&gt;&#13;
-&lt;peripheralInstance derived_from="SPI0" id="SPI0" location="0x40076000"/&gt;&#13;
-&lt;peripheralInstance derived_from="SPI1" id="SPI1" location="0x40077000"/&gt;&#13;
-&lt;peripheralInstance derived_from="KBI0" id="KBI0" location="0x40079000"/&gt;&#13;
-&lt;peripheralInstance derived_from="KBI1" id="KBI1" location="0x4007A000"/&gt;&#13;
-&lt;peripheralInstance derived_from="PMC" id="PMC" location="0x4007D000"/&gt;&#13;
-&lt;peripheralInstance derived_from="GPIOA" id="GPIOA" location="0x400FF000"/&gt;&#13;
-&lt;peripheralInstance derived_from="GPIOB" id="GPIOB" location="0x400FF040"/&gt;&#13;
-&lt;peripheralInstance derived_from="ROM" id="ROM" location="0xF0002000"/&gt;&#13;
-&lt;peripheralInstance derived_from="MCM" id="MCM" location="0xF0003000"/&gt;&#13;
-&lt;peripheralInstance derived_from="FGPIOA" id="FGPIOA" location="0xF8000000"/&gt;&#13;
-&lt;peripheralInstance derived_from="FGPIOB" id="FGPIOB" location="0xF8000040"/&gt;&#13;
+&lt;memory can_program="true" id="Flash" is_ro="true" size="128" type="Flash"/&gt;&#13;
+&lt;memory id="RAM" size="16" type="RAM"/&gt;&#13;
+&lt;memoryInstance derived_from="Flash" driver="FTFE_2K_KE.cfx" id="PROGRAM_FLASH" location="0x00000000" size="0x00020000"/&gt;&#13;
+&lt;memoryInstance derived_from="RAM" id="SRAM" location="0x1ffff000" size="0x00004000"/&gt;&#13;
+&lt;peripheralInstance derived_from="FTMRE" determined="infoFile" id="FTMRE" location="0x40020000"/&gt;&#13;
+&lt;peripheralInstance derived_from="IRQ" determined="infoFile" id="IRQ" location="0x40031000"/&gt;&#13;
+&lt;peripheralInstance derived_from="CRC" determined="infoFile" id="CRC" location="0x40032000"/&gt;&#13;
+&lt;peripheralInstance derived_from="PWT" determined="infoFile" id="PWT" location="0x40033000"/&gt;&#13;
+&lt;peripheralInstance derived_from="PIT" determined="infoFile" id="PIT" location="0x40037000"/&gt;&#13;
+&lt;peripheralInstance derived_from="FTM0" determined="infoFile" id="FTM0" location="0x40038000"/&gt;&#13;
+&lt;peripheralInstance derived_from="FTM1" determined="infoFile" id="FTM1" location="0x40039000"/&gt;&#13;
+&lt;peripheralInstance derived_from="FTM2" determined="infoFile" id="FTM2" location="0x4003A000"/&gt;&#13;
+&lt;peripheralInstance derived_from="ADC" determined="infoFile" id="ADC" location="0x4003B000"/&gt;&#13;
+&lt;peripheralInstance derived_from="RTC" determined="infoFile" id="RTC" location="0x4003D000"/&gt;&#13;
+&lt;peripheralInstance derived_from="SIM" determined="infoFile" id="SIM" location="0x40048000"/&gt;&#13;
+&lt;peripheralInstance derived_from="PORT" determined="infoFile" id="PORT" location="0x40049000"/&gt;&#13;
+&lt;peripheralInstance derived_from="WDOG" determined="infoFile" id="WDOG" location="0x40052000"/&gt;&#13;
+&lt;peripheralInstance derived_from="ICS" determined="infoFile" id="ICS" location="0x40064000"/&gt;&#13;
+&lt;peripheralInstance derived_from="OSC" determined="infoFile" id="OSC" location="0x40065000"/&gt;&#13;
+&lt;peripheralInstance derived_from="I2C0" determined="infoFile" id="I2C0" location="0x40066000"/&gt;&#13;
+&lt;peripheralInstance derived_from="I2C1" determined="infoFile" id="I2C1" location="0x40067000"/&gt;&#13;
+&lt;peripheralInstance derived_from="UART0" determined="infoFile" id="UART0" location="0x4006A000"/&gt;&#13;
+&lt;peripheralInstance derived_from="UART1" determined="infoFile" id="UART1" location="0x4006B000"/&gt;&#13;
+&lt;peripheralInstance derived_from="UART2" determined="infoFile" id="UART2" location="0x4006C000"/&gt;&#13;
+&lt;peripheralInstance derived_from="ACMP0" determined="infoFile" id="ACMP0" location="0x40073000"/&gt;&#13;
+&lt;peripheralInstance derived_from="ACMP1" determined="infoFile" id="ACMP1" location="0x40074000"/&gt;&#13;
+&lt;peripheralInstance derived_from="SPI0" determined="infoFile" id="SPI0" location="0x40076000"/&gt;&#13;
+&lt;peripheralInstance derived_from="SPI1" determined="infoFile" id="SPI1" location="0x40077000"/&gt;&#13;
+&lt;peripheralInstance derived_from="KBI0" determined="infoFile" id="KBI0" location="0x40079000"/&gt;&#13;
+&lt;peripheralInstance derived_from="KBI1" determined="infoFile" id="KBI1" location="0x4007A000"/&gt;&#13;
+&lt;peripheralInstance derived_from="PMC" determined="infoFile" id="PMC" location="0x4007D000"/&gt;&#13;
+&lt;peripheralInstance derived_from="GPIOA" determined="infoFile" id="GPIOA" location="0x400FF000"/&gt;&#13;
+&lt;peripheralInstance derived_from="GPIOB" determined="infoFile" id="GPIOB" location="0x400FF040"/&gt;&#13;
+&lt;peripheralInstance derived_from="GPIOC" determined="infoFile" id="GPIOC" location="0x400FF080"/&gt;&#13;
+&lt;peripheralInstance derived_from="ROM" determined="infoFile" id="ROM" location="0xF0002000"/&gt;&#13;
+&lt;peripheralInstance derived_from="MCM" determined="infoFile" id="MCM" location="0xF0003000"/&gt;&#13;
+&lt;peripheralInstance derived_from="FGPIOA" determined="infoFile" id="FGPIOA" location="0xF8000000"/&gt;&#13;
+&lt;peripheralInstance derived_from="FGPIOB" determined="infoFile" id="FGPIOB" location="0xF8000040"/&gt;&#13;
+&lt;peripheralInstance derived_from="FGPIOC" determined="infoFile" id="FGPIOC" location="0xF8000080"/&gt;&#13;
 &lt;/chip&gt;&#13;
-&lt;processor&gt;&lt;name gcc_name="cortex-m0plus"&gt;Cortex-M0+&lt;/name&gt;&#13;
+&lt;processor&gt;&#13;
+&lt;name gcc_name="cortex-m0plus"&gt;Cortex-M0+&lt;/name&gt;&#13;
 &lt;family&gt;Cortex-M&lt;/family&gt;&#13;
 &lt;/processor&gt;&#13;
-&lt;link href="MKE02Z4_internal_peripheral.xml" show="embed" type="simple"/&gt;&#13;
+&lt;link href="MKE04Z1284_internal_peripheral.xml" show="embed" type="simple"/&gt;&#13;
 &lt;/info&gt;&#13;
 &lt;/infoList&gt;&#13;
 &lt;/TargetConfig&gt;</projectStorage>
 	</storageModule>
-	<storageModule moduleId="com.nxp.mcuxpresso.core.datamodels">
-		<sdkName>SDK_2.x_MKE02Z64xxx4</sdkName>
-		<sdkVersion>2.3.0</sdkVersion>
-		<sdkComponents>middleware.baremetal.MKE02Z4;platform.drivers.clock.MKE02Z4;platform.Include_common.MKE02Z4;platform.Include_core_cm0plus.MKE02Z4;platform.devices.MKE02Z4_CMSIS.MKE02Z4;platform.drivers.common.MKE02Z4;platform.drivers.gpio_1.MKE02Z4;platform.drivers.i2c.MKE02Z4;platform.drivers.irq.MKE02Z4;platform.drivers.spi.MKE02Z4;platform.drivers.uart.MKE02Z4;platform.devices.MKE02Z4_startup.MKE02Z4;platform.drivers.pit.MKE02Z4;platform.drivers.port_ke02.MKE02Z4;platform.drivers.kbi.MKE02Z4;</sdkComponents>
-		<package>MKE02Z64VLD4</package>
-		<core>cm0plus</core>
-	</storageModule>
 	<storageModule moduleId="refreshScope"/>
 	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
 	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
+	<storageModule moduleId="com.nxp.mcuxpresso.core.datamodels">
+		<sdkName>SDK_2.x_MKE04Z128xxx4</sdkName>
+		<sdkVersion>2.5.0</sdkVersion>
+	</storageModule>
 </cproject>
